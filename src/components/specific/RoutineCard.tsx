@@ -1,0 +1,151 @@
+import { Calendar, Dumbbell, Edit } from "lucide-react-native";
+import React from "react";
+import {
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { COLORS } from "../../theme/theme";
+
+interface RoutineCardProps {
+    name: string;
+    days: number;
+    volume: number;
+    variant?: "user" | "community";
+    recommended?: boolean;
+    rating?: number;
+    onPress: () => void;
+    onEdit?: () => void;
+}
+
+export const RoutineCard: React.FC<RoutineCardProps> = ({
+    name,
+    days,
+    volume,
+    variant = "user",
+    recommended = false,
+    rating,
+    onPress,
+    onEdit,
+}) => {
+    const isUser = variant === "user";
+
+    return (
+        <View style={styles.card}>
+            <View style={styles.cardHeader}>
+                <Text style={styles.name}>{name}</Text>
+                {isUser && onEdit && (
+                    <TouchableOpacity onPress={onEdit} style={styles.editButton}>
+                        <Edit size={18} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
+                )}
+                {isUser && recommended && !onEdit && (
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>Creado para ti</Text>
+                    </View>
+                )}
+                {!isUser && (
+                    <View style={styles.badgeCommunity}>
+                        <Text style={styles.badgeText}>Recomendada</Text>
+                    </View>
+                )}
+            </View>
+
+            <View style={styles.stats}>
+                <View style={styles.statItem}>
+                    <Calendar color={COLORS.textSecondary} size={16} />
+                    <Text style={styles.statText}>{days} días</Text>
+                </View>
+                <View style={styles.statItem}>
+                    <Dumbbell color={COLORS.textSecondary} size={16} />
+                    <Text style={styles.statText}>{volume} vol.</Text>
+                </View>
+                {!isUser && rating && (
+                    <View style={styles.statItem}>
+                        <Text style={styles.ratingText}>⭐ {rating.toFixed(1)}</Text>
+                    </View>
+                )}
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={onPress}>
+                <Text style={styles.buttonText}>
+                    {isUser ? "Entrenar" : "Empezar"}
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    card: {
+        backgroundColor: COLORS.card,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 16,
+        marginBottom: 12,
+    },
+    cardHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    name: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: COLORS.textPrimary,
+        flex: 1,
+    },
+    editButton: {
+        padding: 4,
+    },
+    badge: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    badgeCommunity: {
+        backgroundColor: COLORS.accent,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    badgeText: {
+        fontSize: 10,
+        fontWeight: "600",
+        color: COLORS.textInverse,
+    },
+    stats: {
+        flexDirection: "row",
+        gap: 16,
+        marginBottom: 12,
+    },
+    statItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    statText: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+    },
+    ratingText: {
+        fontSize: 13,
+        color: COLORS.textPrimary,
+        fontWeight: "600",
+    },
+    button: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 12,
+        paddingVertical: 10,
+        alignItems: "center",
+    },
+    buttonText: {
+        color: COLORS.textInverse,
+        fontSize: 14,
+        fontWeight: "600",
+    },
+});

@@ -1,0 +1,46 @@
+# expo / react native ignores
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+web-build/
+android/
+ios/
+yarn-error.log
+npm-debug.log
+npm-debug.log.*
+expo-error.log
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig
+*.swp
+.DS_Store
+
+# environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# IDE files
+.vscode/
+.idea/
+
+# metro & cache
+.cache/
+metro-cache/
+
+# logs
+*.log
+logs/
+
+# keystore & credentials
+*.keystore
+*.pem
+
+# system files
+Thumbs.db
