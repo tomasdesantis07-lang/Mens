@@ -36,7 +36,7 @@ const HomeScreen: React.FC = () => {
   const [communityRoutines, setCommunityRoutines] = useState<Routine[]>([]);
   const [selectedRoutineForTraining, setSelectedRoutineForTraining] = useState<Routine | null>(null);
 
-  const { startWorkout, activeWorkout } = useWorkout();
+  const { startWorkout } = useWorkout();
 
   useEffect(() => {
     const loadData = async () => {
@@ -93,19 +93,13 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleResumeWorkout = () => {
-    if (activeWorkout) {
-      router.push(`../routines/${activeWorkout.routine.id}/train` as any);
-    }
-  };
-
   return (
     <>
       <ScrollView
         style={styles.container}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 20 },
+          { paddingTop: insets.top + 20, paddingBottom: 100 },
         ]}
       >
         <Text style={styles.greeting}>Hola, {displayName}</Text>
@@ -181,18 +175,6 @@ const HomeScreen: React.FC = () => {
         onClose={() => setSelectedRoutineForTraining(null)}
         onSelectDay={handleSelectDay}
       />
-
-      {activeWorkout && (
-        <TouchableOpacity style={styles.resumeBar} onPress={handleResumeWorkout}>
-          <View>
-            <Text style={styles.resumeTitle}>Rutina en curso</Text>
-            <Text style={styles.resumeSubtitle}>
-              {activeWorkout.routine.name} - Día {activeWorkout.dayIndex + 1}
-            </Text>
-          </View>
-          <Text style={styles.resumeAction}>Continuar</Text>
-        </TouchableOpacity>
-      )}
     </>
   );
 };
@@ -258,37 +240,6 @@ const styles = StyleSheet.create({
   viewMoreText: {
     fontSize: 14,
     color: COLORS.primary,
-    fontWeight: "600",
-  },
-  resumeBar: {
-    position: "absolute",
-    bottom: 20,
-    left: 24,
-    right: 24,
-    backgroundColor: COLORS.primary,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  resumeTitle: {
-    color: COLORS.textInverse,
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  resumeSubtitle: {
-    color: COLORS.textInverse,
-    opacity: 0.8,
-    fontSize: 12,
-  },
-  resumeAction: {
-    color: COLORS.textInverse,
     fontWeight: "600",
   },
 });

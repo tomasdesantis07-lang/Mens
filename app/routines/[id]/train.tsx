@@ -1,3 +1,4 @@
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Edit, Info, Plus } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -12,7 +13,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
-import { RestTimer } from "../../../src/components/specific/RestTimer";
 import { useWorkout } from "../../../src/context/WorkoutContext";
 import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
@@ -45,29 +45,12 @@ const TrainScreen: React.FC = () => {
         removeSet,
         finishWorkout,
         cancelWorkout,
-        elapsedSeconds
+        elapsedSeconds,
+        startRestTimer
     } = useWorkout();
 
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
-    const [timerConfig, setTimerConfig] = useState<{ duration: number; key: number } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-
-    // Sync timer with completed sets from context
-    useEffect(() => {
-        if (activeWorkout?.completedSets.size) {
-            // This is a simplification. Ideally, we'd track the *last* completed set timestamp in context
-            // to start the timer. For now, we rely on the user interaction or context updates.
-            // Since we don't have the "last completed set time" in context yet, 
-            // we might need to adjust this if we want the timer to persist correctly across navigations
-            // for the *rest* period. 
-            // However, the requirement is "start rest timer automatically".
-            // If we navigate away and back, the local timerConfig is lost. 
-            // We can leave it as local state for now as a "view" concern, 
-            // or move it to context if we want the rest timer to persist globally too.
-            // For this iteration, let's keep the rest timer local to the screen, 
-            // but the workout timer global.
-        }
-    }, [activeWorkout?.completedSets]);
 
     useEffect(() => {
         const loadRoutineAndHistory = async () => {
@@ -108,12 +91,15 @@ const TrainScreen: React.FC = () => {
 
 
     const handleToggleSet = (exerciseId: string, setIndex: number, restSeconds: number) => {
+        const key = `${exerciseId}-${setIndex}`;
+        const wasCompleted = activeWorkout?.completedSets.has(key);
+
         toggleSetComplete(exerciseId, setIndex);
 
-        // If we are marking as complete (not unchecking), start the timer
-        const key = `${exerciseId}-${setIndex}`;
-        if (!activeWorkout?.completedSets.has(key)) {
-            setTimerConfig({ duration: restSeconds, key: Date.now() });
+        // If we are marking as complete (not unchecking), trigger haptics and start rest timer
+        if (!wasCompleted) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            startRestTimer(restSeconds);
         }
     };
 
@@ -257,14 +243,6 @@ const TrainScreen: React.FC = () => {
             )}
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-                {/* Timer Section */}
-                {timerConfig && (
-                    <RestTimer
-                        key={timerConfig.key}
-                        defaultSeconds={timerConfig.duration}
-                    />
-                )}
-
                 {currentDay?.exercises.map((exercise) => (
                     <View key={exercise.id} style={styles.exerciseCard}>
                         <View style={styles.exerciseHeader}>
@@ -524,8 +502,9 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     historyText: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
+        fontSize: 11,
+        color: COLORS.textTertiary,
+        fontVariant: ["tabular-nums"],
     },
     inputCompleted: {
         backgroundColor: COLORS.surface,
@@ -544,6 +523,11 @@ const styles = StyleSheet.create({
     checkButtonActive: {
         backgroundColor: COLORS.success,
         borderColor: COLORS.success,
+        shadowColor: COLORS.success,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 4,
     },
     setNumberContainer: {
         width: 40,
@@ -556,13 +540,18 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        backgroundColor: COLORS.background,
-        borderRadius: 8,
-        padding: 10,
+        backgroundColor: "transparent",
+        borderRadius: 0,
+        paddingVertical: 8,
+        paddingHorizontal: 8,
         color: COLORS.textPrimary,
         textAlign: "center",
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        borderWidth: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+        fontSize: 16,
+        fontWeight: "600",
+        fontVariant: ["tabular-nums"],
     },
     removeSetButton: {
         width: 40,
