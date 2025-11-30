@@ -1,10 +1,4 @@
-import {
-  createMaterialTopTabNavigator,
-  MaterialTopTabNavigationEventMap,
-  MaterialTopTabNavigationOptions,
-} from "@react-navigation/material-top-tabs";
-import { ParamListBase, TabNavigationState } from "@react-navigation/native";
-import { withLayoutContext } from "expo-router";
+import { Tabs } from "expo-router";
 import {
   BarChart3,
   Crown,
@@ -13,42 +7,25 @@ import {
   Users,
 } from "lucide-react-native";
 import React from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../../src/theme/theme";
 
-const { Navigator } = createMaterialTopTabNavigator();
-
-const MaterialTopTabs = withLayoutContext<
-  MaterialTopTabNavigationOptions,
-  typeof Navigator,
-  TabNavigationState<ParamListBase>,
-  MaterialTopTabNavigationEventMap
->(Navigator);
-
 export default function TabsLayout() {
-  const insets = useSafeAreaInsets();
-
   return (
-    <MaterialTopTabs
+    <Tabs
       initialRouteName="home"
       screenOptions={{
-        tabBarActiveTintColor: COLORS.textPrimary,
+        headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarStyle: {
           backgroundColor: COLORS.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: COLORS.border,
-          paddingTop: insets.top,
+          borderTopColor: COLORS.border,
+          borderTopWidth: 1,
         },
         tabBarShowLabel: false,
-        tabBarIndicatorStyle: {
-          backgroundColor: COLORS.primary,
-          height: 3,
-        },
-        tabBarShowIcon: true,
       }}
     >
-      <MaterialTopTabs.Screen
+      <Tabs.Screen
         name="stats"
         options={{
           title: "Estadísticas",
@@ -58,7 +35,7 @@ export default function TabsLayout() {
         }}
       />
 
-      <MaterialTopTabs.Screen
+      <Tabs.Screen
         name="communities"
         options={{
           title: "Comunidad",
@@ -68,7 +45,7 @@ export default function TabsLayout() {
         }}
       />
 
-      <MaterialTopTabs.Screen
+      <Tabs.Screen
         name="home"
         options={{
           title: "Inicio",
@@ -78,7 +55,7 @@ export default function TabsLayout() {
         }}
       />
 
-      <MaterialTopTabs.Screen
+      <Tabs.Screen
         name="premium"
         options={{
           title: "Premium",
@@ -88,7 +65,7 @@ export default function TabsLayout() {
         }}
       />
 
-      <MaterialTopTabs.Screen
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Perfil",
@@ -97,6 +74,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-    </MaterialTopTabs>
+    </Tabs>
   );
 }

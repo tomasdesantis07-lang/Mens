@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import React from 'react';
 import { StatusBar } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { ActiveWorkoutOverlay } from '../src/components/workout/ActiveWorkoutOverlay';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
 import { COLORS } from '../src/theme/theme';
 
@@ -23,6 +24,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="routines" />
             </Stack>
+            <ActiveWorkoutOverlay />
             <Toast />
         </WorkoutProvider>
     );

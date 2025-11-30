@@ -20,6 +20,10 @@ interface WorkoutContextType {
     addSet: (exerciseId: string) => void;
     removeSet: (exerciseId: string, setIndex: number) => void;
     elapsedSeconds: number;
+    restTimerDuration: number;
+    isResting: boolean;
+    startRestTimer: (seconds: number) => void;
+    stopRestTimer: () => void;
 }
 
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
@@ -27,6 +31,8 @@ const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [restTimerDuration, setRestTimerDuration] = useState(0);
+    const [isResting, setIsResting] = useState(false);
 
     // Global timer effect
     useEffect(() => {
@@ -43,6 +49,23 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         return () => clearInterval(interval);
     }, [activeWorkout]);
+
+    // Rest timer effect
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (isResting && restTimerDuration > 0) {
+            interval = setInterval(() => {
+                setRestTimerDuration((prev) => {
+                    if (prev <= 1) {
+                        setIsResting(false);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isResting, restTimerDuration]);
 
     const startWorkout = (routine: Routine, dayIndex: number) => {
         // Initialize logs based on the routine day
@@ -145,6 +168,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     };
 
+    const startRestTimer = (seconds: number) => {
+        setRestTimerDuration(seconds);
+        setIsResting(true);
+    };
+
+    const stopRestTimer = () => {
+        setIsResting(false);
+        setRestTimerDuration(0);
+    };
+
     return (
         <WorkoutContext.Provider value={{
             activeWorkout,
@@ -155,7 +188,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             toggleSetComplete,
             addSet,
             removeSet,
-            elapsedSeconds
+            elapsedSeconds,
+            restTimerDuration,
+            isResting,
+            startRestTimer,
+            stopRestTimer
         }}>
             {children}
         </WorkoutContext.Provider>
