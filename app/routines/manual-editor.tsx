@@ -12,6 +12,7 @@ import { CustomInput } from "../../src/components/common/CustomInput";
 import { PrimaryButton } from "../../src/components/common/PrimaryButton";
 import { DayEditorSheet } from "../../src/components/specific/DayEditorSheet";
 import { RoutineDayCard } from "../../src/components/specific/RoutineDayCard";
+import { useWorkout } from "../../src/context/WorkoutContext";
 import { auth } from "../../src/services/firebaseConfig";
 import { RoutineService } from "../../src/services/routineService";
 import { COLORS } from "../../src/theme/theme";
@@ -21,6 +22,7 @@ import { showToast } from "../../src/utils/toast";
 const ManualEditorScreen: React.FC = () => {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { activeWorkout } = useWorkout();
     const [draft, setDraft] = useState<RoutineDraft>(createEmptyDraft());
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
     const [isEditorVisible, setIsEditorVisible] = useState(false);
@@ -134,7 +136,7 @@ const ManualEditorScreen: React.FC = () => {
             </ScrollView>
 
             {/* Bottom Action */}
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 + (activeWorkout ? 60 : 0) }]}>
                 <PrimaryButton
                     title="Crear rutina"
                     onPress={handleCreateRoutine}

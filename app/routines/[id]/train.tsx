@@ -215,32 +215,7 @@ const TrainScreen: React.FC = () => {
                 </View>
             </View>
 
-            {/* Day Selector (if multiple days) */}
-            {routine.days.length > 1 && (
-                <View style={styles.daySelector}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {routine.days.map((day) => (
-                            <TouchableOpacity
-                                key={day.dayIndex}
-                                style={[
-                                    styles.dayChip,
-                                    selectedDayIndex === day.dayIndex && styles.dayChipSelected,
-                                ]}
-                                onPress={() => setSelectedDayIndex(day.dayIndex)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.dayChipText,
-                                        selectedDayIndex === day.dayIndex && styles.dayChipTextSelected,
-                                    ]}
-                                >
-                                    {day.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-            )}
+
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
                 {currentDay?.exercises.map((exercise) => (
@@ -406,30 +381,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         fontSize: 14,
     },
-    daySelector: {
-        marginBottom: 16,
-        paddingHorizontal: 24,
-    },
-    dayChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: COLORS.surface,
-        marginRight: 8,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    dayChipSelected: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
-    },
-    dayChipText: {
-        color: COLORS.textSecondary,
-        fontWeight: "600",
-    },
-    dayChipTextSelected: {
-        color: COLORS.textInverse,
-    },
+
     content: {
         flex: 1,
         paddingHorizontal: 24,

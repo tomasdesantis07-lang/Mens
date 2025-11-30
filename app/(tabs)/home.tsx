@@ -89,7 +89,8 @@ const HomeScreen: React.FC = () => {
     if (selectedRoutineForTraining) {
       startWorkout(selectedRoutineForTraining, dayIndex);
       setSelectedRoutineForTraining(null);
-      router.push(`../routines/${selectedRoutineForTraining.id}/train` as any);
+      // Pass dayIndex as query param to ensure TrainScreen opens the correct day
+      router.push(`../routines/${selectedRoutineForTraining.id}/train?dayIndex=${dayIndex}` as any);
     }
   };
 
@@ -99,7 +100,7 @@ const HomeScreen: React.FC = () => {
         style={styles.container}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 20, paddingBottom: 100 },
+          { paddingTop: insets.top + 20, paddingBottom: 150 },
         ]}
       >
         <Text style={styles.greeting}>Hola, {displayName}</Text>

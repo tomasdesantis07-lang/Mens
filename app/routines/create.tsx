@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { Edit3, Sparkles } from "lucide-react-native";
 import React from "react";
 import {
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -15,7 +16,10 @@ const CreateRoutineScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 120 }}
+        >
             <Text style={styles.title}>Crear Rutina</Text>
             <Text style={styles.subtitle}>
                 Elegí cómo querés crear tu rutina de entrenamiento
@@ -64,7 +68,7 @@ const CreateRoutineScreen: React.FC = () => {
             >
                 <Text style={styles.backButtonText}>Cancelar</Text>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     );
 };
 

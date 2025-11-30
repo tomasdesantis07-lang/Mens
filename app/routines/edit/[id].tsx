@@ -13,6 +13,7 @@ import { CustomInput } from "../../../src/components/common/CustomInput";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { DayEditorSheet } from "../../../src/components/specific/DayEditorSheet";
 import { RoutineDayCard } from "../../../src/components/specific/RoutineDayCard";
+import { useWorkout } from "../../../src/context/WorkoutContext";
 import { RoutineService } from "../../../src/services/routineService";
 import { COLORS } from "../../../src/theme/theme";
 import { RoutineDay, RoutineDraft } from "../../../src/types/routine";
@@ -22,6 +23,7 @@ const EditRoutineScreen: React.FC = () => {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
+    const { activeWorkout } = useWorkout();
 
     const [loading, setLoading] = useState(true);
     const [draft, setDraft] = useState<RoutineDraft | null>(null);
@@ -201,7 +203,7 @@ const EditRoutineScreen: React.FC = () => {
             </ScrollView>
 
             {/* Bottom Action */}
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 + (activeWorkout ? 60 : 0) }]}>
                 <PrimaryButton
                     title="Guardar cambios"
                     onPress={handleSaveRoutine}
