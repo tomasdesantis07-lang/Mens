@@ -12,6 +12,7 @@ import {
     View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { useWorkout } from "../../../src/context/WorkoutContext";
 import { auth } from "../../../src/services/firebaseConfig";
@@ -22,7 +23,10 @@ import { Routine } from "../../../src/types/routine";
 import { WorkoutExerciseLog, WorkoutSession } from "../../../src/types/workout";
 import { showToast } from "../../../src/utils/toast";
 
+import { useTranslation } from "react-i18next";
+
 const TrainScreen: React.FC = () => {
+    const { t } = useTranslation();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { id, dayIndex } = useLocalSearchParams<{ id: string; dayIndex?: string }>();
@@ -51,6 +55,7 @@ const TrainScreen: React.FC = () => {
 
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
 
     useEffect(() => {
         const loadRoutineAndHistory = async () => {
@@ -151,7 +156,11 @@ const TrainScreen: React.FC = () => {
     };
 
     const handleCancelWorkout = () => {
-        // In a real app, show confirmation alert
+        setShowCancelDialog(true);
+    };
+
+    const confirmCancelWorkout = () => {
+        setShowCancelDialog(false);
         cancelWorkout();
         router.back();
     };
@@ -166,7 +175,7 @@ const TrainScreen: React.FC = () => {
 
     const navigateToEdit = () => {
         if (routine) {
-            router.push(`../../routines/edit/${routine.id}` as any);
+            router.push(`/routines/edit/${routine.id}` as any);
         }
     };
 
@@ -197,20 +206,20 @@ const TrainScreen: React.FC = () => {
             <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Text style={styles.backButtonText}>↓ Minimizar</Text>
+                        <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
                     </TouchableOpacity>
                     <View style={styles.timerContainer}>
                         <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>
                     </View>
                     <TouchableOpacity onPress={navigateToEdit} style={styles.editButton}>
                         <Edit size={16} color={COLORS.primary} />
-                        <Text style={styles.editButtonText}>Editar</Text>
+                        <Text style={styles.editButtonText}>{t('train.edit')}</Text>
                     </TouchableOpacity>
                 </View>
                 <View style={styles.headerTitle}>
                     <Text style={styles.routineName}>{routine.name}</Text>
                     <Text style={styles.dayLabel}>
-                        {currentDay ? currentDay.label : `Día ${selectedDayIndex + 1}`}
+                        {currentDay ? currentDay.label : t('train.day_label', { number: selectedDayIndex + 1 })}
                     </Text>
                 </View>
             </View>
@@ -233,7 +242,7 @@ const TrainScreen: React.FC = () => {
                                 )}
                             </View>
                             <Text style={styles.exerciseTarget}>
-                                Meta: {exercise.sets} series x {exercise.reps} reps • Descanso: {exercise.restSeconds}s
+                                {t('train.target', { sets: exercise.sets, reps: exercise.reps, rest: exercise.restSeconds })}
                             </Text>
                             {exercise.notes && (
                                 <Text style={styles.exerciseNotes} numberOfLines={2}>
@@ -243,10 +252,10 @@ const TrainScreen: React.FC = () => {
                         </View>
 
                         <View style={styles.setsHeader}>
-                            <Text style={[styles.colHeader, { width: 40 }]}>Set</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>Previo</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>Kg</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>Reps</Text>
+                            <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
+                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
+                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
+                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
                             <View style={{ width: 40 }} />
                         </View>
 
@@ -309,7 +318,7 @@ const TrainScreen: React.FC = () => {
                             onPress={() => addSet(exercise.id)}
                         >
                             <Plus size={16} color={COLORS.primary} />
-                            <Text style={styles.addSetText}>Agregar serie</Text>
+                            <Text style={styles.addSetText}>{t('train.add_set')}</Text>
                         </TouchableOpacity>
                     </View>
                 ))}
@@ -317,14 +326,26 @@ const TrainScreen: React.FC = () => {
 
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
                 <PrimaryButton
-                    title="Finalizar sesión"
+                    title={t('train.finish_session')}
                     onPress={handleFinishWorkout}
                     loading={isSaving}
                 />
                 <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
-                    <Text style={styles.cancelWorkoutText}>Cancelar entrenamiento</Text>
+                    <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Cancel Workout Confirmation Dialog */}
+            <ConfirmDialog
+                visible={showCancelDialog}
+                title={t('train.cancel_dialog.title')}
+                message={t('train.cancel_dialog.message')}
+                confirmText={t('train.cancel_dialog.confirm')}
+                cancelText={t('train.cancel_dialog.cancel')}
+                onConfirm={confirmCancelWorkout}
+                onCancel={() => setShowCancelDialog(false)}
+                variant="danger"
+            />
         </View>
     );
 };

@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     ActivityIndicator,
     ScrollView,
@@ -9,6 +10,7 @@ import {
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { CustomInput } from "../../../src/components/common/CustomInput";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { DayEditorSheet } from "../../../src/components/specific/DayEditorSheet";
@@ -22,6 +24,7 @@ import { showToast } from "../../../src/utils/toast";
 const EditRoutineScreen: React.FC = () => {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const { id } = useLocalSearchParams<{ id: string }>();
     const { activeWorkout } = useWorkout();
 
@@ -30,6 +33,7 @@ const EditRoutineScreen: React.FC = () => {
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
     const [isEditorVisible, setIsEditorVisible] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     useEffect(() => {
         const loadRoutine = async () => {
@@ -38,14 +42,12 @@ const EditRoutineScreen: React.FC = () => {
             try {
                 const routine = await RoutineService.getRoutineById(id);
                 if (routine) {
-                    // Convert routine to draft format
-                    // Fill in missing days (0-6) if they don't exist
                     const existingDays = routine.days;
                     const allDays: RoutineDay[] = Array.from({ length: 7 }, (_, i) => {
                         const existingDay = existingDays.find(d => d.dayIndex === i);
                         return existingDay || {
                             dayIndex: i,
-                            label: `Día ${i + 1}`,
+                            label: t('train.day_label', { number: i + 1 }),
                             exercises: [],
                         };
                     });
@@ -63,7 +65,7 @@ const EditRoutineScreen: React.FC = () => {
         };
 
         loadRoutine();
-    }, [id]);
+    }, [id, t]);
 
     const handleRoutineNameChange = (name: string) => {
         if (draft) {
@@ -98,31 +100,32 @@ const EditRoutineScreen: React.FC = () => {
         setIsSaving(true);
         try {
             await RoutineService.updateRoutine(id, draft);
-            showToast.success("Rutina actualizada exitosamente", "¡Listo!");
+            showToast.success(t('routines.success_update'), t('common.success'));
             router.back();
         } catch (error) {
             console.error("Error updating routine:", error);
-            showToast.error("No se pudo actualizar la rutina. Por favor intentá de nuevo.");
+            showToast.error(t('routines.error_update'));
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDeleteRoutine = async () => {
+    const handleDeleteRoutine = () => {
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDeleteRoutine = async () => {
         if (!id) return;
 
-        // In a real app, we would show a confirmation dialog here
-        // For now, we'll just proceed (or rely on the user being careful)
-        // Ideally: Alert.alert("Eliminar rutina", "¿Estás seguro?", ...)
-
+        setShowDeleteDialog(false);
         setIsSaving(true);
         try {
             await RoutineService.deleteRoutine(id);
-            showToast.success("Rutina eliminada");
+            showToast.success(t('routines.success_delete'));
             router.replace("/(tabs)/home");
         } catch (error) {
             console.error("Error deleting routine:", error);
-            showToast.error("Error al eliminar la rutina");
+            showToast.error(t('routines.error_delete'));
             setIsSaving(false);
         }
     };
@@ -138,7 +141,7 @@ const EditRoutineScreen: React.FC = () => {
     if (!draft) {
         return (
             <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-                <Text style={styles.errorText}>No se pudo cargar la rutina</Text>
+                <Text style={styles.errorText}>{t('routines.error_load')}</Text>
             </View>
         );
     }
@@ -151,9 +154,9 @@ const EditRoutineScreen: React.FC = () => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.backButton}>← Atrás</Text>
+                    <Text style={styles.backButton}>← {t('common.back')}</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Editar Rutina</Text>
+                <Text style={styles.title}>{t('routines.edit_title')}</Text>
             </View>
 
             <ScrollView
@@ -163,9 +166,9 @@ const EditRoutineScreen: React.FC = () => {
             >
                 {/* Routine Name Input */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Nombre de la rutina</Text>
+                    <Text style={styles.sectionLabel}>{t('routines.name_label')}</Text>
                     <CustomInput
-                        placeholder="Ej: PPL Semana 1, Hypertrophy, etc."
+                        placeholder={t('routines.name_placeholder')}
                         value={draft.name}
                         onChangeText={handleRoutineNameChange}
                         style={styles.nameInput}
@@ -174,9 +177,9 @@ const EditRoutineScreen: React.FC = () => {
 
                 {/* Days Grid */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Días de entrenamiento</Text>
+                    <Text style={styles.sectionLabel}>{t('routines.days_label')}</Text>
                     <Text style={styles.sectionHint}>
-                        Tocá cada día para editar ejercicios
+                        {t('routines.days_hint_edit')}
                     </Text>
 
                     <View style={styles.daysGrid}>
@@ -196,7 +199,7 @@ const EditRoutineScreen: React.FC = () => {
                 {!hasExercises && (
                     <View style={styles.infoCard}>
                         <Text style={styles.infoText}>
-                            💡 Agregá ejercicios a al menos un día para guardar la rutina
+                            {t('routines.info_save_exercises')}
                         </Text>
                     </View>
                 )}
@@ -205,7 +208,7 @@ const EditRoutineScreen: React.FC = () => {
             {/* Bottom Action */}
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 + (activeWorkout ? 60 : 0) }]}>
                 <PrimaryButton
-                    title="Guardar cambios"
+                    title={t('routines.save_changes')}
                     onPress={handleSaveRoutine}
                     disabled={!canSave}
                     loading={isSaving}
@@ -217,7 +220,7 @@ const EditRoutineScreen: React.FC = () => {
                     onPress={handleDeleteRoutine}
                     disabled={isSaving}
                 >
-                    <Text style={styles.deleteButtonText}>Eliminar rutina</Text>
+                    <Text style={styles.deleteButtonText}>{t('routines.delete_routine')}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -230,6 +233,18 @@ const EditRoutineScreen: React.FC = () => {
                     onClose={handleCloseEditor}
                 />
             )}
+
+            {/* Delete Routine Confirmation Dialog */}
+            <ConfirmDialog
+                visible={showDeleteDialog}
+                title={t('routines.delete_confirm_title')}
+                message={t('routines.delete_confirm_message')}
+                confirmText={t('routines.delete_confirm_action')}
+                cancelText={t('common.cancel')}
+                onConfirm={confirmDeleteRoutine}
+                onCancel={() => setShowDeleteDialog(false)}
+                variant="danger"
+            />
         </View>
     );
 };

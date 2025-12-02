@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     ScrollView,
     StyleSheet,
@@ -22,6 +23,7 @@ import { showToast } from "../../src/utils/toast";
 const ManualEditorScreen: React.FC = () => {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const { activeWorkout } = useWorkout();
     const [draft, setDraft] = useState<RoutineDraft>(createEmptyDraft());
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
@@ -57,25 +59,23 @@ const ManualEditorScreen: React.FC = () => {
         const user = auth.currentUser;
         if (!user) {
             console.error("No user logged in");
-            showToast.error("No hay usuario autenticado");
+            showToast.error(t('routines.error_no_user'));
             return;
         }
 
         setIsSaving(true);
         try {
             await RoutineService.createRoutine(user.uid, draft);
-            showToast.success("Rutina creada exitosamente", "¡Listo!");
-            // Navigate back to home and refresh
+            showToast.success(t('routines.success_create'), t('common.success'));
             router.replace("/(tabs)/home");
         } catch (error) {
             console.error("Error creating routine:", error);
-            showToast.error("No se pudo crear la rutina. Por favor intentá de nuevo.");
+            showToast.error(t('routines.error_create'));
         } finally {
             setIsSaving(false);
         }
     };
 
-    // Basic validation: name not empty and at least one day with exercises
     const hasExercises = draft.days.some((day) => day.exercises.length > 0);
     const canCreate = draft.name.trim().length > 0 && hasExercises;
 
@@ -84,9 +84,9 @@ const ManualEditorScreen: React.FC = () => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.backButton}>← Atrás</Text>
+                    <Text style={styles.backButton}>← {t('common.back')}</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Nueva Rutina</Text>
+                <Text style={styles.title}>{t('routines.manual_title')}</Text>
             </View>
 
             <ScrollView
@@ -96,9 +96,9 @@ const ManualEditorScreen: React.FC = () => {
             >
                 {/* Routine Name Input */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Nombre de la rutina</Text>
+                    <Text style={styles.sectionLabel}>{t('routines.name_label')}</Text>
                     <CustomInput
-                        placeholder="Ej: PPL Semana 1, Hypertrophy, etc."
+                        placeholder={t('routines.name_placeholder')}
                         value={draft.name}
                         onChangeText={handleRoutineNameChange}
                         style={styles.nameInput}
@@ -107,9 +107,9 @@ const ManualEditorScreen: React.FC = () => {
 
                 {/* Days Grid */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Días de entrenamiento</Text>
+                    <Text style={styles.sectionLabel}>{t('routines.days_label')}</Text>
                     <Text style={styles.sectionHint}>
-                        Tocá cada día para agregar ejercicios
+                        {t('routines.days_hint_add')}
                     </Text>
 
                     <View style={styles.daysGrid}>
@@ -129,7 +129,7 @@ const ManualEditorScreen: React.FC = () => {
                 {!hasExercises && (
                     <View style={styles.infoCard}>
                         <Text style={styles.infoText}>
-                            💡 Agregá ejercicios a al menos un día para crear la rutina
+                            {t('routines.info_add_exercises')}
                         </Text>
                     </View>
                 )}
@@ -138,7 +138,7 @@ const ManualEditorScreen: React.FC = () => {
             {/* Bottom Action */}
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 + (activeWorkout ? 60 : 0) }]}>
                 <PrimaryButton
-                    title="Crear rutina"
+                    title={t('routines.create_action')}
                     onPress={handleCreateRoutine}
                     disabled={!canCreate}
                     loading={isSaving}

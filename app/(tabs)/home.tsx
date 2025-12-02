@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   ScrollView,
@@ -30,6 +31,7 @@ type UserData = {
 const HomeScreen: React.FC = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRoutines, setUserRoutines] = useState<Routine[]>([]);
@@ -89,7 +91,6 @@ const HomeScreen: React.FC = () => {
     if (selectedRoutineForTraining) {
       startWorkout(selectedRoutineForTraining, dayIndex);
       setSelectedRoutineForTraining(null);
-      // Pass dayIndex as query param to ensure TrainScreen opens the correct day
       router.push(`../routines/${selectedRoutineForTraining.id}/train?dayIndex=${dayIndex}` as any);
     }
   };
@@ -103,14 +104,14 @@ const HomeScreen: React.FC = () => {
           { paddingTop: insets.top + 20, paddingBottom: 150 },
         ]}
       >
-        <Text style={styles.greeting}>Hola, {displayName}</Text>
+        <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mis Rutinas</Text>
+          <Text style={styles.sectionTitle}>{t('home.my_routines')}</Text>
 
           {userRoutines.length === 0 ? (
             <Text style={styles.emptyText}>
-              Aún no tenés rutinas guardadas
+              {t('home.no_routines')}
             </Text>
           ) : (
             userRoutines.map((routine) => (
@@ -130,16 +131,16 @@ const HomeScreen: React.FC = () => {
             style={styles.newRoutineCard}
             onPress={handleCreateRoutine}
           >
-            <Text style={styles.newRoutineText}>+ Nueva</Text>
+            <Text style={styles.newRoutineText}>{t('home.new_routine')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rutinas de la comunidad</Text>
+          <Text style={styles.sectionTitle}>{t('home.community_routines')}</Text>
 
           {communityRoutines.length === 0 ? (
             <Text style={styles.emptyText}>
-              No hay rutinas de la comunidad disponibles
+              {t('home.no_community_routines')}
             </Text>
           ) : (
             <ScrollView
@@ -165,7 +166,7 @@ const HomeScreen: React.FC = () => {
             style={styles.viewMore}
             onPress={() => console.log("View more community routines")}
           >
-            <Text style={styles.viewMoreText}>Ver más...</Text>
+            <Text style={styles.viewMoreText}>{t('home.view_more')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

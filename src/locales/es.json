@@ -1,0 +1,142 @@
+{
+    "common": {
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "continue": "Continuar",
+        "back": "Atrás",
+        "error": "Error",
+        "success": "Éxito",
+        "loading": "Cargando...",
+        "coming_soon": "Próximamente",
+        "yes": "Sí",
+        "no": "No"
+    },
+    "welcome": {
+        "title": "MENS",
+        "subtitle": "Master Energy, Nutrition & Strength",
+        "start": "Empezar"
+    },
+    "auth": {
+        "login": "Iniciar sesión",
+        "register": "Crear cuenta",
+        "email_placeholder": "Correo",
+        "password_placeholder": "Contraseña (mínimo 6 caracteres)",
+        "forgot_password": "¿Olvidaste la contraseña?",
+        "switch_to_register": "¿No tenés cuenta? Crear una",
+        "switch_to_login": "¿Ya tenés cuenta? Iniciá sesión",
+        "create_action": "Crear",
+        "login_action": "Iniciar sesión"
+    },
+    "onboarding": {
+        "title": "Configurar tu entrenamiento",
+        "subtitle": "Esto nos ayuda a adaptar mejor tu experiencia en MENS.",
+        "name_question": "¿Cómo querés que te llamemos?",
+        "name_placeholder": "Ej: Juan",
+        "objective_question": "1. ¿Cuál es tu objetivo principal?",
+        "days_question": "2. ¿Cuántos días por semana podés entrenar?",
+        "level_question": "3. ¿Cuál es tu nivel actual?",
+        "days_suffix": "días",
+        "saving": "Guardando...",
+        "error_session": "Sesión no válida. Volvé a iniciar sesión.",
+        "error_save": "No se pudo guardar la encuesta. Intentá de nuevo.",
+        "objectives": {
+            "muscle": "Ganar músculo",
+            "fat_loss": "Perder grasa",
+            "strength": "Fuerza / rendimiento",
+            "health": "Salud general"
+        },
+        "levels": {
+            "beginner": "Principiante",
+            "intermediate": "Intermedio",
+            "advanced": "Avanzado"
+        }
+    },
+    "home": {
+        "greeting": "Hola, {{name}}",
+        "my_routines": "Mis Rutinas",
+        "community_routines": "Rutinas de la comunidad",
+        "no_routines": "Aún no tenés rutinas guardadas",
+        "no_community_routines": "No hay rutinas de la comunidad disponibles",
+        "new_routine": "+ Nueva",
+        "view_more": "Ver más..."
+    },
+    "routines": {
+        "create_title": "Crear Rutina",
+        "create_subtitle": "Elegí cómo querés crear tu rutina de entrenamiento",
+        "create_manual": "Crear manual",
+        "create_manual_desc": "Diseñá tu rutina día por día, eligiendo ejercicios, series y repeticiones",
+        "create_ai": "Crear con IA",
+        "create_ai_desc": "Próximamente: creá rutinas personalizadas con inteligencia artificial",
+        "manual_title": "Nueva Rutina",
+        "edit_title": "Editar Rutina",
+        "name_label": "Nombre de la rutina",
+        "name_placeholder": "Ej: PPL Semana 1, Hypertrophy, etc.",
+        "days_label": "Días de entrenamiento",
+        "days_hint_add": "Tocá cada día para agregar ejercicios",
+        "days_hint_edit": "Tocá cada día para editar ejercicios",
+        "info_add_exercises": "💡 Agregá ejercicios a al menos un día para crear la rutina",
+        "info_save_exercises": "💡 Agregá ejercicios a al menos un día para guardar la rutina",
+        "create_action": "Crear rutina",
+        "save_changes": "Guardar cambios",
+        "delete_routine": "Eliminar rutina",
+        "delete_confirm_title": "¿Eliminar rutina?",
+        "delete_confirm_message": "Esta rutina se eliminará permanentemente. No podrás recuperarla después.",
+        "delete_confirm_action": "Sí, eliminar",
+        "success_create": "Rutina creada exitosamente",
+        "success_update": "Rutina actualizada exitosamente",
+        "success_delete": "Rutina eliminada",
+        "error_create": "No se pudo crear la rutina. Por favor intentá de nuevo.",
+        "error_update": "No se pudo actualizar la rutina. Por favor intentá de nuevo.",
+        "error_delete": "Error al eliminar la rutina",
+        "error_no_user": "No hay usuario autenticado",
+        "error_load": "No se pudo cargar la rutina"
+    },
+    "day_selector": {
+        "title": "¿Qué día te toca hoy?",
+        "start": "Comenzar"
+    },
+    "day_editor": {
+        "title": "Editar Día",
+        "day_label_placeholder": "Nombre del día (ej: Pecho / Tríceps)",
+        "add_exercise": "Agregar ejercicio",
+        "save_day": "Guardar día",
+        "empty_state": "Aún no hay ejercicios en este día",
+        "empty_hint": "Tocá \"Agregar ejercicio\" para comenzar"
+    },
+    "routine_card": {
+        "days_per_week": "días/semana",
+        "volume": "Volumen"
+    },
+    "tabs": {
+        "home": "Inicio",
+        "stats": "Estadísticas",
+        "communities": "Comunidad",
+        "premium": "Premium",
+        "profile": "Perfil"
+    },
+    "train": {
+        "minimize": "Minimizar",
+        "edit": "Editar",
+        "finish_session": "Finalizar sesión",
+        "cancel_workout": "Cancelar entrenamiento",
+        "add_set": "Agregar serie",
+        "cancel_dialog": {
+            "title": "¿Cancelar entrenamiento?",
+            "message": "Se perderá todo el progreso de esta sesión. Esta acción no se puede deshacer.",
+            "confirm": "Sí, cancelar",
+            "cancel": "Continuar entrenando"
+        },
+        "day_label": "Día {{number}}",
+        "set": "Set",
+        "prev": "Previo",
+        "kg": "Kg",
+        "reps": "Reps",
+        "notes": "Notas",
+        "target": "Meta: {{sets}} series x {{reps}} reps • Descanso: {{rest}}s"
+    },
+    "language_selection": {
+        "title": "Selecciona tu idioma",
+        "spanish": "Español",
+        "english": "English"
+    }
+}

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { COLORS } from "../../theme/theme";
 
@@ -8,6 +9,7 @@ interface AuthTabsProps {
 }
 
 export const AuthTabs: React.FC<AuthTabsProps> = ({ mode, setMode }) => {
+    const { t } = useTranslation();
     const isRegister = mode === "register";
 
     return (
@@ -19,7 +21,7 @@ export const AuthTabs: React.FC<AuthTabsProps> = ({ mode, setMode }) => {
                 <Text
                     style={[styles.tabText, isRegister && styles.tabTextActive]}
                 >
-                    Crear cuenta
+                    {t('auth.register')}
                 </Text>
                 {isRegister && <View style={styles.tabIndicator} />}
             </TouchableOpacity>
@@ -31,7 +33,7 @@ export const AuthTabs: React.FC<AuthTabsProps> = ({ mode, setMode }) => {
                 <Text
                     style={[styles.tabText, !isRegister && styles.tabTextActive]}
                 >
-                    Iniciar sesión
+                    {t('auth.login')}
                 </Text>
                 {!isRegister && <View style={styles.tabIndicator} />}
             </TouchableOpacity>

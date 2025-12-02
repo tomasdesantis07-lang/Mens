@@ -1,0 +1,142 @@
+{
+    "common": {
+        "cancel": "Cancel",
+        "save": "Save",
+        "continue": "Continue",
+        "back": "Back",
+        "error": "Error",
+        "success": "Success",
+        "loading": "Loading...",
+        "coming_soon": "Coming Soon",
+        "yes": "Yes",
+        "no": "No"
+    },
+    "welcome": {
+        "title": "MENS",
+        "subtitle": "Master Energy, Nutrition & Strength",
+        "start": "Start"
+    },
+    "auth": {
+        "login": "Log In",
+        "register": "Sign Up",
+        "email_placeholder": "Email",
+        "password_placeholder": "Password (min 6 chars)",
+        "forgot_password": "Forgot password?",
+        "switch_to_register": "Don't have an account? Sign up",
+        "switch_to_login": "Already have an account? Log in",
+        "create_action": "Create",
+        "login_action": "Log In"
+    },
+    "onboarding": {
+        "title": "Setup your training",
+        "subtitle": "This helps us tailor your MENS experience.",
+        "name_question": "What should we call you?",
+        "name_placeholder": "Ex: John",
+        "objective_question": "1. What is your main goal?",
+        "days_question": "2. How many days a week can you train?",
+        "level_question": "3. What is your current level?",
+        "days_suffix": "days",
+        "saving": "Saving...",
+        "error_session": "Invalid session. Please log in again.",
+        "error_save": "Could not save survey. Please try again.",
+        "objectives": {
+            "muscle": "Build Muscle",
+            "fat_loss": "Lose Fat",
+            "strength": "Strength / Performance",
+            "health": "General Health"
+        },
+        "levels": {
+            "beginner": "Beginner",
+            "intermediate": "Intermediate",
+            "advanced": "Advanced"
+        }
+    },
+    "home": {
+        "greeting": "Hello, {{name}}",
+        "my_routines": "My Routines",
+        "community_routines": "Community Routines",
+        "no_routines": "You don't have any saved routines yet",
+        "no_community_routines": "No community routines available",
+        "new_routine": "+ New",
+        "view_more": "View more..."
+    },
+    "routines": {
+        "create_title": "Create Routine",
+        "create_subtitle": "Choose how you want to create your workout routine",
+        "create_manual": "Manual Creation",
+        "create_manual_desc": "Design your routine day by day, choosing exercises, sets, and reps",
+        "create_ai": "Create with AI",
+        "create_ai_desc": "Coming soon: create personalized routines with artificial intelligence",
+        "manual_title": "New Routine",
+        "edit_title": "Edit Routine",
+        "name_label": "Routine Name",
+        "name_placeholder": "Ex: PPL Week 1, Hypertrophy, etc.",
+        "days_label": "Training Days",
+        "days_hint_add": "Tap each day to add exercises",
+        "days_hint_edit": "Tap each day to edit exercises",
+        "info_add_exercises": "💡 Add exercises to at least one day to create the routine",
+        "info_save_exercises": "💡 Add exercises to at least one day to save the routine",
+        "create_action": "Create Routine",
+        "save_changes": "Save Changes",
+        "delete_routine": "Delete Routine",
+        "delete_confirm_title": "Delete Routine?",
+        "delete_confirm_message": "This routine will be permanently deleted. You cannot recover it later.",
+        "delete_confirm_action": "Yes, delete",
+        "success_create": "Routine created successfully",
+        "success_update": "Routine updated successfully",
+        "success_delete": "Routine deleted",
+        "error_create": "Could not create routine. Please try again.",
+        "error_update": "Could not update routine. Please try again.",
+        "error_delete": "Error deleting routine",
+        "error_no_user": "No authenticated user",
+        "error_load": "Could not load routine"
+    },
+    "day_selector": {
+        "title": "What day is it today?",
+        "start": "Start"
+    },
+    "day_editor": {
+        "title": "Edit Day",
+        "day_label_placeholder": "Day name (ex: Chest / Triceps)",
+        "add_exercise": "Add Exercise",
+        "save_day": "Save Day",
+        "empty_state": "No exercises yet on this day",
+        "empty_hint": "Tap \"Add Exercise\" to get started"
+    },
+    "routine_card": {
+        "days_per_week": "days/week",
+        "volume": "Volume"
+    },
+    "tabs": {
+        "home": "Home",
+        "stats": "Stats",
+        "communities": "Community",
+        "premium": "Premium",
+        "profile": "Profile"
+    },
+    "train": {
+        "minimize": "Minimize",
+        "edit": "Edit",
+        "finish_session": "Finish Session",
+        "cancel_workout": "Cancel Workout",
+        "add_set": "Add Set",
+        "cancel_dialog": {
+            "title": "Cancel Workout?",
+            "message": "All progress from this session will be lost. This action cannot be undone.",
+            "confirm": "Yes, cancel",
+            "cancel": "Keep training"
+        },
+        "day_label": "Day {{number}}",
+        "set": "Set",
+        "prev": "Prev",
+        "kg": "Kg",
+        "reps": "Reps",
+        "notes": "Notes",
+        "target": "Target: {{sets}} sets x {{reps}} reps • Rest: {{rest}}s"
+    },
+    "language_selection": {
+        "title": "Select your language",
+        "spanish": "Español",
+        "english": "English"
+    }
+}

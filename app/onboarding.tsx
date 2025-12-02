@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ScrollView,
   StyleSheet,
@@ -12,19 +13,11 @@ import {
 import { auth, db } from "../src/services/firebaseConfig";
 import { COLORS, COMPONENTS } from "../src/theme/theme";
 
-const objectives = [
-  "Ganar músculo",
-  "Perder grasa",
-  "Fuerza / rendimiento",
-  "Salud general",
-];
-
 const daysOptions = [2, 3, 4, 5, 6];
-
-const levels = ["Principiante", "Intermedio", "Avanzado"];
 
 const OnboardingScreen: React.FC = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [objective, setObjective] = useState<string | null>(null);
   const [daysPerWeek, setDaysPerWeek] = useState<number | null>(null);
   const [level, setLevel] = useState<string | null>(null);
@@ -32,12 +25,25 @@ const OnboardingScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const objectives = [
+    t('onboarding.objectives.muscle'),
+    t('onboarding.objectives.fat_loss'),
+    t('onboarding.objectives.strength'),
+    t('onboarding.objectives.health'),
+  ];
+
+  const levels = [
+    t('onboarding.levels.beginner'),
+    t('onboarding.levels.intermediate'),
+    t('onboarding.levels.advanced'),
+  ];
+
   const handleSave = async () => {
     if (!objective || !daysPerWeek || !level) return;
 
     const user = auth.currentUser;
     if (!user) {
-      setErrorMsg("Sesión no válida. Volvé a iniciar sesión.");
+      setErrorMsg(t('onboarding.error_session'));
       return;
     }
 
@@ -60,7 +66,7 @@ const OnboardingScreen: React.FC = () => {
       router.replace("/(tabs)/home");
     } catch (err) {
       console.log(err);
-      setErrorMsg("No se pudo guardar la encuesta. Intentá de nuevo.");
+      setErrorMsg(t('onboarding.error_save'));
     } finally {
       setSaving(false);
     }
@@ -71,17 +77,17 @@ const OnboardingScreen: React.FC = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Configurar tu entrenamiento</Text>
+      <Text style={styles.title}>{t('onboarding.title')}</Text>
 
       <Text style={styles.subtitle}>
-        Esto nos ayuda a adaptar mejor tu experiencia en MENS.
+        {t('onboarding.subtitle')}
       </Text>
 
       {/* NOMBRE */}
-      <Text style={styles.sectionTitle}>¿Cómo querés que te llamemos?</Text>
+      <Text style={styles.sectionTitle}>{t('onboarding.name_question')}</Text>
       <TextInput
         style={styles.nameInput}
-        placeholder="Ej: Juan"
+        placeholder={t('onboarding.name_placeholder')}
         placeholderTextColor={COMPONENTS.input.placeholder}
         value={displayName}
         onChangeText={setDisplayName}
@@ -89,7 +95,7 @@ const OnboardingScreen: React.FC = () => {
 
       {/* OBJETIVO */}
       <Text style={styles.sectionTitle}>
-        1. ¿Cuál es tu objetivo principal?
+        {t('onboarding.objective_question')}
       </Text>
 
       <View style={styles.chipGroup}>
@@ -116,7 +122,7 @@ const OnboardingScreen: React.FC = () => {
 
       {/* DÍAS */}
       <Text style={styles.sectionTitle}>
-        2. ¿Cuántos días por semana podés entrenar?
+        {t('onboarding.days_question')}
       </Text>
 
       <View style={styles.chipGroup}>
@@ -135,14 +141,14 @@ const OnboardingScreen: React.FC = () => {
                 daysPerWeek === d && styles.chipTextSelected,
               ]}
             >
-              {d} días
+              {d} {t('onboarding.days_suffix')}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {/* NIVEL */}
-      <Text style={styles.sectionTitle}>3. ¿Cuál es tu nivel actual?</Text>
+      <Text style={styles.sectionTitle}>{t('onboarding.level_question')}</Text>
 
       <View style={styles.chipGroup}>
         {levels.map((lv) => (
@@ -178,7 +184,7 @@ const OnboardingScreen: React.FC = () => {
         onPress={handleSave}
       >
         <Text style={styles.buttonText}>
-          {saving ? "Guardando..." : "Continuar"}
+          {saving ? t('onboarding.saving') : t('common.continue')}
         </Text>
       </TouchableOpacity>
     </ScrollView>

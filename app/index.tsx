@@ -1,26 +1,32 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../src/theme/theme';
 
 const WelcomeScreen: React.FC = () => {
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const handleStart = () => {
+    router.push('/language');
+  };
 
   return (
     <View style={styles.container}>
       <Image
-        source={require('../assets/images/logo.png')} // tu logo está en assets/images
+        source={require('../assets/images/logo.png')}
         style={styles.logo}
       />
 
-      <Text style={styles.title}>MENS</Text>
-      <Text style={styles.subtitle}>Master Energy, Nutrition & Strength</Text>
+      <Text style={styles.title}>{t('welcome.title')}</Text>
+      <Text style={styles.subtitle}>{t('welcome.subtitle')}</Text>
 
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.push('/auth')}
+        onPress={handleStart}
       >
-        <Text style={styles.buttonText}>Empezar</Text>
+        <Text style={styles.buttonText}>{t('welcome.start')}</Text>
       </TouchableOpacity>
     </View>
   );

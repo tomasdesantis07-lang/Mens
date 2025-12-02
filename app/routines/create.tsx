@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { Edit3, Sparkles } from "lucide-react-native";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     ScrollView,
     StyleSheet,
@@ -14,15 +15,16 @@ import { COLORS } from "../../src/theme/theme";
 const CreateRoutineScreen: React.FC = () => {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
 
     return (
         <ScrollView
             style={styles.container}
             contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 120 }}
         >
-            <Text style={styles.title}>Crear Rutina</Text>
+            <Text style={styles.title}>{t('routines.create_title')}</Text>
             <Text style={styles.subtitle}>
-                Elegí cómo querés crear tu rutina de entrenamiento
+                {t('routines.create_subtitle')}
             </Text>
 
             <View style={styles.optionsContainer}>
@@ -34,10 +36,9 @@ const CreateRoutineScreen: React.FC = () => {
                     <View style={styles.iconContainer}>
                         <Edit3 color={COLORS.primary} size={32} />
                     </View>
-                    <Text style={styles.optionTitle}>Crear manual</Text>
+                    <Text style={styles.optionTitle}>{t('routines.create_manual')}</Text>
                     <Text style={styles.optionDescription}>
-                        Diseñá tu rutina día por día, eligiendo ejercicios, series y
-                        repeticiones
+                        {t('routines.create_manual_desc')}
                     </Text>
                 </TouchableOpacity>
 
@@ -50,14 +51,13 @@ const CreateRoutineScreen: React.FC = () => {
                         <Sparkles color={COLORS.textSecondary} size={32} />
                     </View>
                     <Text style={[styles.optionTitle, styles.textDisabled]}>
-                        Crear con IA
+                        {t('routines.create_ai')}
                     </Text>
                     <Text style={[styles.optionDescription, styles.textDisabled]}>
-                        Próximamente: creá rutinas personalizadas con inteligencia
-                        artificial
+                        {t('routines.create_ai_desc')}
                     </Text>
                     <View style={styles.comingSoonBadge}>
-                        <Text style={styles.comingSoonText}>Próximamente</Text>
+                        <Text style={styles.comingSoonText}>{t('common.coming_soon')}</Text>
                     </View>
                 </TouchableOpacity>
             </View>
@@ -66,7 +66,7 @@ const CreateRoutineScreen: React.FC = () => {
                 style={styles.backButton}
                 onPress={() => router.back()}
             >
-                <Text style={styles.backButtonText}>Cancelar</Text>
+                <Text style={styles.backButtonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
         </ScrollView>
     );

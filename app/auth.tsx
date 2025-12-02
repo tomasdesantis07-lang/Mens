@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Image,
   StyleSheet,
@@ -16,6 +17,7 @@ import { COLORS } from "../src/theme/theme";
 
 const AuthScreen: React.FC = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,30 +49,25 @@ const AuthScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* Logo arriba, fuera de la tarjeta */}
       <Image
         source={require("../assets/images/logo.png")}
         style={styles.logo}
       />
 
-      {/* Tarjeta central */}
       <View style={styles.card}>
-        {/* Tabs Crear / Iniciar */}
         <AuthTabs mode={mode} setMode={setMode} />
 
-        {/* Email */}
         <CustomInput
-          placeholder="Correo"
+          placeholder={t('auth.email_placeholder')}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
         />
 
-        {/* Password */}
         <View style={styles.passwordRow}>
           <CustomInput
-            placeholder="Contraseña (mínimo 6 caracteres)"
+            placeholder={t('auth.password_placeholder')}
             style={styles.passwordInput}
             secureTextEntry={!showPassword}
             value={password}
@@ -88,7 +85,6 @@ const AuthScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Olvidaste contraseña solo en login */}
         {!isRegister && (
           <TouchableOpacity
             style={styles.forgotContainer}
@@ -96,22 +92,19 @@ const AuthScreen: React.FC = () => {
               router.push("../forgot");
             }}
           >
-            <Text style={styles.forgotText}>¿Olvidaste la contraseña?</Text>
+            <Text style={styles.forgotText}>{t('auth.forgot_password')}</Text>
           </TouchableOpacity>
         )}
 
-        {/* Error */}
         {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
 
-        {/* Botón principal */}
         <PrimaryButton
-          title={isRegister ? "Crear" : "Iniciar sesión"}
+          title={isRegister ? t('auth.create_action') : t('auth.login_action')}
           onPress={handleSubmit}
           loading={loading}
           disabled={!email || password.length < 6}
         />
 
-        {/* Texto para cambiar modo abajo de todo */}
         <TouchableOpacity
           onPress={() =>
             setMode((prev) => (prev === "login" ? "register" : "login"))
@@ -120,8 +113,8 @@ const AuthScreen: React.FC = () => {
         >
           <Text style={styles.switchModeText}>
             {isRegister
-              ? "¿Ya tenés cuenta? Iniciá sesión"
-              : "¿No tenés cuenta? Crear una"}
+              ? t('auth.switch_to_login')
+              : t('auth.switch_to_register')}
           </Text>
         </TouchableOpacity>
       </View>

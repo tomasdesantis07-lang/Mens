@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react-native";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     KeyboardAvoidingView,
     Modal,
@@ -35,9 +36,9 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
     onClose,
 }) => {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const [editedDay, setEditedDay] = useState<RoutineDay>(day);
 
-    // Reset edited day when modal opens
     React.useEffect(() => {
         if (visible) {
             setEditedDay(day);
@@ -89,16 +90,15 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                 <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
                     <View style={styles.headerRow}>
                         <TouchableOpacity onPress={onClose}>
-                            <Text style={styles.cancelButton}>Cancelar</Text>
+                            <Text style={styles.cancelButton}>{t('common.cancel')}</Text>
                         </TouchableOpacity>
-                        <Text style={styles.title}>Editar Día</Text>
+                        <Text style={styles.title}>{t('day_editor.title')}</Text>
                         <View style={{ width: 70 }} />
                     </View>
 
-                    {/* Day Label Input */}
                     <TextInput
                         style={styles.dayLabelInput}
-                        placeholder="Nombre del día (ej: Pecho / Tríceps)"
+                        placeholder={t('day_editor.day_label_placeholder')}
                         placeholderTextColor={COLORS.textTertiary}
                         value={editedDay.label}
                         onChangeText={handleLabelChange}
@@ -110,14 +110,13 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Exercise List */}
                     {editedDay.exercises.length === 0 ? (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyText}>
-                                Aún no hay ejercicios en este día
+                                {t('day_editor.empty_state')}
                             </Text>
                             <Text style={styles.emptyHint}>
-                                Tocá "Agregar ejercicio" para comenzar
+                                {t('day_editor.empty_hint')}
                             </Text>
                         </View>
                     ) : (
@@ -131,20 +130,18 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                         ))
                     )}
 
-                    {/* Add Exercise Button */}
                     <TouchableOpacity
                         style={styles.addButton}
                         onPress={handleAddExercise}
                     >
                         <Plus color={COLORS.primary} size={20} />
-                        <Text style={styles.addButtonText}>Agregar ejercicio</Text>
+                        <Text style={styles.addButtonText}>{t('day_editor.add_exercise')}</Text>
                     </TouchableOpacity>
                 </ScrollView>
 
-                {/* Bottom Bar */}
                 <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
                     <PrimaryButton
-                        title="Guardar día"
+                        title={t('day_editor.save_day')}
                         onPress={handleSave}
                         style={styles.saveButton}
                     />
@@ -167,14 +164,15 @@ const styles = StyleSheet.create({
     },
     headerRow: {
         flexDirection: "row",
-        justifyContent: "space-between",
         alignItems: "center",
+        justifyContent: "space-between",
         marginBottom: 16,
     },
     cancelButton: {
         fontSize: 16,
-        color: COLORS.textSecondary,
+        color: COLORS.primary,
         fontWeight: "600",
+        width: 70,
     },
     title: {
         fontSize: 18,
@@ -184,49 +182,53 @@ const styles = StyleSheet.create({
     dayLabelInput: {
         backgroundColor: COLORS.surface,
         borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        padding: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         fontSize: 16,
         color: COLORS.textPrimary,
-        fontWeight: "600",
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     content: {
         flex: 1,
     },
     scrollContent: {
-        padding: 24,
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        paddingBottom: 24,
     },
     emptyState: {
         alignItems: "center",
-        paddingVertical: 40,
+        paddingVertical: 60,
     },
     emptyText: {
         fontSize: 16,
         color: COLORS.textSecondary,
         marginBottom: 8,
+        textAlign: "center",
     },
     emptyHint: {
         fontSize: 14,
         color: COLORS.textTertiary,
+        textAlign: "center",
     },
     addButton: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
         backgroundColor: COLORS.surface,
         borderRadius: 12,
         borderWidth: 2,
         borderColor: COLORS.border,
         borderStyle: "dashed",
         padding: 16,
-        marginTop: 8,
+        marginTop: 16,
     },
     addButtonText: {
         fontSize: 16,
         fontWeight: "600",
         color: COLORS.primary,
+        marginLeft: 8,
     },
     bottomBar: {
         paddingHorizontal: 24,

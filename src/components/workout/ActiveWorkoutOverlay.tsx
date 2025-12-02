@@ -27,12 +27,10 @@ export const ActiveWorkoutOverlay: React.FC = () => {
         router.push(`/routines/${activeWorkout.routine.id}/train` as any);
     };
 
-    // Calculate position above tab bar (standard tab bar height ~49px)
-    const bottomPosition = 49 + insets.bottom;
 
     return (
         <TouchableOpacity
-            style={[styles.container, { bottom: bottomPosition }]}
+            style={styles.container}
             onPress={handlePress}
             activeOpacity={0.8}
         >
@@ -77,17 +75,9 @@ export const ActiveWorkoutOverlay: React.FC = () => {
 
 const styles = StyleSheet.create({
     container: {
-        position: "absolute",
-        left: 0,
-        right: 0,
         backgroundColor: COLORS.card,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 8,
     },
     restIndicator: {
         position: "absolute",

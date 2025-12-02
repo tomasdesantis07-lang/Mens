@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../../theme/theme";
@@ -18,6 +19,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
     onClose,
 }) => {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
 
     if (!routine) return null;
 
@@ -32,7 +34,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
                 <TouchableOpacity style={styles.backdrop} onPress={onClose} />
                 <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
                     <View style={styles.handle} />
-                    <Text style={styles.title}>¿Qué día te toca hoy?</Text>
+                    <Text style={styles.title}>{t('day_selector.title')}</Text>
                     <Text style={styles.subtitle}>{routine.name}</Text>
 
                     <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
@@ -45,7 +47,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
                                 <View style={styles.dayInfo}>
                                     <Text style={styles.dayLabel}>{day.label}</Text>
                                     <Text style={styles.exerciseCount}>
-                                        {day.exercises.length} ejercicios
+                                        {day.exercises.length} {day.exercises.length === 1 ? 'ejercicio' : 'ejercicios'}
                                     </Text>
                                 </View>
                                 <Text style={styles.arrow}>→</Text>
@@ -54,7 +56,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
                     </ScrollView>
 
                     <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-                        <Text style={styles.cancelText}>Cancelar</Text>
+                        <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
