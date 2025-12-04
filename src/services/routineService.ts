@@ -16,21 +16,46 @@ import { db } from "./firebaseConfig";
 
 export const RoutineService = {
     /**
+     * Sanitize routine data for Firestore (remove undefined values)
+     */
+    sanitizeRoutineForFirestore(draft: RoutineDraft) {
+        return {
+            ...draft,
+            days: draft.days.map(day => ({
+                ...day,
+                exercises: day.exercises.map(exercise => ({
+                    ...exercise,
+                    sets: exercise.sets.map(set => ({
+                        setIndex: set.setIndex,
+                        // Only include targetWeight/targetReps if they have values
+                        ...(set.targetWeight !== undefined && { targetWeight: set.targetWeight }),
+                        ...(set.targetReps !== undefined && { targetReps: set.targetReps }),
+                    })),
+                    // Remove notes if undefined
+                    ...(exercise.notes !== undefined && { notes: exercise.notes }),
+                })),
+            })),
+        };
+    },
+
+    /**
      * Create a new routine from a draft
      * @returns The new routine's Firestore doc ID
      */
     async createRoutine(userId: string, draft: RoutineDraft): Promise<string> {
         const routineRef = doc(collection(db, "routines"));
 
+        const sanitizedDraft = this.sanitizeRoutineForFirestore(draft);
+
         const routine = {
             userId,
-            name: draft.name,
+            name: sanitizedDraft.name,
             source: "manual" as const,
             isActive: false,
-            daysPerWeek: draft.days.filter((d) => d.exercises.length > 0).length,
+            daysPerWeek: sanitizedDraft.days.filter((d) => d.exercises.length > 0).length,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            days: draft.days.filter((d) => d.exercises.length > 0), // Only save days with exercises
+            days: sanitizedDraft.days.filter((d) => d.exercises.length > 0), // Only save days with exercises
         };
 
         await setDoc(routineRef, routine);
@@ -43,10 +68,12 @@ export const RoutineService = {
     async updateRoutine(routineId: string, draft: RoutineDraft): Promise<void> {
         const routineRef = doc(db, "routines", routineId);
 
+        const sanitizedDraft = this.sanitizeRoutineForFirestore(draft);
+
         await updateDoc(routineRef, {
-            name: draft.name,
-            days: draft.days.filter((d) => d.exercises.length > 0),
-            daysPerWeek: draft.days.filter((d) => d.exercises.length > 0).length,
+            name: sanitizedDraft.name,
+            days: sanitizedDraft.days.filter((d) => d.exercises.length > 0),
+            daysPerWeek: sanitizedDraft.days.filter((d) => d.exercises.length > 0).length,
             updatedAt: serverTimestamp(),
         });
     },

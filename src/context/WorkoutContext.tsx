@@ -74,10 +74,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         if (day) {
             day.exercises.forEach(ex => {
-                initialLogs[ex.id] = Array.from({ length: ex.sets }).map((_, i) => ({
-                    setIndex: i + 1,
-                    weight: 0,
-                    reps: 0,
+                // Use the PredefinedSet array to initialize logs with preset values
+                initialLogs[ex.id] = ex.sets.map((set) => ({
+                    setIndex: set.setIndex,
+                    weight: set.targetWeight || 0,
+                    reps: set.targetReps || 0,
                 }));
             });
         }

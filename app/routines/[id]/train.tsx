@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Check, Edit, Info, Plus } from "lucide-react-native";
+import { Check, ChevronDown, ChevronUp, Edit, Info, Plus } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -56,6 +56,7 @@ const TrainScreen: React.FC = () => {
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
 
     useEffect(() => {
         const loadRoutineAndHistory = async () => {
@@ -83,7 +84,7 @@ const TrainScreen: React.FC = () => {
                 }
             } catch (error) {
                 console.error("Error loading routine:", error);
-                showToast.error("Error al cargar la rutina");
+                showToast.error(t('train.error_load'));
             } finally {
                 setLoading(false);
             }
@@ -117,10 +118,20 @@ const TrainScreen: React.FC = () => {
     };
 
     const handleFinishWorkout = async () => {
-        if (!routine || !auth.currentUser || !activeWorkout) return;
+        if (!routine || !auth.currentUser || !activeWorkout) {
+            console.log("Cannot finish workout - missing data:", {
+                hasRoutine: !!routine,
+                hasUser: !!auth.currentUser,
+                hasActiveWorkout: !!activeWorkout
+            });
+            return;
+        }
 
         const currentDay = routine.days.find((d) => d.dayIndex === selectedDayIndex);
-        if (!currentDay) return;
+        if (!currentDay) {
+            console.log("Cannot find current day for index:", selectedDayIndex);
+            return;
+        }
 
         setIsSaving(true);
         try {
@@ -130,13 +141,18 @@ const TrainScreen: React.FC = () => {
                 return {
                     routineExerciseId: ex.id,
                     name: ex.name,
-                    targetSets: ex.sets,
+                    targetSets: ex.sets.length,
                     targetReps: ex.reps,
                     sets: sets,
                 };
             });
 
-            await WorkoutService.createWorkoutSession({
+            console.log("Attempting to save workout session...");
+            console.log("User ID:", auth.currentUser.uid);
+            console.log("Routine ID:", routine.id);
+            console.log("Exercises count:", exercisesLog.length);
+
+            const sessionId = await WorkoutService.createWorkoutSession({
                 userId: auth.currentUser.uid,
                 routineId: routine.id,
                 routineName: routine.name,
@@ -144,12 +160,15 @@ const TrainScreen: React.FC = () => {
                 exercises: exercisesLog,
             });
 
-            showToast.success("¡Entrenamiento guardado!", "Buen trabajo");
+            console.log("Workout session saved successfully with ID:", sessionId);
+            showToast.success(t('train.success_save'), t('train.success_save_subtitle'));
             finishWorkout(); // Clear context
             router.replace("/(tabs)/home");
         } catch (error) {
             console.error("Error saving workout:", error);
-            showToast.error("Error al guardar el entrenamiento");
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error instanceof Error ? error.message : String(error));
+            showToast.error(t('train.error_save'));
         } finally {
             setIsSaving(false);
         }
@@ -190,9 +209,9 @@ const TrainScreen: React.FC = () => {
     if (!routine) {
         return (
             <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-                <Text style={styles.errorText}>No se encontró la rutina</Text>
+                <Text style={styles.errorText}>{t('train.routine_not_found')}</Text>
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.backButton}>Volver</Text>
+                    <Text style={styles.backButton}>{t('train.back')}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -227,101 +246,129 @@ const TrainScreen: React.FC = () => {
 
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-                {currentDay?.exercises.map((exercise) => (
-                    <View key={exercise.id} style={styles.exerciseCard}>
-                        <View style={styles.exerciseHeader}>
-                            <View style={styles.exerciseTitleRow}>
-                                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                {currentDay?.exercises.map((exercise) => {
+                    const isExpanded = expandedExerciseId === exercise.id;
+                    const completedSets = activeWorkout?.logs[exercise.id]?.filter((set) =>
+                        activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`)
+                    ).length || 0;
+                    const totalSets = activeWorkout?.logs[exercise.id]?.length || 0;
+
+                    return (
+                        <View key={exercise.id} style={styles.exerciseCard}>
+                            {/* Collapsible Header */}
+                            <TouchableOpacity
+                                style={styles.exerciseCollapsibleHeader}
+                                onPress={() => setExpandedExerciseId(isExpanded ? null : exercise.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.headerLeftTrain}>
+                                    <View style={styles.expandIconTrain}>
+                                        {isExpanded ? (
+                                            <ChevronUp size={20} color={COLORS.primary} />
+                                        ) : (
+                                            <ChevronDown size={20} color={COLORS.textSecondary} />
+                                        )}
+                                    </View>
+                                    <View style={styles.headerInfoTrain}>
+                                        <Text style={styles.exerciseNameHeader} numberOfLines={1}>
+                                            {exercise.name}
+                                        </Text>
+                                        <Text style={styles.exerciseMetaTrain}>
+                                            {completedSets}/{totalSets} {t('train.set')} • {exercise.sets.length} × {exercise.reps}
+                                        </Text>
+                                    </View>
+                                </View>
                                 {exercise.notes && (
                                     <TouchableOpacity
-                                        onPress={() => showToast.info(exercise.notes || "")}
-                                        style={styles.noteButton}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            showToast.info(exercise.notes || "");
+                                        }}
+                                        style={styles.noteButtonHeader}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <Info size={18} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 )}
-                            </View>
-                            <Text style={styles.exerciseTarget}>
-                                {t('train.target', { sets: exercise.sets, reps: exercise.reps, rest: exercise.restSeconds })}
-                            </Text>
-                            {exercise.notes && (
-                                <Text style={styles.exerciseNotes} numberOfLines={2}>
-                                    📝 {exercise.notes}
-                                </Text>
-                            )}
-                        </View>
+                            </TouchableOpacity>
 
-                        <View style={styles.setsHeader}>
-                            <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
-                            <View style={{ width: 40 }} />
-                        </View>
-
-                        {activeWorkout?.logs[exercise.id]?.map((set, index) => {
-                            const isCompleted = activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`);
-                            const lastSet = getLastSessionSet(exercise.id, set.setIndex);
-
-                            return (
-                                <View key={set.setIndex} style={[
-                                    styles.setRow,
-                                    isCompleted && styles.setRowCompleted
-                                ]}>
-                                    <View style={styles.setNumberContainer}>
-                                        <Text style={styles.setNumber}>{index + 1}</Text>
+                            {/* Expandable Content */}
+                            {isExpanded && (
+                                <View style={styles.exerciseExpandedContent}>
+                                    <View style={styles.setsHeader}>
+                                        <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
+                                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
+                                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
+                                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
+                                        <View style={{ width: 40 }} />
                                     </View>
 
-                                    {/* Previous History */}
-                                    <View style={styles.historyContainer}>
-                                        <Text style={styles.historyText}>
-                                            {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
-                                        </Text>
-                                    </View>
+                                    {activeWorkout?.logs[exercise.id]?.map((set, index) => {
+                                        const isCompleted = activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`);
+                                        const lastSet = getLastSessionSet(exercise.id, set.setIndex);
 
-                                    <TextInput
-                                        style={[styles.input, isCompleted && styles.inputCompleted]}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        placeholderTextColor={COLORS.textSecondary}
-                                        value={set.weight > 0 ? set.weight.toString() : ""}
-                                        onChangeText={(val) =>
-                                            logSet(exercise.id, set.setIndex, "weight", parseFloat(val) || 0)
-                                        }
-                                        editable={!isCompleted}
-                                    />
+                                        return (
+                                            <View key={set.setIndex} style={[
+                                                styles.setRow,
+                                                isCompleted && styles.setRowCompleted
+                                            ]}>
+                                                <View style={styles.setNumberContainer}>
+                                                    <Text style={styles.setNumber}>{index + 1}</Text>
+                                                </View>
 
-                                    <TextInput
-                                        style={[styles.input, isCompleted && styles.inputCompleted]}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        placeholderTextColor={COLORS.textSecondary}
-                                        value={set.reps > 0 ? set.reps.toString() : ""}
-                                        onChangeText={(val) =>
-                                            logSet(exercise.id, set.setIndex, "reps", parseFloat(val) || 0)
-                                        }
-                                        editable={!isCompleted}
-                                    />
+                                                {/* Previous History */}
+                                                <View style={styles.historyContainer}>
+                                                    <Text style={styles.historyText}>
+                                                        {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
+                                                    </Text>
+                                                </View>
+
+                                                <TextInput
+                                                    style={[styles.input, isCompleted && styles.inputCompleted]}
+                                                    keyboardType="numeric"
+                                                    placeholder="0"
+                                                    placeholderTextColor={COLORS.textSecondary}
+                                                    value={set.weight > 0 ? set.weight.toString() : ""}
+                                                    onChangeText={(val) =>
+                                                        logSet(exercise.id, set.setIndex, "weight", parseFloat(val) || 0)
+                                                    }
+                                                    editable={!isCompleted}
+                                                />
+
+                                                <TextInput
+                                                    style={[styles.input, isCompleted && styles.inputCompleted]}
+                                                    keyboardType="numeric"
+                                                    placeholder="0"
+                                                    placeholderTextColor={COLORS.textSecondary}
+                                                    value={set.reps > 0 ? set.reps.toString() : ""}
+                                                    onChangeText={(val) =>
+                                                        logSet(exercise.id, set.setIndex, "reps", parseFloat(val) || 0)
+                                                    }
+                                                    editable={!isCompleted}
+                                                />
+
+                                                <TouchableOpacity
+                                                    onPress={() => handleToggleSet(exercise.id, set.setIndex, exercise.restSeconds)}
+                                                    style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
+                                                >
+                                                    <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })}
 
                                     <TouchableOpacity
-                                        onPress={() => handleToggleSet(exercise.id, set.setIndex, exercise.restSeconds)}
-                                        style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
+                                        style={styles.addSetButton}
+                                        onPress={() => addSet(exercise.id)}
                                     >
-                                        <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
+                                        <Plus size={16} color={COLORS.primary} />
+                                        <Text style={styles.addSetText}>{t('train.add_set')}</Text>
                                     </TouchableOpacity>
                                 </View>
-                            );
-                        })}
-
-                        <TouchableOpacity
-                            style={styles.addSetButton}
-                            onPress={() => addSet(exercise.id)}
-                        >
-                            <Plus size={16} color={COLORS.primary} />
-                            <Text style={styles.addSetText}>{t('train.add_set')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                ))}
+                            )}
+                        </View>
+                    );
+                })}
             </ScrollView>
 
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -573,5 +620,42 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         fontSize: 16,
         fontVariant: ["tabular-nums"],
+    },
+    // Collapsible styles
+    exerciseCollapsibleHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingBottom: 16,
+    },
+    headerLeftTrain: {
+        flexDirection: "row",
+        alignItems: "center",
+        flex: 1,
+    },
+    expandIconTrain: {
+        marginRight: 12,
+    },
+    headerInfoTrain: {
+        flex: 1,
+    },
+    exerciseNameHeader: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: COLORS.textPrimary,
+        marginBottom: 4,
+    },
+    exerciseMetaTrain: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+    },
+    noteButtonHeader: {
+        padding: 8,
+        marginLeft: 8,
+    },
+    exerciseExpandedContent: {
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        paddingTop: 16,
     },
 });

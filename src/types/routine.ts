@@ -2,12 +2,18 @@ import { Timestamp } from "firebase/firestore";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 
+export interface PredefinedSet {
+    setIndex: number;
+    targetWeight?: number;  // Optional preset
+    targetReps?: number;    // Optional preset
+}
+
 export interface RoutineExercise {
     id: string;                  // UUID generated with uuidv4()
     exerciseId?: string;         // Future: catalog reference
     name: string;
-    sets: number;
-    reps: string;                // Flexible: "8-12", "AMRAP", etc.
+    sets: PredefinedSet[];       // Changed from number to array
+    reps: string;                // Flexible: "8-12", "AMRAP", etc. (kept for reference)
     restSeconds: number;
     notes?: string;
     order: number;
@@ -38,10 +44,20 @@ export interface RoutineDraft {
 }
 
 // Helper for creating empty structures
+export const createEmptySet = (setIndex: number): PredefinedSet => ({
+    setIndex,
+    targetWeight: undefined,
+    targetReps: undefined,
+});
+
 export const createEmptyExercise = (order: number): RoutineExercise => ({
     id: uuidv4(),
     name: "",
-    sets: 3,
+    sets: [
+        createEmptySet(0),
+        createEmptySet(1),
+        createEmptySet(2),
+    ],
     reps: "8-12",
     restSeconds: 90,
     order,

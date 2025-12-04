@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   error: {
-    color: COLORS.accent,
+    color: COLORS.error,
     marginBottom: 8,
     fontSize: 13,
   },

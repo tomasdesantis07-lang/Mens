@@ -1,5 +1,6 @@
 import { Calendar, Dumbbell, Edit } from "lucide-react-native";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     StyleSheet,
     Text,
@@ -29,6 +30,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
     onPress,
     onEdit,
 }) => {
+    const { t } = useTranslation();
     const isUser = variant === "user";
 
     return (
@@ -42,12 +44,12 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                 )}
                 {isUser && recommended && !onEdit && (
                     <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Creado para ti</Text>
+                        <Text style={styles.badgeText}>{t('routine_card.created_for_you')}</Text>
                     </View>
                 )}
                 {!isUser && (
                     <View style={styles.badgeCommunity}>
-                        <Text style={styles.badgeText}>Recomendada</Text>
+                        <Text style={styles.badgeText}>{t('routine_card.recommended')}</Text>
                     </View>
                 )}
             </View>
@@ -55,11 +57,11 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
             <View style={styles.stats}>
                 <View style={styles.statItem}>
                     <Calendar color={COLORS.textSecondary} size={16} />
-                    <Text style={styles.statText}>{days} días</Text>
+                    <Text style={styles.statText}>{days} {t('routine_card.days')}</Text>
                 </View>
                 <View style={styles.statItem}>
                     <Dumbbell color={COLORS.textSecondary} size={16} />
-                    <Text style={styles.statText}>{volume} vol.</Text>
+                    <Text style={styles.statText}>{volume} {t('routine_card.vol')}</Text>
                 </View>
                 {!isUser && rating && (
                     <View style={styles.statItem}>
@@ -70,7 +72,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
 
             <TouchableOpacity style={styles.button} onPress={onPress}>
                 <Text style={styles.buttonText}>
-                    {isUser ? "Entrenar" : "Empezar"}
+                    {isUser ? t('routine_card.train') : t('routine_card.start')}
                 </Text>
             </TouchableOpacity>
         </View>

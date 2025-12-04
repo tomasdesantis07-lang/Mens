@@ -1,5 +1,6 @@
 import { Users } from "lucide-react-native";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "../../src/components/common/PrimaryButton";
@@ -8,9 +9,10 @@ import { showToast } from "../../src/utils/toast";
 
 const CommunitiesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   const handleNotifyMe = () => {
-    showToast.success("¡Perfecto! Te avisaremos cuando 'La Manada' esté lista.");
+    showToast.success(t('communities.notify_success'));
   };
 
   return (
@@ -22,17 +24,17 @@ const CommunitiesScreen: React.FC = () => {
         </View>
 
         {/* Main Message */}
-        <Text style={styles.mainText}>Esta página está entrenando...</Text>
+        <Text style={styles.mainText}>{t('communities.training_message')}</Text>
 
         {/* Secondary Message */}
         <Text style={styles.secondaryText}>
-          Próximamente: Comunidad y Leaderboards.
+          {t('communities.coming_soon')}
         </Text>
 
         {/* CTA Button */}
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            title="Notificarme"
+            title={t('communities.notify_me')}
             onPress={handleNotifyMe}
           />
         </View>

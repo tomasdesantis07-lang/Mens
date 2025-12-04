@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react-native";
+import { ChevronDown, ChevronUp, Clock, Plus, Trash2, X } from "lucide-react-native";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     StyleSheet,
     Text,
@@ -8,110 +9,209 @@ import {
     View,
 } from "react-native";
 import { COLORS } from "../../theme/theme";
-import { RoutineExercise } from "../../types/routine";
+import { createEmptySet, PredefinedSet, RoutineExercise } from "../../types/routine";
+import { RestTimePicker } from "./RestTimePicker";
 
 interface ExerciseRowProps {
     exercise: RoutineExercise;
     onUpdate: (exercise: RoutineExercise) => void;
     onDelete: () => void;
+    isExpanded: boolean;
+    onToggleExpand: () => void;
 }
 
 export const ExerciseRow: React.FC<ExerciseRowProps> = ({
     exercise,
     onUpdate,
     onDelete,
+    isExpanded,
+    onToggleExpand,
 }) => {
+    const { t } = useTranslation();
     const [showNotes, setShowNotes] = useState(false);
+    const [showRestPicker, setShowRestPicker] = useState(false);
 
     const handleFieldChange = (field: keyof RoutineExercise, value: any) => {
         onUpdate({ ...exercise, [field]: value });
     };
 
+    const handleSetChange = (setIndex: number, field: keyof PredefinedSet, value: any) => {
+        const updatedSets = exercise.sets.map((set) =>
+            set.setIndex === setIndex ? { ...set, [field]: value } : set
+        );
+        onUpdate({ ...exercise, sets: updatedSets });
+    };
+
+    const handleAddSet = () => {
+        const newSet = createEmptySet(exercise.sets.length);
+        onUpdate({ ...exercise, sets: [...exercise.sets, newSet] });
+    };
+
+    const handleRemoveSet = (setIndex: number) => {
+        if (exercise.sets.length <= 1) return; // Keep at least one set
+        const updatedSets = exercise.sets
+            .filter((set) => set.setIndex !== setIndex)
+            .map((set, index) => ({ ...set, setIndex: index })); // Reindex
+        onUpdate({ ...exercise, sets: updatedSets });
+    };
+
+    const formatRestTime = (seconds: number) => {
+        const min = Math.floor(seconds / 60);
+        const sec = seconds % 60;
+        return `${min}:${sec.toString().padStart(2, "0")}`;
+    };
+
     return (
         <View style={styles.container}>
-            {/* Exercise Name */}
-            <View style={styles.row}>
-                <TextInput
-                    style={styles.nameInput}
-                    placeholder="Nombre del ejercicio"
-                    placeholderTextColor={COLORS.textTertiary}
-                    value={exercise.name}
-                    onChangeText={(text) => handleFieldChange("name", text)}
-                />
-                <TouchableOpacity onPress={onDelete} style={styles.deleteButton}>
-                    <Trash2 color={COLORS.accent} size={20} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Sets, Reps, Rest */}
-            <View style={styles.statsRow}>
-                <View style={styles.statInput}>
-                    <Text style={styles.label}>Series</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="3"
-                        placeholderTextColor={COLORS.textTertiary}
-                        keyboardType="numeric"
-                        value={String(exercise.sets)}
-                        onChangeText={(text) =>
-                            handleFieldChange("sets", parseInt(text) || 0)
-                        }
-                    />
-                </View>
-
-                <View style={styles.statInput}>
-                    <Text style={styles.label}>Reps</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="8-12"
-                        placeholderTextColor={COLORS.textTertiary}
-                        value={exercise.reps}
-                        onChangeText={(text) => handleFieldChange("reps", text)}
-                    />
-                </View>
-
-                <View style={styles.statInput}>
-                    <Text style={styles.label}>Descanso (s)</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="90"
-                        placeholderTextColor={COLORS.textTertiary}
-                        keyboardType="numeric"
-                        value={String(exercise.restSeconds)}
-                        onChangeText={(text) =>
-                            handleFieldChange("restSeconds", parseInt(text) || 0)
-                        }
-                    />
-                </View>
-            </View>
-
-            {/* Notes Toggle */}
+            {/* Collapsible Header */}
             <TouchableOpacity
-                style={styles.notesToggle}
-                onPress={() => setShowNotes(!showNotes)}
+                style={styles.header}
+                onPress={onToggleExpand}
+                activeOpacity={0.7}
             >
-                <Text style={styles.notesToggleText}>
-                    {showNotes ? "Ocultar notas" : "Agregar notas"}
-                </Text>
-                {showNotes ? (
-                    <ChevronUp color={COLORS.textSecondary} size={16} />
-                ) : (
-                    <ChevronDown color={COLORS.textSecondary} size={16} />
-                )}
+                <View style={styles.headerLeft}>
+                    <View style={styles.expandIcon}>
+                        {isExpanded ? (
+                            <ChevronUp size={20} color={COLORS.primary} />
+                        ) : (
+                            <ChevronDown size={20} color={COLORS.textSecondary} />
+                        )}
+                    </View>
+                    <View style={styles.headerInfo}>
+                        <Text style={styles.exerciseNameHeader} numberOfLines={1}>
+                            {exercise.name || t('exercise_row.name_placeholder')}
+                        </Text>
+                        <Text style={styles.exerciseMeta}>
+                            {exercise.sets.length} × {exercise.reps} • {formatRestTime(exercise.restSeconds)}
+                        </Text>
+                    </View>
+                </View>
+                <TouchableOpacity
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                    }}
+                    style={styles.deleteButtonHeader}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Trash2 color={COLORS.error} size={18} />
+                </TouchableOpacity>
             </TouchableOpacity>
 
-            {/* Notes Input */}
-            {showNotes && (
-                <TextInput
-                    style={styles.notesInput}
-                    placeholder="Ej: Tempo 3-1-1, drop set al final..."
-                    placeholderTextColor={COLORS.textTertiary}
-                    multiline
-                    numberOfLines={3}
-                    value={exercise.notes || ""}
-                    onChangeText={(text) => handleFieldChange("notes", text)}
-                />
+            {/* Expandable Content */}
+            {isExpanded && (
+                <View style={styles.content}>
+                    {/* Exercise Name Input */}
+                    <TextInput
+                        style={styles.nameInput}
+                        placeholder={t('exercise_row.name_placeholder')}
+                        placeholderTextColor={COLORS.textTertiary}
+                        value={exercise.name}
+                        onChangeText={(text) => handleFieldChange("name", text)}
+                    />
+
+                    {/* Rest Time */}
+                    <TouchableOpacity style={styles.restRow} onPress={() => setShowRestPicker(true)}>
+                        <View style={styles.restInfo}>
+                            <Clock size={16} color={COLORS.textSecondary} />
+                            <Text style={styles.restLabel}>{t('exercise_row.rest_time', { time: formatRestTime(exercise.restSeconds) })}</Text>
+                        </View>
+                        <Text style={styles.editButton}>{t('exercise_row.edit_rest')}</Text>
+                    </TouchableOpacity>
+
+                    {/* Sets Table Header */}
+                    <View style={styles.tableHeader}>
+                        <Text style={[styles.headerText, { width: 40 }]}>{t('exercise_row.set_header')}</Text>
+                        <Text style={[styles.headerText, { flex: 1 }]}>{t('exercise_row.kg_header')}</Text>
+                        <Text style={[styles.headerText, { flex: 1 }]}>{t('exercise_row.reps_header')}</Text>
+                        <View style={{ width: 32 }} />
+                    </View>
+
+                    {/* Sets Rows */}
+                    {exercise.sets.map((set, index) => (
+                        <View key={set.setIndex} style={styles.setRow}>
+                            <View style={styles.setNumberContainer}>
+                                <Text style={styles.setNumber}>{index + 1}</Text>
+                            </View>
+
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                placeholder="—"
+                                placeholderTextColor={COLORS.textTertiary}
+                                value={set.targetWeight !== undefined ? set.targetWeight.toString() : ""}
+                                onChangeText={(val) =>
+                                    handleSetChange(set.setIndex, "targetWeight", val ? parseFloat(val) : undefined)
+                                }
+                            />
+
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                placeholder="—"
+                                placeholderTextColor={COLORS.textTertiary}
+                                value={set.targetReps !== undefined ? set.targetReps.toString() : ""}
+                                onChangeText={(val) =>
+                                    handleSetChange(set.setIndex, "targetReps", val ? parseInt(val) : undefined)
+                                }
+                            />
+
+                            <TouchableOpacity
+                                onPress={() => handleRemoveSet(set.setIndex)}
+                                style={styles.removeButton}
+                                disabled={exercise.sets.length <= 1}
+                            >
+                                <X size={16} color={exercise.sets.length <= 1 ? COLORS.textTertiary : COLORS.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+
+                    {/* Add Set Button */}
+                    <TouchableOpacity style={styles.addSetButton} onPress={handleAddSet}>
+                        <Plus size={16} color={COLORS.primary} />
+                        <Text style={styles.addSetText}>{t('exercise_row.add_set')}</Text>
+                    </TouchableOpacity>
+
+                    {/* Notes Toggle */}
+                    <TouchableOpacity
+                        style={styles.notesToggle}
+                        onPress={() => setShowNotes(!showNotes)}
+                    >
+                        <Text style={styles.notesToggleText}>
+                            {showNotes ? t('exercise_row.hide_notes') : t('exercise_row.add_notes')}
+                        </Text>
+                        {showNotes ? (
+                            <ChevronUp color={COLORS.textSecondary} size={16} />
+                        ) : (
+                            <ChevronDown color={COLORS.textSecondary} size={16} />
+                        )}
+                    </TouchableOpacity>
+
+                    {/* Notes Input */}
+                    {showNotes && (
+                        <TextInput
+                            style={styles.notesInput}
+                            placeholder={t('exercise_row.notes_placeholder')}
+                            placeholderTextColor={COLORS.textTertiary}
+                            multiline
+                            numberOfLines={3}
+                            value={exercise.notes || ""}
+                            onChangeText={(text) => handleFieldChange("notes", text)}
+                        />
+                    )}
+                </View>
             )}
+
+            {/* Rest Time Picker Modal */}
+            <RestTimePicker
+                visible={showRestPicker}
+                initialSeconds={exercise.restSeconds}
+                onConfirm={(seconds) => {
+                    handleFieldChange("restSeconds", seconds);
+                    setShowRestPicker(false);
+                }}
+                onCancel={() => setShowRestPicker(false)}
+            />
         </View>
     );
 };
@@ -122,54 +222,153 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.border,
-        padding: 12,
         marginBottom: 12,
+        overflow: "hidden",
     },
-    row: {
+    header: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
-        marginBottom: 12,
+        justifyContent: "space-between",
+        padding: 16,
     },
-    nameInput: {
+    headerLeft: {
+        flexDirection: "row",
+        alignItems: "center",
         flex: 1,
+    },
+    expandIcon: {
+        marginRight: 12,
+    },
+    headerInfo: {
+        flex: 1,
+    },
+    exerciseNameHeader: {
         fontSize: 16,
         fontWeight: "600",
         color: COLORS.textPrimary,
-        padding: 0,
-    },
-    deleteButton: {
-        padding: 4,
-    },
-    statsRow: {
-        flexDirection: "row",
-        gap: 8,
-        marginBottom: 8,
-    },
-    statInput: {
-        flex: 1,
-    },
-    label: {
-        fontSize: 11,
-        fontWeight: "600",
-        color: COLORS.textSecondary,
         marginBottom: 4,
-        textTransform: "uppercase",
     },
-    input: {
+    exerciseMeta: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+    },
+    deleteButtonHeader: {
+        padding: 8,
+        marginLeft: 8,
+    },
+    content: {
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    nameInput: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: COLORS.textPrimary,
         backgroundColor: COLORS.surface,
         borderRadius: 8,
         borderWidth: 1,
         borderColor: COLORS.border,
-        padding: 8,
+        padding: 12,
+        marginBottom: 12,
+    },
+    restRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: COLORS.surface,
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 12,
+    },
+    restInfo: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    restLabel: {
         fontSize: 14,
+        fontWeight: "600",
         color: COLORS.textPrimary,
+    },
+    editButton: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: COLORS.primary,
+    },
+    tableHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 4,
+        paddingBottom: 8,
+        gap: 8,
+    },
+    headerText: {
+        fontSize: 11,
+        fontWeight: "600",
+        color: COLORS.textSecondary,
+        textAlign: "center",
+        textTransform: "uppercase",
+    },
+    setRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 8,
+    },
+    setNumberContainer: {
+        width: 40,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    setNumber: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: COLORS.textSecondary,
+    },
+    input: {
+        flex: 1,
+        backgroundColor: "transparent",
+        borderRadius: 0,
+        paddingVertical: 8,
+        paddingHorizontal: 8,
+        color: COLORS.textPrimary,
+        textAlign: "center",
+        borderWidth: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+        fontSize: 16,
+        fontWeight: "600",
+        fontVariant: ["tabular-nums"],
+    },
+    removeButton: {
+        width: 32,
+        height: 32,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    addSetButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 12,
+        gap: 8,
+        marginTop: 4,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    addSetText: {
+        color: COLORS.primary,
+        fontWeight: "600",
+        fontSize: 14,
     },
     notesToggle: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        paddingVertical: 4,
+        paddingVertical: 8,
+        marginTop: 4,
     },
     notesToggleText: {
         fontSize: 13,

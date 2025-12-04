@@ -38,10 +38,13 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const [editedDay, setEditedDay] = useState<RoutineDay>(day);
+    const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
 
     React.useEffect(() => {
         if (visible) {
             setEditedDay(day);
+            // Auto-expand first exercise when opening
+            setExpandedExerciseId(day.exercises[0]?.id || null);
         }
     }, [visible, day]);
 
@@ -126,6 +129,12 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                                 exercise={exercise}
                                 onUpdate={(updated) => handleUpdateExercise(index, updated)}
                                 onDelete={() => handleDeleteExercise(index)}
+                                isExpanded={expandedExerciseId === exercise.id}
+                                onToggleExpand={() => {
+                                    setExpandedExerciseId(
+                                        expandedExerciseId === exercise.id ? null : exercise.id
+                                    );
+                                }}
                             />
                         ))
                     )}

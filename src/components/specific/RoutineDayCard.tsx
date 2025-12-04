@@ -1,5 +1,6 @@
 import { Calendar, Dumbbell } from "lucide-react-native";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     StyleSheet,
     Text,
@@ -20,6 +21,7 @@ export const RoutineDayCard: React.FC<RoutineDayCardProps> = ({
     onPress,
     variant,
 }) => {
+    const { t } = useTranslation();
     const exerciseCount = day.exercises.length;
     const isEmpty = variant === "empty" || exerciseCount === 0;
 
@@ -43,12 +45,12 @@ export const RoutineDayCard: React.FC<RoutineDayCardProps> = ({
             {isEmpty ? (
                 <View style={styles.emptyState}>
                     <Calendar color={COLORS.textTertiary} size={20} />
-                    <Text style={styles.emptyText}>Sin ejercicios</Text>
+                    <Text style={styles.emptyText}>{t('routine_day_card.no_exercises')}</Text>
                 </View>
             ) : (
                 <View style={styles.preview}>
                     <Text style={styles.previewText}>
-                        {exerciseCount} {exerciseCount === 1 ? "ejercicio" : "ejercicios"}
+                        {exerciseCount} {t('routine_day_card.exercise', { count: exerciseCount })}
                     </Text>
                 </View>
             )}

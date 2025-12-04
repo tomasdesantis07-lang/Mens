@@ -1,12 +1,14 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 const PremiumScreen: React.FC = () => {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>MENS Premium</Text>
+      <Text style={styles.title}>{t('premium.title')}</Text>
       <Text style={styles.text}>
-        Aquí más adelante vas a mostrar los beneficios y planes Premium.
+        {t('premium.placeholder')}
       </Text>
     </View>
   );

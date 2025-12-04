@@ -1,12 +1,14 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 const ProfileScreen: React.FC = () => {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Perfil</Text>
+      <Text style={styles.title}>{t('profile.title')}</Text>
       <Text style={styles.text}>
-        Acá después vas a mostrar el apodo, progreso, logros y ajustes.
+        {t('profile.placeholder')}
       </Text>
     </View>
   );

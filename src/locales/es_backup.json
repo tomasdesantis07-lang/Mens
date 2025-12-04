@@ -13,7 +13,7 @@
     },
     "welcome": {
         "title": "MENS",
-        "subtitle": "Master Energy, Nutrition & Strength",
+        "subtitle": "Master Energy, Nutrition, Strength",
         "start": "Empezar"
     },
     "auth": {
@@ -112,22 +112,12 @@
     },
     "exercise_row": {
         "name_placeholder": "Nombre del ejercicio",
-        "rest_time": "Descanso: {{time}}",
-        "edit_rest": "Editar",
-        "set_header": "Set",
-        "kg_header": "Kg",
-        "reps_header": "Reps",
-        "add_set": "Agregar serie",
+        "sets": "Series",
+        "reps": "Reps",
+        "rest": "Descanso (s)",
         "hide_notes": "Ocultar notas",
         "add_notes": "Agregar notas",
         "notes_placeholder": "Ej: Tempo 3-1-1, drop set al final..."
-    },
-    "rest_time_picker": {
-        "title": "Tiempo de descanso",
-        "minutes": "min",
-        "seconds": "seg",
-        "confirm": "Confirmar",
-        "cancel": "Cancelar"
     },
     "routine_card": {
         "days_per_week": "días/semana",
@@ -182,7 +172,7 @@
         "training_message": "Esta página está entrenando...",
         "coming_soon": "Próximamente: Comunidad y Leaderboards.",
         "notify_me": "Notificarme",
-        "notify_success": "¡Perfecto! Te avisaremos cuando 'La Manada' esté lista."
+        "notify_success": "¡Perfecto! Te avisaremos cuando \u0027La Manada\u0027 esté lista."
     },
     "stats": {
         "title": "Estadísticas",

@@ -2,8 +2,6 @@ import {
     addDoc,
     collection,
     getDocs,
-    limit,
-    orderBy,
     query,
     serverTimestamp,
     where
@@ -18,14 +16,23 @@ export const WorkoutService = {
     async createWorkoutSession(
         session: Omit<WorkoutSession, "id" | "performedAt">
     ): Promise<string> {
-        const sessionsRef = collection(db, "workoutSessions");
+        try {
+            console.log("Creating workout session with data:", JSON.stringify(session, null, 2));
 
-        const docRef = await addDoc(sessionsRef, {
-            ...session,
-            performedAt: serverTimestamp(),
-        });
+            const sessionsRef = collection(db, "workoutSessions");
 
-        return docRef.id;
+            const docRef = await addDoc(sessionsRef, {
+                ...session,
+                performedAt: serverTimestamp(),
+            });
+
+            console.log("Workout session created successfully with ID:", docRef.id);
+            return docRef.id;
+        } catch (error) {
+            console.error("Error creating workout session:", error);
+            console.error("Error details:", JSON.stringify(error, null, 2));
+            throw error;
+        }
     },
 
     /**
@@ -39,15 +46,21 @@ export const WorkoutService = {
             const q = query(
                 collection(db, "workoutSessions"),
                 where("userId", "==", userId),
-                where("routineId", "==", routineId),
-                orderBy("performedAt", "desc")
+                where("routineId", "==", routineId)
             );
 
             const snapshot = await getDocs(q);
-            return snapshot.docs.map((doc) => ({
+            const sessions = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
             })) as WorkoutSession[];
+
+            // Sort by performedAt on client side (newest first)
+            return sessions.sort((a, b) => {
+                const aTime = a.performedAt?.toMillis?.() || 0;
+                const bTime = b.performedAt?.toMillis?.() || 0;
+                return bTime - aTime;
+            });
         } catch (error) {
             console.error("Error fetching workout sessions:", error);
             return [];
@@ -67,18 +80,25 @@ export const WorkoutService = {
                 collection(db, "workoutSessions"),
                 where("userId", "==", userId),
                 where("routineId", "==", routineId),
-                where("dayIndex", "==", dayIndex),
-                orderBy("performedAt", "desc"),
-                limit(1)
+                where("dayIndex", "==", dayIndex)
             );
 
             const snapshot = await getDocs(q);
             if (snapshot.empty) return null;
 
-            return {
-                id: snapshot.docs[0].id,
-                ...snapshot.docs[0].data(),
-            } as WorkoutSession;
+            const sessions = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as WorkoutSession[];
+
+            // Sort by performedAt on client side and get the most recent
+            sessions.sort((a, b) => {
+                const aTime = a.performedAt?.toMillis?.() || 0;
+                const bTime = b.performedAt?.toMillis?.() || 0;
+                return bTime - aTime;
+            });
+
+            return sessions[0] || null;
         } catch (error) {
             console.error("Error fetching last workout session:", error);
             return null;

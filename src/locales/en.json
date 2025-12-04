@@ -93,7 +93,9 @@
     },
     "day_selector": {
         "title": "What day is it today?",
-        "start": "Start"
+        "start": "Start",
+        "exercise_one": "exercise",
+        "exercise_other": "exercises"
     },
     "day_editor": {
         "title": "Edit Day",
@@ -103,9 +105,39 @@
         "empty_state": "No exercises yet on this day",
         "empty_hint": "Tap \"Add Exercise\" to get started"
     },
+    "routine_day_card": {
+        "no_exercises": "No exercises",
+        "exercise_one": "exercise",
+        "exercise_other": "exercises"
+    },
+    "exercise_row": {
+        "name_placeholder": "Exercise name",
+        "rest_time": "Rest: {{time}}",
+        "edit_rest": "Edit",
+        "set_header": "Set",
+        "kg_header": "Kg",
+        "reps_header": "Reps",
+        "add_set": "Add set",
+        "hide_notes": "Hide notes",
+        "add_notes": "Add notes",
+        "notes_placeholder": "Ex: Tempo 3-1-1, drop set at the end..."
+    },
+    "rest_time_picker": {
+        "title": "Rest time",
+        "minutes": "min",
+        "seconds": "sec",
+        "confirm": "Confirm",
+        "cancel": "Cancel"
+    },
     "routine_card": {
         "days_per_week": "days/week",
-        "volume": "Volume"
+        "volume": "Volume",
+        "created_for_you": "Created for you",
+        "recommended": "Recommended",
+        "days": "days",
+        "vol": "vol.",
+        "train": "Train",
+        "start": "Start"
     },
     "tabs": {
         "home": "Home",
@@ -132,11 +164,36 @@
         "kg": "Kg",
         "reps": "Reps",
         "notes": "Notes",
-        "target": "Target: {{sets}} sets x {{reps}} reps • Rest: {{rest}}s"
+        "target": "Target: {{sets}} sets x {{reps}} reps • Rest: {{rest}}s",
+        "error_load": "Error loading routine",
+        "error_save": "Error saving workout",
+        "success_save": "Workout saved!",
+        "success_save_subtitle": "Good job",
+        "routine_not_found": "Routine not found",
+        "back": "Back"
     },
     "language_selection": {
         "title": "Select your language",
         "spanish": "Español",
         "english": "English"
+    },
+    "communities": {
+        "title": "Community",
+        "training_message": "This page is training...",
+        "coming_soon": "Coming soon: Community and Leaderboards.",
+        "notify_me": "Notify me",
+        "notify_success": "Perfect! We'll notify you when 'The Pack' is ready."
+    },
+    "stats": {
+        "title": "Statistics",
+        "placeholder": "Here you will see your training metrics later."
+    },
+    "premium": {
+        "title": "MENS Premium",
+        "placeholder": "Here you will show Premium benefits and plans later."
+    },
+    "profile": {
+        "title": "Profile",
+        "placeholder": "Here you will show nickname, progress, achievements and settings later."
     }
 }

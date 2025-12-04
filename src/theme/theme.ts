@@ -1,28 +1,28 @@
 export const COLORS = {
-  // Brand
-  primary: "#6B4EFF",
-  secondary: "#5A46FF",
+  // Brand - Paleta 
+  primary: "#2962FF",
+  secondary: "#0039CB",
 
   // Accents
-  accent: "#FF6C47",
-  warning: "#FFD25E",
-  success: "#30D158",
-  error: "#FF453A",
+  accent: "#00B0FF",
+  warning: "#FFAB00",
+  success: "#00C853",
+  error: "#D50000",
 
   // Backgrounds
-  background: "#0D0D0F",
-  surface: "#131316",
-  card: "#1A1A1E",
-  cardAlt: "#1F1F23",
+  background: "#050505",
+  surface: "#0B0E14",
+  card: "#151922",
+  cardAlt: "#1E2430",
 
   // Border / dividers
-  border: "#2A2A2F",
-  divider: "#2A2A2F",
+  border: "#2A303C",
+  divider: "#1C212B",
 
   // Text
   textPrimary: "#FFFFFF",
-  textSecondary: "#A7A7AD",
-  textTertiary: "#8A8A8F",
+  textSecondary: "#94A3B8",
+  textTertiary: "#64748B",
   textInverse: "#FFFFFF",
 };
 

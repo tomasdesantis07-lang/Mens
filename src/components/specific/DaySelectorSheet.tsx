@@ -47,7 +47,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
                                 <View style={styles.dayInfo}>
                                     <Text style={styles.dayLabel}>{day.label}</Text>
                                     <Text style={styles.exerciseCount}>
-                                        {day.exercises.length} {day.exercises.length === 1 ? 'ejercicio' : 'ejercicios'}
+                                        {day.exercises.length} {t('day_selector.exercise', { count: day.exercises.length })}
                                     </Text>
                                 </View>
                                 <Text style={styles.arrow}>→</Text>
