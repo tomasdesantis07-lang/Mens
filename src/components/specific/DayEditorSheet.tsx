@@ -14,12 +14,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../../theme/theme";
+import { CatalogExercise } from "../../types/exercise";
 import {
     createEmptyExercise,
     RoutineDay,
     RoutineExercise,
 } from "../../types/routine";
 import { PrimaryButton } from "../common/PrimaryButton";
+import { ExercisePickerModal } from "./ExercisePickerModal";
 import { ExerciseRow } from "./ExerciseRow";
 
 interface DayEditorSheetProps {
@@ -39,6 +41,7 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
     const { t } = useTranslation();
     const [editedDay, setEditedDay] = useState<RoutineDay>(day);
     const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+    const [showExercisePicker, setShowExercisePicker] = useState(false);
 
     React.useEffect(() => {
         if (visible) {
@@ -53,11 +56,33 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
     };
 
     const handleAddExercise = () => {
+        setShowExercisePicker(true);
+    };
+
+    const handleExerciseSelect = (exercise: CatalogExercise, translatedName: string) => {
         const newExercise = createEmptyExercise(editedDay.exercises.length);
+        newExercise.exerciseId = exercise.id;
+        newExercise.targetZone = exercise.targetZone;
+        newExercise.name = translatedName;
+
         setEditedDay((prev) => ({
             ...prev,
             exercises: [...prev.exercises, newExercise],
         }));
+        setShowExercisePicker(false);
+        setExpandedExerciseId(newExercise.id);
+    };
+
+    const handleCustomExercise = () => {
+        const newExercise = createEmptyExercise(editedDay.exercises.length);
+        // No exerciseId means it's a custom exercise
+
+        setEditedDay((prev) => ({
+            ...prev,
+            exercises: [...prev.exercises, newExercise],
+        }));
+        setShowExercisePicker(false);
+        setExpandedExerciseId(newExercise.id);
     };
 
     const handleUpdateExercise = (index: number, exercise: RoutineExercise) => {
@@ -156,6 +181,14 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                     />
                 </View>
             </KeyboardAvoidingView>
+
+            {/* Exercise Picker Modal */}
+            <ExercisePickerModal
+                visible={showExercisePicker}
+                onSelect={handleExerciseSelect}
+                onCustomExercise={handleCustomExercise}
+                onClose={() => setShowExercisePicker(false)}
+            />
         </Modal>
     );
 };

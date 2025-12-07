@@ -8,9 +8,12 @@ export interface PredefinedSet {
     targetReps?: number;    // Optional preset
 }
 
+import { BodyZone } from "./exercise";
+
 export interface RoutineExercise {
     id: string;                  // UUID generated with uuidv4()
-    exerciseId?: string;         // Future: catalog reference
+    exerciseId?: string;         // Catalog reference
+    targetZone?: BodyZone;       // Cached zone for quick access
     name: string;
     sets: PredefinedSet[];       // Changed from number to array
     reps: string;                // Flexible: "8-12", "AMRAP", etc. (kept for reference)
@@ -31,6 +34,7 @@ export interface Routine {
     name: string;
     source: "manual" | "ai";
     isActive: boolean;
+    isCurrentPlan: boolean;      // Only one routine can be the current plan
     daysPerWeek: number;
     createdAt: Timestamp;
     updatedAt: Timestamp;

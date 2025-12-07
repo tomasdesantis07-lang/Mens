@@ -1,4 +1,36 @@
 {
+    "exercises": {
+        "chest_bench_press_bar": "Bench Press (Barbell)",
+        "chest_incline_press_dumbbells": "Incline Press (Dumbbells)",
+        "chest_pushups": "Pushups",
+        "back_pullups": "Pullups",
+        "back_rows_bar": "Barbell Rows",
+        "back_lat_pulldown": "Lat Pulldown",
+        "legs_squat_bar": "Squat (Barbell)",
+        "legs_leg_press": "Leg Press",
+        "legs_lunges_dumbbells": "Lunges (Dumbbells)",
+        "shoulders_overhead_press_bar": "Overhead Press (Barbell)",
+        "shoulders_lateral_raises": "Lateral Raises",
+        "arms_bicep_curls_bar": "Bicep Curls (Barbell)",
+        "arms_tricep_pushdown": "Tricep Pushdown (Cable)",
+        "core_plank": "Plank"
+    },
+    "body_zones": {
+        "chest": "Chest",
+        "back": "Back",
+        "legs": "Legs",
+        "shoulders": "Shoulders",
+        "arms": "Arms",
+        "core": "Core",
+        "cardio": "Cardio",
+        "full_body": "Full Body"
+    },
+    "exercise_picker": {
+        "title": "Select Exercise",
+        "search_placeholder": "Search exercise...",
+        "no_results": "No exercises found",
+        "custom_exercise": "Can't find it? Add manually"
+    },
     "common": {
         "cancel": "Cancel",
         "save": "Save",
@@ -71,6 +103,7 @@
         "edit_title": "Edit Routine",
         "name_label": "Routine Name",
         "name_placeholder": "Ex: PPL Week 1, Hypertrophy, etc.",
+        "rest_days_tip": "Empty days are your rest days, use them for proper recovery",
         "days_label": "Training Days",
         "days_hint_add": "Tap each day to add exercises",
         "days_hint_edit": "Tap each day to edit exercises",
@@ -180,20 +213,34 @@
     "communities": {
         "title": "Community",
         "training_message": "This page is training...",
-        "coming_soon": "Coming soon: Community and Leaderboards.",
+        "coming_soon": "Coming Soon: Community and Leaderboards.",
         "notify_me": "Notify me",
-        "notify_success": "Perfect! We'll notify you when 'The Pack' is ready."
-    },
-    "stats": {
-        "title": "Statistics",
-        "placeholder": "Here you will see your training metrics later."
-    },
-    "premium": {
-        "title": "MENS Premium",
-        "placeholder": "Here you will show Premium benefits and plans later."
+        "notify_success": "Perfect! We'll let you know when 'The Pack' is ready."
     },
     "profile": {
         "title": "Profile",
-        "placeholder": "Here you will show nickname, progress, achievements and settings later."
+        "my_routines": "My Routines",
+        "routine": "routine",
+        "routines": "routines",
+        "achievements": "Achievements",
+        "menu": {
+            "settings": "Settings",
+            "edit_profile": "Edit Profile",
+            "sign_out": "Sign Out",
+            "sign_out_confirm": {
+                "title": "Sign Out",
+                "message": "Are you sure you want to sign out?",
+                "confirm": "Sign Out",
+                "cancel": "Cancel"
+            }
+        },
+        "achievements_list": {
+            "first_workout": "First Workout",
+            "first_workout_desc": "Created your first routine",
+            "week_streak": "Weekly Streak",
+            "week_streak_desc": "7 consecutive days training",
+            "ten_workouts": "10 Workouts",
+            "ten_workouts_desc": "Completed 10 sessions"
+        }
     }
 }

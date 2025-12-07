@@ -94,6 +94,13 @@ const ManualEditorScreen: React.FC = () => {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Tip about rest days */}
+                <View style={styles.tipCard}>
+                    <Text style={styles.tipText}>
+                        💡 {t('routines.rest_days_tip')}
+                    </Text>
+                </View>
+
                 {/* Routine Name Input */}
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.name_label')}</Text>
@@ -233,5 +240,18 @@ const styles = StyleSheet.create({
     },
     createButton: {
         width: "100%",
+    },
+    tipCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 16,
+        marginBottom: 24,
+    },
+    tipText: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        lineHeight: 20,
     },
 });

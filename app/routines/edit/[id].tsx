@@ -5,9 +5,10 @@ import {
     ActivityIndicator,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
@@ -16,6 +17,7 @@ import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { DayEditorSheet } from "../../../src/components/specific/DayEditorSheet";
 import { RoutineDayCard } from "../../../src/components/specific/RoutineDayCard";
 import { useWorkout } from "../../../src/context/WorkoutContext";
+import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
 import { COLORS } from "../../../src/theme/theme";
 import { RoutineDay, RoutineDraft } from "../../../src/types/routine";
@@ -30,6 +32,8 @@ const EditRoutineScreen: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
     const [draft, setDraft] = useState<RoutineDraft | null>(null);
+    const [isCurrentPlan, setIsCurrentPlan] = useState(false);
+    const [userRoutineCount, setUserRoutineCount] = useState(0);
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
     const [isEditorVisible, setIsEditorVisible] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -40,6 +44,12 @@ const EditRoutineScreen: React.FC = () => {
             if (!id) return;
 
             try {
+                const user = auth.currentUser;
+                if (user) {
+                    const allRoutines = await RoutineService.getUserRoutines(user.uid);
+                    setUserRoutineCount(allRoutines.length);
+                }
+
                 const routine = await RoutineService.getRoutineById(id);
                 if (routine) {
                     const existingDays = routine.days;
@@ -56,6 +66,7 @@ const EditRoutineScreen: React.FC = () => {
                         name: routine.name,
                         days: allDays,
                     });
+                    setIsCurrentPlan(routine.isCurrentPlan || false);
                 }
             } catch (error) {
                 console.error("Error loading routine:", error);
@@ -130,6 +141,28 @@ const EditRoutineScreen: React.FC = () => {
         }
     };
 
+    const handleToggleCurrentPlan = async (value: boolean) => {
+        if (!id) return;
+
+        const user = auth.currentUser;
+        if (!user) return;
+
+        try {
+            if (value) {
+                await RoutineService.setRoutineAsCurrent(user.uid, id);
+            } else {
+                await RoutineService.setRoutineAsCurrent(user.uid, '');
+            }
+            setIsCurrentPlan(value);
+            showToast.success(
+                value ? 'Plan actual activado' : 'Plan actual desactivado'
+            );
+        } catch (error) {
+            console.error('Error toggling current plan:', error);
+            showToast.error('Error al actualizar el plan actual');
+        }
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
@@ -164,6 +197,13 @@ const EditRoutineScreen: React.FC = () => {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Tip about rest days */}
+                <View style={styles.tipCard}>
+                    <Text style={styles.tipText}>
+                        💡 {t('routines.rest_days_tip')}
+                    </Text>
+                </View>
+
                 {/* Routine Name Input */}
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.name_label')}</Text>
@@ -174,6 +214,26 @@ const EditRoutineScreen: React.FC = () => {
                         style={styles.nameInput}
                     />
                 </View>
+
+                {/* Current Plan Toggle - Only show if user has more than 1 routine */}
+                {userRoutineCount > 1 && (
+                    <View style={styles.section}>
+                        <View style={styles.currentPlanRow}>
+                            <View style={styles.currentPlanInfo}>
+                                <Text style={styles.sectionLabel}>Plan Actual</Text>
+                                <Text style={styles.sectionHint}>
+                                    Esta será tu rutina activa para entrenar
+                                </Text>
+                            </View>
+                            <Switch
+                                value={isCurrentPlan}
+                                onValueChange={handleToggleCurrentPlan}
+                                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                                thumbColor={COLORS.card}
+                            />
+                        </View>
+                    </View>
+                )}
 
                 {/* Days Grid */}
                 <View style={styles.section}>
@@ -338,5 +398,27 @@ const styles = StyleSheet.create({
         color: COLORS.error,
         fontSize: 16,
         fontWeight: "600",
+    },
+    tipCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 16,
+        marginBottom: 24,
+    },
+    tipText: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        lineHeight: 20,
+    },
+    currentPlanRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    currentPlanInfo: {
+        flex: 1,
+        marginRight: 16,
     },
 });

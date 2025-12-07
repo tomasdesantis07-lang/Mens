@@ -52,6 +52,7 @@ export const RoutineService = {
             name: sanitizedDraft.name,
             source: "manual" as const,
             isActive: false,
+            isCurrentPlan: false,
             daysPerWeek: sanitizedDraft.days.filter((d) => d.exercises.length > 0).length,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
@@ -145,6 +146,21 @@ export const RoutineService = {
         userRoutines.forEach((r) => {
             const ref = doc(db, "routines", r.id);
             batch.update(ref, { isActive: r.id === routineId });
+        });
+
+        await batch.commit();
+    },
+
+    /**
+     * Set a routine as the current plan (only one can be active at a time)
+     */
+    async setRoutineAsCurrent(userId: string, routineId: string): Promise<void> {
+        const userRoutines = await this.getUserRoutines(userId);
+        const batch = writeBatch(db);
+
+        userRoutines.forEach((r) => {
+            const ref = doc(db, "routines", r.id);
+            batch.update(ref, { isCurrentPlan: r.id === routineId });
         });
 
         await batch.commit();

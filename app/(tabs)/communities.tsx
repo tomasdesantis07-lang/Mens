@@ -3,6 +3,11 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  AnimatedCard,
+  AnimatedPopIn,
+  AnimatedSection,
+} from "../../src/components/common/Animations";
 import { PrimaryButton } from "../../src/components/common/PrimaryButton";
 import { COLORS } from "../../src/theme/theme";
 import { showToast } from "../../src/utils/toast";
@@ -19,25 +24,33 @@ const CommunitiesScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         {/* Icon */}
-        <View style={styles.iconContainer}>
-          <Users size={60} color={COLORS.primary} strokeWidth={2} />
-        </View>
+        <AnimatedPopIn delay={0}>
+          <View style={styles.iconContainer}>
+            <Users size={60} color={COLORS.primary} strokeWidth={2} />
+          </View>
+        </AnimatedPopIn>
 
         {/* Main Message */}
-        <Text style={styles.mainText}>{t('communities.training_message')}</Text>
+        <AnimatedCard delay={100}>
+          <Text style={styles.mainText}>{t('communities.training_message')}</Text>
+        </AnimatedCard>
 
         {/* Secondary Message */}
-        <Text style={styles.secondaryText}>
-          {t('communities.coming_soon')}
-        </Text>
+        <AnimatedCard delay={200}>
+          <Text style={styles.secondaryText}>
+            {t('communities.coming_soon')}
+          </Text>
+        </AnimatedCard>
 
         {/* CTA Button */}
-        <View style={styles.buttonContainer}>
-          <PrimaryButton
-            title={t('communities.notify_me')}
-            onPress={handleNotifyMe}
-          />
-        </View>
+        <AnimatedSection delay={400}>
+          <View style={styles.buttonContainer}>
+            <PrimaryButton
+              title={t('communities.notify_me')}
+              onPress={handleNotifyMe}
+            />
+          </View>
+        </AnimatedSection>
       </View>
     </View>
   );

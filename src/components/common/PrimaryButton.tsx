@@ -39,13 +39,14 @@ const styles = StyleSheet.create({
     primaryButton: {
         backgroundColor: COMPONENTS.button.solid.background,
         borderRadius: 999,
-        paddingVertical: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
         alignItems: "center",
         marginTop: 8,
     },
     primaryButtonText: {
         color: COMPONENTS.button.solid.text,
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: "600",
     },
 });

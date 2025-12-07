@@ -103,11 +103,15 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
                 <View style={styles.content}>
                     {/* Exercise Name Input */}
                     <TextInput
-                        style={styles.nameInput}
+                        style={[
+                            styles.nameInput,
+                            exercise.exerciseId && styles.nameInputReadOnly
+                        ]}
                         placeholder={t('exercise_row.name_placeholder')}
                         placeholderTextColor={COLORS.textTertiary}
                         value={exercise.name}
                         onChangeText={(text) => handleFieldChange("name", text)}
+                        editable={!exercise.exerciseId}
                     />
 
                     {/* Rest Time */}
@@ -272,6 +276,10 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
         padding: 12,
         marginBottom: 12,
+    },
+    nameInputReadOnly: {
+        backgroundColor: COLORS.background,
+        opacity: 0.7,
     },
     restRow: {
         flexDirection: "row",

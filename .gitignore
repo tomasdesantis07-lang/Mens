@@ -26,6 +26,9 @@ expo-error.log
 .env.development
 .env.production
 
+# Firebase config (contains sensitive credentials)
+src/services/firebaseConfig.ts
+
 # IDE files
 .vscode/
 .idea/

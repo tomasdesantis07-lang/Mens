@@ -71,6 +71,7 @@
         "edit_title": "Editar Rutina",
         "name_label": "Nombre de la rutina",
         "name_placeholder": "Ej: PPL Semana 1, Hypertrophy, etc.",
+        "rest_days_tip": "Los días vacíos son tus días de descanso, usalos para una correcta recuperación",
         "days_label": "Días de entrenamiento",
         "days_hint_add": "Tocá cada día para agregar ejercicios",
         "days_hint_edit": "Tocá cada día para editar ejercicios",
@@ -194,6 +195,28 @@
     },
     "profile": {
         "title": "Perfil",
-        "placeholder": "Acá después vas a mostrar el apodo, progreso, logros y ajustes."
+        "my_routines": "Mis Rutinas",
+        "routine": "rutina",
+        "routines": "rutinas",
+        "achievements": "Logros",
+        "menu": {
+            "settings": "Configuración",
+            "edit_profile": "Editar perfil",
+            "sign_out": "Cerrar sesión",
+            "sign_out_confirm": {
+                "title": "Cerrar sesión",
+                "message": "¿Seguro que querés cerrar sesión?",
+                "confirm": "Cerrar sesión",
+                "cancel": "Cancelar"
+            }
+        },
+        "achievements_list": {
+            "first_workout": "Primera Rutina",
+            "first_workout_desc": "Creaste tu primera rutina",
+            "week_streak": "Racha Semanal",
+            "week_streak_desc": "7 días consecutivos entrenando",
+            "ten_workouts": "10 Entrenamientos",
+            "ten_workouts_desc": "Completaste 10 sesiones"
+        }
     }
 }
