@@ -58,7 +58,14 @@
         "no_routines": "Aún no tenés rutinas guardadas",
         "no_community_routines": "No hay rutinas de la comunidad disponibles",
         "new_routine": "+ Nueva",
-        "view_more": "Ver más..."
+        "view_more": "Ver más...",
+        "quick_start_button": "Continuar entrenamiento",
+        "streak": "Racha",
+        "days": "días",
+        "weekly_improvement": "Mejora Semanal",
+        "vs_last_week": "vs. semana pasada",
+        "volume_30d": "Volumen (30d)",
+        "kg_lifted": "kg levantados"
     },
     "routines": {
         "create_title": "Crear Rutina",
@@ -218,5 +225,22 @@
             "ten_workouts": "10 Entrenamientos",
             "ten_workouts_desc": "Completaste 10 sesiones"
         }
+    },
+    "mens_systems": {
+        "routine_tpl_fundamentos": "Sistema MENS: Fundamentos (Full Body)",
+        "routine_tpl_arquitectura": "Sistema MENS: Arquitectura (Torso/Pierna)",
+        "routine_tpl_dominio": "Sistema MENS: Dominio (Híbrido)",
+        "day_fullbody_a": "Cuerpo Completo A",
+        "day_fullbody_b": "Cuerpo Completo B",
+        "day_fullbody_c": "Cuerpo Completo C",
+        "day_torso_a": "Torso A",
+        "day_pierna_a": "Pierna A",
+        "day_torso_b": "Torso B",
+        "day_pierna_b": "Pierna B",
+        "day_torso_fuerza": "Torso Fuerza",
+        "day_pierna_fuerza": "Pierna Fuerza",
+        "day_empuje_hipertrofia": "Empuje Hipertrofia",
+        "day_traccion_hipertrofia": "Tracción Hipertrofia",
+        "day_pierna_hombro": "Pierna/Hombro"
     }
 }

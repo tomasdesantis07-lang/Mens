@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { auth, db } from "../src/services/firebaseConfig";
+import { RoutineService } from "../src/services/routineService";
 import { COLORS, COMPONENTS } from "../src/theme/theme";
 
 const daysOptions = [2, 3, 4, 5, 6];
@@ -38,6 +39,20 @@ const OnboardingScreen: React.FC = () => {
     t('onboarding.levels.advanced'),
   ];
 
+  // Map translated labels back to internal values
+  const getObjectiveKey = (label: string): "muscle" | "fat_loss" | "strength" | "health" => {
+    if (label === t('onboarding.objectives.muscle')) return "muscle";
+    if (label === t('onboarding.objectives.fat_loss')) return "fat_loss";
+    if (label === t('onboarding.objectives.strength')) return "strength";
+    return "health";
+  };
+
+  const getLevelKey = (label: string): "beginner" | "intermediate" | "advanced" => {
+    if (label === t('onboarding.levels.beginner')) return "beginner";
+    if (label === t('onboarding.levels.intermediate')) return "intermediate";
+    return "advanced";
+  };
+
   const handleSave = async () => {
     if (!objective || !daysPerWeek || !level) return;
 
@@ -51,6 +66,7 @@ const OnboardingScreen: React.FC = () => {
     setErrorMsg("");
 
     try {
+      // Step 1: Save user profile data
       const ref = doc(db, "users", user.uid);
       await setDoc(
         ref,
@@ -63,6 +79,18 @@ const OnboardingScreen: React.FC = () => {
         { merge: true }
       );
 
+      // Step 2: Create and assign starter routine using MENS System
+      const objectiveKey = getObjectiveKey(objective);
+      const levelKey = getLevelKey(level);
+
+      await RoutineService.createAndAssignStarterRoutine(
+        user.uid,
+        daysPerWeek,
+        objectiveKey,
+        levelKey
+      );
+
+      // Step 3: Navigate to home only on success
       router.replace("/(tabs)/home");
     } catch (err) {
       console.log(err);

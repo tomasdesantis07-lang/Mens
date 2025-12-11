@@ -90,7 +90,14 @@
         "no_routines": "You don't have any saved routines yet",
         "no_community_routines": "No community routines available",
         "new_routine": "+ New",
-        "view_more": "View more..."
+        "view_more": "View more...",
+        "quick_start_button": "Continue Workout",
+        "streak": "Streak",
+        "days": "days",
+        "weekly_improvement": "Weekly Improvement",
+        "vs_last_week": "vs. last week",
+        "volume_30d": "Volume (30d)",
+        "kg_lifted": "kg lifted"
     },
     "routines": {
         "create_title": "Create Routine",
@@ -242,5 +249,22 @@
             "ten_workouts": "10 Workouts",
             "ten_workouts_desc": "Completed 10 sessions"
         }
+    },
+    "mens_systems": {
+        "routine_tpl_fundamentos": "MENS System: Foundations (Full Body)",
+        "routine_tpl_arquitectura": "MENS System: Architecture (Upper/Lower)",
+        "routine_tpl_dominio": "MENS System: Mastery (Hybrid)",
+        "day_fullbody_a": "Full Body A",
+        "day_fullbody_b": "Full Body B",
+        "day_fullbody_c": "Full Body C",
+        "day_torso_a": "Upper A",
+        "day_pierna_a": "Lower A",
+        "day_torso_b": "Upper B",
+        "day_pierna_b": "Lower B",
+        "day_torso_fuerza": "Upper Strength",
+        "day_pierna_fuerza": "Lower Strength",
+        "day_empuje_hipertrofia": "Push Hypertrophy",
+        "day_traccion_hipertrofia": "Pull Hypertrophy",
+        "day_pierna_hombro": "Lower/Shoulders"
     }
 }

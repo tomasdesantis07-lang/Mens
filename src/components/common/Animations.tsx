@@ -81,7 +81,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
     }));
 
     return (
-        <Animated.View style={[{ width: '100%' }, animatedStyle, style]}>
+        <Animated.View style={[animatedStyle, style]}>
             {children}
         </Animated.View>
     );

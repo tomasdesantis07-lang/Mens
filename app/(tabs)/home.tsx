@@ -1,10 +1,11 @@
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
-import { Play } from "lucide-react-native";
+import { Dumbbell, Flame, Play, TrendingUp } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -42,6 +43,11 @@ type UserMetrics = {
   totalVolume30d: number;
   weeklyImprovementPercent: number;
 };
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CARD_GAP = 12;
+const PADDING_H = 24;
+const CARD_WIDTH = (SCREEN_WIDTH - (PADDING_H * 2) - CARD_GAP) / 2;
 
 const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -149,32 +155,49 @@ const HomeScreen: React.FC = () => {
           <AnimatedSection delay={50} style={styles.statsSection}>
             <View style={styles.statsGrid}>
               {/* Streak Card */}
-              <AnimatedCard index={0} delay={100}>
+              <AnimatedCard
+                index={0}
+                delay={100}
+                style={{ width: CARD_WIDTH, height: CARD_WIDTH }}
+              >
                 <View style={styles.statCard}>
-                  <Text style={styles.statLabel}>Racha 🔥</Text>
+                  <View style={styles.statIconContainer}>
+                    <Flame size={22} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.statLabel}>{t('home.streak')}</Text>
                   <Text style={styles.statValue}>{metrics.streak}</Text>
-                  <Text style={styles.statUnit}>días</Text>
+                  <Text style={styles.statUnit}>{t('home.days')}</Text>
                 </View>
               </AnimatedCard>
 
               {/* Dynamic Card: Show Improvement % if positive, otherwise Total Volume */}
-              <AnimatedCard index={1} delay={150}>
+              <AnimatedCard
+                index={1}
+                delay={150}
+                style={{ width: CARD_WIDTH, height: CARD_WIDTH }}
+              >
                 <View style={styles.statCard}>
                   {metrics.weeklyImprovementPercent > 0 ? (
                     <>
-                      <Text style={styles.statLabel}>Mejora Semanal 📈</Text>
+                      <View style={styles.statIconContainer}>
+                        <TrendingUp size={22} color={COLORS.success} />
+                      </View>
+                      <Text style={styles.statLabel}>{t('home.weekly_improvement')}</Text>
                       <Text style={[styles.statValue, styles.statValueSuccess]}>
                         +{metrics.weeklyImprovementPercent}%
                       </Text>
-                      <Text style={styles.statUnit}>vs. semana pasada</Text>
+                      <Text style={styles.statUnit}>{t('home.vs_last_week')}</Text>
                     </>
                   ) : (
                     <>
-                      <Text style={styles.statLabel}>Volumen (30d) 💪</Text>
+                      <View style={styles.statIconContainer}>
+                        <Dumbbell size={22} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.statLabel}>{t('home.volume_30d')}</Text>
                       <Text style={styles.statValue}>
                         {(metrics.totalVolume30d / 1000).toFixed(1)}k
                       </Text>
-                      <Text style={styles.statUnit}>kg levantados</Text>
+                      <Text style={styles.statUnit}>{t('home.kg_lifted')}</Text>
                     </>
                   )}
                 </View>
@@ -192,7 +215,7 @@ const HomeScreen: React.FC = () => {
                   <View style={styles.quickStartTextContainer}>
                     <Text style={styles.quickStartText}>{t('home.quick_start_button')}</Text>
                     <Text style={styles.quickStartSubtext}>
-                      {userRoutines.find(r => r.id === nextWorkout.routineId)?.name} • Día {nextWorkout.dayIndex + 1}
+                      {userRoutines.find(r => r.id === nextWorkout.routineId)?.name} • {t('train.day_label', { number: nextWorkout.dayIndex + 1 })}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -366,11 +389,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 16,
+    padding: 12,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  statIconContainer: {
+    marginBottom: 8,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: COLORS.textSecondary,
     fontWeight: "600",
     textTransform: "uppercase",
@@ -379,7 +406,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "700",
     color: COLORS.textPrimary,
     marginBottom: 2,
@@ -388,7 +415,7 @@ const styles = StyleSheet.create({
     color: COLORS.success,
   },
   statUnit: {
-    fontSize: 11,
+    fontSize: 9,
     color: COLORS.textSecondary,
     textAlign: "center",
   },

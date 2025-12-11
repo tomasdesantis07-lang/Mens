@@ -11,7 +11,9 @@ import {
     where,
     writeBatch,
 } from "firebase/firestore";
+import { templateToRoutineDays } from "../data/starterRoutineTemplates";
 import { Routine, RoutineDraft } from "../types/routine";
+import { getRecommendedTemplate, UserGoal, UserLevel } from "../utils/routineRecommendation";
 import { db } from "./firebaseConfig";
 
 export const RoutineService = {
@@ -164,6 +166,57 @@ export const RoutineService = {
         });
 
         await batch.commit();
+    },
+
+    /**
+     * Create and assign a starter routine based on user's onboarding data
+     * This is the MENS System entry point - automatically creates the first routine
+     */
+    async createAndAssignStarterRoutine(
+        userId: string,
+        days: number,
+        goal: UserGoal,
+        level: UserLevel
+    ): Promise<string> {
+        // Step 1: Get the recommended template from MENS engine
+        const template = getRecommendedTemplate({
+            daysAvailable: days,
+            goal,
+            level,
+        });
+
+        // Step 2: Convert template to routine days
+        const templateDays = templateToRoutineDays(template);
+
+        // Step 3: Create the routine object
+        const routineRef = doc(collection(db, "routines"));
+        const routine = {
+            userId,
+            name: template.nameKey, // Store the i18n key, will be translated in UI
+            source: "ai" as const, // Mark as AI-generated (MENS System)
+            isActive: true,
+            isCurrentPlan: true,
+            daysPerWeek: template.daysPerWeek,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            days: templateDays,
+        };
+
+        // Step 4: Deactivate all existing routines first
+        const existingRoutines = await this.getUserRoutines(userId);
+        if (existingRoutines.length > 0) {
+            const batch = writeBatch(db);
+            existingRoutines.forEach((r) => {
+                const ref = doc(db, "routines", r.id);
+                batch.update(ref, { isActive: false, isCurrentPlan: false });
+            });
+            await batch.commit();
+        }
+
+        // Step 5: Save the new routine
+        await setDoc(routineRef, routine);
+
+        return routineRef.id;
     },
 
     /**
