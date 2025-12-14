@@ -21,7 +21,7 @@ interface RoutineCardProps {
     onEdit?: () => void;
 }
 
-export const RoutineCard: React.FC<RoutineCardProps> = ({
+const RoutineCardComponent: React.FC<RoutineCardProps> = ({
     name,
     days,
     exerciseCount,
@@ -92,6 +92,24 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
         </View>
     );
 };
+
+// Custom comparison function to prevent re-renders when only callbacks change
+// This allows React.memo to work effectively even with inline callbacks
+const arePropsEqual = (prevProps: RoutineCardProps, nextProps: RoutineCardProps) => {
+    return (
+        prevProps.name === nextProps.name &&
+        prevProps.days === nextProps.days &&
+        prevProps.exerciseCount === nextProps.exerciseCount &&
+        prevProps.isCurrentPlan === nextProps.isCurrentPlan &&
+        prevProps.variant === nextProps.variant &&
+        prevProps.recommended === nextProps.recommended &&
+        prevProps.rating === nextProps.rating
+        // Note: We intentionally ignore onPress and onEdit functions
+    );
+};
+
+// Memoized export to prevent unnecessary re-renders
+export const RoutineCard = React.memo(RoutineCardComponent, arePropsEqual);
 
 const styles = StyleSheet.create({
     card: {

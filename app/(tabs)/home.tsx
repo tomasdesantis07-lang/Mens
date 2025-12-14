@@ -145,6 +145,16 @@ const HomeScreen: React.FC = () => {
     loadData();
   }, []);
 
+  // Memoized handlers for RoutineCard callbacks (performance optimization)
+  // MUST be declared before any conditional returns to follow Rules of Hooks
+  const handleRoutinePress = useCallback((routine: Routine) => {
+    setSelectedRoutineForTraining(routine);
+  }, []);
+
+  const handleRoutineEdit = useCallback((routineId: string) => {
+    router.push(`../routines/edit/${routineId}` as any);
+  }, [router]);
+
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
@@ -266,8 +276,8 @@ const HomeScreen: React.FC = () => {
                     exerciseCount={exerciseCount}
                     isCurrentPlan={routine.isCurrentPlan}
                     variant="user"
-                    onPress={() => setSelectedRoutineForTraining(routine)}
-                    onEdit={() => router.push(`../routines/edit/${routine.id}` as any)}
+                    onPress={() => handleRoutinePress(routine)}
+                    onEdit={() => handleRoutineEdit(routine.id)}
                   />
                 </AnimatedCard>
               );

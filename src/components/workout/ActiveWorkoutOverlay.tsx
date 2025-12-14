@@ -33,7 +33,7 @@ export const ActiveWorkoutOverlay: React.FC = () => {
         <TouchableOpacity
             style={[
                 styles.container,
-                { bottom: TAB_BAR_BOTTOM + TAB_BAR_HEIGHT - 1 } // -1 to overlap slightly
+                { bottom: TAB_BAR_BOTTOM + TAB_BAR_HEIGHT + 8 } // 8px gap above tab bar
             ]}
             onPress={handlePress}
             activeOpacity={0.8}
@@ -79,9 +79,6 @@ export const ActiveWorkoutOverlay: React.FC = () => {
                     <Text style={styles.badgeText}>→</Text>
                 </View>
             </View>
-
-            {/* Separator line */}
-            <View style={styles.separator} />
         </TouchableOpacity>
     );
 };
@@ -89,23 +86,21 @@ export const ActiveWorkoutOverlay: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        left: 20,
-        right: 20,
-        backgroundColor: 'rgba(10, 10, 15, 0.4)', // Match tab bar
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        left: 40,   // More margin than tab bar (20) to be narrower
+        right: 40,  // More margin than tab bar (20) to be narrower
+        backgroundColor: 'rgba(10, 10, 15, 0.85)',
+        borderRadius: 20,
         overflow: 'hidden',
         borderWidth: 1,
-        borderBottomWidth: 0, // No bottom border to blend
-        borderColor: 'rgba(255, 255, 255, 0.15)', // Match tab bar
+        borderColor: 'rgba(255, 255, 255, 0.15)',
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
-            height: -2,
+            height: 4,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 5,
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
         zIndex: 999,
     },
     restIndicator: {
@@ -115,20 +110,18 @@ const styles = StyleSheet.create({
         right: 0,
         height: 2,
         backgroundColor: COLORS.accent,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
     },
     content: {
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingVertical: 10,
-        gap: 10,
+        paddingVertical: 12,
+        gap: 12,
     },
     iconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: "rgba(41, 98, 255, 0.15)",
         alignItems: "center",
         justifyContent: "center",
@@ -138,7 +131,7 @@ const styles = StyleSheet.create({
         gap: 3,
     },
     routineName: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: "700",
         color: COLORS.textPrimary,
     },
@@ -148,33 +141,27 @@ const styles = StyleSheet.create({
         gap: 5,
     },
     duration: {
-        fontSize: 11,
+        fontSize: 12,
         color: COLORS.textSecondary,
         fontVariant: ["tabular-nums"],
     },
     restText: {
-        fontSize: 11,
+        fontSize: 12,
         color: COLORS.accent,
         fontWeight: "600",
         fontVariant: ["tabular-nums"],
     },
     badge: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: "rgba(255, 255, 255, 0.05)",
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "rgba(255, 255, 255, 0.08)",
         alignItems: "center",
         justifyContent: "center",
     },
     badgeText: {
         color: COLORS.primary,
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: "600",
-    },
-    separator: {
-        height: 1,
-        backgroundColor: "rgba(255, 255, 255, 0.08)",
-        marginHorizontal: 16,
-        marginBottom: 4,
     },
 });

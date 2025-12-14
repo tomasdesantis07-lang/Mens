@@ -31,7 +31,7 @@ const mapSlugToMuscleId = (slug: BodyPartSlug, view: 'anterior' | 'posterior'): 
     }
 };
 
-export const BodyHeatmap: React.FC<BodyHeatmapProps> = ({ data }) => {
+const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({ data }) => {
     const [view, setView] = useState<"anterior" | "posterior">("anterior");
 
     const getIntensityColor = (muscleId: MuscleId | null): string => {
@@ -112,6 +112,9 @@ export const BodyHeatmap: React.FC<BodyHeatmapProps> = ({ data }) => {
         </View>
     );
 };
+
+// Memoized export to prevent unnecessary re-renders of complex SVG
+export const BodyHeatmap = React.memo(BodyHeatmapComponent);
 
 const styles = StyleSheet.create({
     container: {

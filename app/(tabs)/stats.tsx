@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -31,7 +31,12 @@ const StatsScreen: React.FC = () => {
   const [volumeProgression, setVolumeProgression] = useState<VolumeDataPoint[]>([]);
   const [userRank, setUserRank] = useState<UserRank | null>(null);
   const [maxStreak, setMaxStreak] = useState(0);
-  const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+  const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
+
+  // Memoized calculation: only recalculates when workoutHistory changes
+  const heatmapData = useMemo(() => {
+    return StatsService.calculateHeatmapData(workoutHistory);
+  }, [workoutHistory]);
 
   useEffect(() => {
     loadAllStats();
@@ -52,11 +57,10 @@ const StatsScreen: React.FC = () => {
         StatsService.getVolumeProgression(userId, 8),
         StatsService.getUserRank(userId),
         WorkoutService.getAllUserWorkoutSessions(userId),
-      ]);
+      ])
 
-      // Calculate heatmap data
-      const heatmap = StatsService.calculateHeatmapData(history);
-      setHeatmapData(heatmap);
+      // Store history for memoized heatmap calculation
+      setWorkoutHistory(history);
 
       // Convert consistency timestamps to Map
       const consistencyMap = new Map<string, number>();

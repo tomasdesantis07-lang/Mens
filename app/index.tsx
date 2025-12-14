@@ -1,28 +1,64 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../src/context/AuthContext';
+import { db } from '../src/services/firebaseConfig';
 import { COLORS } from '../src/theme/theme';
 
 const WelcomeScreen: React.FC = () => {
   const router = useRouter();
   const { t } = useTranslation();
   const { user, loading } = useAuth();
+  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) {
-      // User is already logged in, redirect to home
-      router.replace('/(tabs)/home');
-    }
+    const checkUserStatus = async () => {
+      if (!loading && user) {
+        setCheckingOnboarding(true);
+        try {
+          // Check if user has completed onboarding
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Verify that critical onboarding fields are present
+            const hasCompletedOnboarding =
+              userData?.username &&
+              userData?.displayName &&
+              (userData?.experienceLevel || userData?.level); // Support both new and legacy field
+
+            if (hasCompletedOnboarding) {
+              // User has completed onboarding, go to home
+              router.replace('/(tabs)/home');
+            } else {
+              // User document exists but is incomplete, complete onboarding
+              router.replace('/onboarding');
+            }
+          } else {
+            // User needs to complete onboarding
+            router.replace('/onboarding');
+          }
+        } catch (error) {
+          console.error('Error checking user status:', error);
+          // On error, assume onboarding needed
+          router.replace('/onboarding');
+        } finally {
+          setCheckingOnboarding(false);
+        }
+      }
+    };
+
+    checkUserStatus();
   }, [user, loading]);
 
   const handleStart = () => {
     router.push('/language');
   };
 
-  // Don't show anything while checking auth state
-  if (loading) {
+  // Don't show anything while checking auth state or onboarding status
+  if (loading || checkingOnboarding) {
     return null;
   }
 

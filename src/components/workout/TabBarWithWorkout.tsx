@@ -87,8 +87,12 @@ export const TabBarWithWorkout: React.FC = () => {
 
 const styles = StyleSheet.create({
     container: {
-        ...StyleSheet.absoluteFillObject,
-        borderRadius: 30,
+        position: 'absolute',
+        top: 0,
+        bottom: 4,  // Small gap from bottom curve
+        left: 16,   // More horizontal margin
+        right: 16,  // More horizontal margin
+        borderRadius: 24,
         overflow: "hidden",
         borderWidth: 1,
         borderColor: "rgba(255, 255, 255, 0.15)",
