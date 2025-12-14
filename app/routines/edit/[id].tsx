@@ -147,16 +147,21 @@ const EditRoutineScreen: React.FC = () => {
         const user = auth.currentUser;
         if (!user) return;
 
+        // Si intenta desactivar el plan, mostrar alerta
+        if (!value && isCurrentPlan) {
+            showToast.info(
+                t('routines.current_plan_change_info'),
+                t('common.cancel')
+            );
+            return;
+        }
+
         try {
             if (value) {
                 await RoutineService.setRoutineAsCurrent(user.uid, id);
-            } else {
-                await RoutineService.setRoutineAsCurrent(user.uid, '');
+                setIsCurrentPlan(true);
+                showToast.success(t('routines.current_plan_activated'), t('common.success'));
             }
-            setIsCurrentPlan(value);
-            showToast.success(
-                value ? 'Plan actual activado' : 'Plan actual desactivado'
-            );
         } catch (error) {
             console.error('Error toggling current plan:', error);
             showToast.error('Error al actualizar el plan actual');
@@ -220,9 +225,9 @@ const EditRoutineScreen: React.FC = () => {
                     <View style={styles.section}>
                         <View style={styles.currentPlanRow}>
                             <View style={styles.currentPlanInfo}>
-                                <Text style={styles.sectionLabel}>Plan Actual</Text>
+                                <Text style={styles.sectionLabel}>{t('routines.current_plan_label')}</Text>
                                 <Text style={styles.sectionHint}>
-                                    Esta será tu rutina activa para entrenar
+                                    {t('routines.current_plan_hint')}
                                 </Text>
                             </View>
                             <Switch

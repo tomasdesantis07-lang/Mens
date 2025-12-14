@@ -1,16 +1,35 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../src/context/AuthContext';
 import { COLORS } from '../src/theme/theme';
 
 const WelcomeScreen: React.FC = () => {
   const router = useRouter();
   const { t } = useTranslation();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      // User is already logged in, redirect to home
+      router.replace('/(tabs)/home');
+    }
+  }, [user, loading]);
 
   const handleStart = () => {
     router.push('/language');
   };
+
+  // Don't show anything while checking auth state
+  if (loading) {
+    return null;
+  }
+
+  // If user is logged in, don't show welcome screen (will redirect)
+  if (user) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

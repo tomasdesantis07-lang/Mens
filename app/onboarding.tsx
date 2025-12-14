@@ -1,14 +1,15 @@
 import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { auth, db } from "../src/services/firebaseConfig";
 import { RoutineService } from "../src/services/routineService";
@@ -25,6 +26,7 @@ const OnboardingScreen: React.FC = () => {
   const [displayName, setDisplayName] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
   const objectives = [
     t('onboarding.objectives.muscle'),
@@ -38,6 +40,24 @@ const OnboardingScreen: React.FC = () => {
     t('onboarding.levels.intermediate'),
     t('onboarding.levels.advanced'),
   ];
+
+  const loadingMessages = [
+    t('onboarding.loading.analyzing'),
+    t('onboarding.loading.calculating'),
+    t('onboarding.loading.structuring'),
+    t('onboarding.loading.assigning'),
+  ];
+
+  // Cycle through loading messages every 800ms
+  useEffect(() => {
+    if (!saving) return;
+
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, [saving, loadingMessages.length]);
 
   // Map translated labels back to internal values
   const getObjectiveKey = (label: string): "muscle" | "fat_loss" | "strength" | "health" => {
@@ -64,6 +84,10 @@ const OnboardingScreen: React.FC = () => {
 
     setSaving(true);
     setErrorMsg("");
+    setLoadingMessageIndex(0);
+
+    const minimumLoadTime = 2800; // 2.8 seconds minimum
+    const startTime = Date.now();
 
     try {
       // Step 1: Save user profile data
@@ -90,12 +114,19 @@ const OnboardingScreen: React.FC = () => {
         levelKey
       );
 
+      // Ensure minimum load time for premium experience
+      const elapsed = Date.now() - startTime;
+      const remainingTime = Math.max(0, minimumLoadTime - elapsed);
+
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+
       // Step 3: Navigate to home only on success
       router.replace("/(tabs)/home");
     } catch (err) {
       console.log(err);
       setErrorMsg(t('onboarding.error_save'));
-    } finally {
       setSaving(false);
     }
   };
@@ -104,118 +135,132 @@ const OnboardingScreen: React.FC = () => {
     !!objective && !!daysPerWeek && !!level && displayName.trim().length > 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{t('onboarding.title')}</Text>
+    <>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>{t('onboarding.title')}</Text>
 
-      <Text style={styles.subtitle}>
-        {t('onboarding.subtitle')}
-      </Text>
-
-      {/* NOMBRE */}
-      <Text style={styles.sectionTitle}>{t('onboarding.name_question')}</Text>
-      <TextInput
-        style={styles.nameInput}
-        placeholder={t('onboarding.name_placeholder')}
-        placeholderTextColor={COMPONENTS.input.placeholder}
-        value={displayName}
-        onChangeText={setDisplayName}
-      />
-
-      {/* OBJETIVO */}
-      <Text style={styles.sectionTitle}>
-        {t('onboarding.objective_question')}
-      </Text>
-
-      <View style={styles.chipGroup}>
-        {objectives.map((opt) => (
-          <TouchableOpacity
-            key={opt}
-            style={[
-              styles.chip,
-              objective === opt && styles.chipSelected,
-            ]}
-            onPress={() => setObjective(opt)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                objective === opt && styles.chipTextSelected,
-              ]}
-            >
-              {opt}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* DÍAS */}
-      <Text style={styles.sectionTitle}>
-        {t('onboarding.days_question')}
-      </Text>
-
-      <View style={styles.chipGroup}>
-        {daysOptions.map((d) => (
-          <TouchableOpacity
-            key={d}
-            style={[
-              styles.chip,
-              daysPerWeek === d && styles.chipSelected,
-            ]}
-            onPress={() => setDaysPerWeek(d)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                daysPerWeek === d && styles.chipTextSelected,
-              ]}
-            >
-              {d} {t('onboarding.days_suffix')}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* NIVEL */}
-      <Text style={styles.sectionTitle}>{t('onboarding.level_question')}</Text>
-
-      <View style={styles.chipGroup}>
-        {levels.map((lv) => (
-          <TouchableOpacity
-            key={lv}
-            style={[
-              styles.chip,
-              level === lv && styles.chipSelected,
-            ]}
-            onPress={() => setLevel(lv)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                level === lv && styles.chipTextSelected,
-              ]}
-            >
-              {lv}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
-
-      {/* BOTÓN */}
-      <TouchableOpacity
-        style={[
-          styles.button,
-          !canContinue && { opacity: 0.4 },
-        ]}
-        disabled={!canContinue || saving}
-        onPress={handleSave}
-      >
-        <Text style={styles.buttonText}>
-          {saving ? t('onboarding.saving') : t('common.continue')}
+        <Text style={styles.subtitle}>
+          {t('onboarding.subtitle')}
         </Text>
-      </TouchableOpacity>
-    </ScrollView>
+
+        {/* NOMBRE */}
+        <Text style={styles.sectionTitle}>{t('onboarding.name_question')}</Text>
+        <TextInput
+          style={styles.nameInput}
+          placeholder={t('onboarding.name_placeholder')}
+          placeholderTextColor={COMPONENTS.input.placeholder}
+          value={displayName}
+          onChangeText={setDisplayName}
+        />
+
+        {/* OBJETIVO */}
+        <Text style={styles.sectionTitle}>
+          {t('onboarding.objective_question')}
+        </Text>
+
+        <View style={styles.chipGroup}>
+          {objectives.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={[
+                styles.chip,
+                objective === opt && styles.chipSelected,
+              ]}
+              onPress={() => setObjective(opt)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  objective === opt && styles.chipTextSelected,
+                ]}
+              >
+                {opt}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* DÍAS */}
+        <Text style={styles.sectionTitle}>
+          {t('onboarding.days_question')}
+        </Text>
+
+        <View style={styles.chipGroup}>
+          {daysOptions.map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[
+                styles.chip,
+                daysPerWeek === d && styles.chipSelected,
+              ]}
+              onPress={() => setDaysPerWeek(d)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  daysPerWeek === d && styles.chipTextSelected,
+                ]}
+              >
+                {d} {t('onboarding.days_suffix')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* NIVEL */}
+        <Text style={styles.sectionTitle}>{t('onboarding.level_question')}</Text>
+
+        <View style={styles.chipGroup}>
+          {levels.map((lv) => (
+            <TouchableOpacity
+              key={lv}
+              style={[
+                styles.chip,
+                level === lv && styles.chipSelected,
+              ]}
+              onPress={() => setLevel(lv)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  level === lv && styles.chipTextSelected,
+                ]}
+              >
+                {lv}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
+
+        {/* BOTÓN */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            !canContinue && { opacity: 0.4 },
+          ]}
+          disabled={!canContinue || saving}
+          onPress={handleSave}
+        >
+          <Text style={styles.buttonText}>
+            {saving ? t('onboarding.saving') : t('common.continue')}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Loading Overlay */}
+      {saving && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingMessage}>
+              {loadingMessages[loadingMessageIndex]}
+            </Text>
+          </View>
+        </View>
+      )}
+    </>
   );
 };
 
@@ -311,5 +356,30 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: COMPONENTS.input.border,
+  },
+
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: COLORS.background,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+
+  loadingContent: {
+    alignItems: "center",
+    gap: 24,
+  },
+
+  loadingMessage: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+    marginTop: 24,
   },
 });

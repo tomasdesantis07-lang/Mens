@@ -1,15 +1,16 @@
-export type BodyZone =
-    | "chest"
-    | "back"
-    | "legs"
-    | "shoulders"
-    | "arms"
-    | "core"
-    | "cardio"
-    | "full_body";
+import { BodyPartSlug } from "./bodyParts";
+
+export type Equipment = 'barbell' | 'dumbbell' | 'cable' | 'machine' | 'bodyweight' | 'kettlebell' | 'band' | 'cardio' | 'smith_machine';
+export type Mechanic = 'compound' | 'isolation';
+export type ForceType = 'push' | 'pull' | 'static' | 'hinge' | 'squat';
 
 export interface CatalogExercise {
     id: string;
-    targetZone: BodyZone;
-    equipment?: "dumbbell" | "barbell" | "machine" | "bodyweight" | "cable" | "other";
+    nameKey: string; // ID para i18n
+    primaryMuscles: BodyPartSlug[];
+    secondaryMuscles: BodyPartSlug[];
+    equipment: Equipment;
+    mechanic: Mechanic;
+    force?: ForceType;
+    // Futuro: imageSource?: any;
 }

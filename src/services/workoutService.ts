@@ -139,20 +139,17 @@ export const WorkoutService = {
     async calculateUserMetrics(userId: string): Promise<{
         streak: number;
         totalVolume30d: number;
-        weeklyImprovementPercent: number;
     }> {
         try {
             const sessions = await this.getAllUserWorkoutSessions(userId);
 
             if (sessions.length === 0) {
-                return { streak: 0, totalVolume30d: 0, weeklyImprovementPercent: 0 };
+                return { streak: 0, totalVolume30d: 0 };
             }
 
             const now = new Date();
             const oneDayMs = 24 * 60 * 60 * 1000;
             const thirtyDaysAgo = new Date(now.getTime() - 30 * oneDayMs);
-            const sevenDaysAgo = new Date(now.getTime() - 7 * oneDayMs);
-            const fourteenDaysAgo = new Date(now.getTime() - 14 * oneDayMs);
 
             // Calculate streak (consecutive days with workouts)
             let streak = 0;
@@ -196,37 +193,13 @@ export const WorkoutService = {
                 }
             });
 
-            // Calculate weekly improvement
-            let currentWeekVolume = 0;
-            let previousWeekVolume = 0;
-
-            sessions.forEach(session => {
-                const sessionDate = new Date(session.performedAt?.toMillis?.() || 0);
-                const volume = session.exercises.reduce((acc, exercise) => {
-                    return acc + exercise.sets.reduce((setAcc, set) => {
-                        return setAcc + (set.weight * set.reps);
-                    }, 0);
-                }, 0);
-
-                if (sessionDate >= sevenDaysAgo) {
-                    currentWeekVolume += volume;
-                } else if (sessionDate >= fourteenDaysAgo && sessionDate < sevenDaysAgo) {
-                    previousWeekVolume += volume;
-                }
-            });
-
-            const weeklyImprovementPercent = previousWeekVolume > 0
-                ? ((currentWeekVolume - previousWeekVolume) / previousWeekVolume) * 100
-                : 0;
-
             return {
                 streak,
                 totalVolume30d: Math.round(totalVolume30d),
-                weeklyImprovementPercent: Math.round(weeklyImprovementPercent * 10) / 10, // 1 decimal
             };
         } catch (error) {
             console.error("Error calculating user metrics:", error);
-            return { streak: 0, totalVolume30d: 0, weeklyImprovementPercent: 0 };
+            return { streak: 0, totalVolume30d: 0 };
         }
     },
 
@@ -280,6 +253,118 @@ export const WorkoutService = {
         } catch (error) {
             console.error("Error getting workout for today:", error);
             return null;
+        }
+    },
+
+    /**
+     * Get comprehensive user statistics for the stats dashboard
+     */
+    async getUserStats(userId: string): Promise<{
+        consistency: number[]; // Array of timestamps for heatmap
+        weeklyVolume: { week: string; volume: number }[]; // Last 8 weeks
+        maxStreak: number; // Best historical streak
+    }> {
+        try {
+            const sessions = await this.getAllUserWorkoutSessions(userId);
+
+            // Calculate consistency (timestamps for last 3 months)
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+            const consistency = sessions
+                .filter((session) => {
+                    const sessionDate = session.performedAt?.toDate();
+                    return sessionDate && sessionDate >= threeMonthsAgo;
+                })
+                .map((session) => session.performedAt?.toMillis() || 0)
+                .filter((timestamp) => timestamp > 0);
+
+            // Calculate weekly volume for last 8 weeks
+            const now = new Date();
+            const weeklyVolume: { week: string; volume: number }[] = [];
+
+            for (let i = 7; i >= 0; i--) {
+                const weekStart = new Date(now);
+                weekStart.setDate(weekStart.getDate() - (i * 7) - weekStart.getDay());
+                weekStart.setHours(0, 0, 0, 0);
+
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 7);
+
+                const weekSessions = sessions.filter((session) => {
+                    const sessionDate = session.performedAt?.toDate();
+                    return sessionDate && sessionDate >= weekStart && sessionDate < weekEnd;
+                });
+
+                let totalVolume = 0;
+                weekSessions.forEach((session) => {
+                    session.exercises.forEach((exercise) => {
+                        exercise.sets.forEach((set) => {
+                            totalVolume += (set.weight || 0) * (set.reps || 0);
+                        });
+                    });
+                });
+
+                // Format week label
+                const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1}`;
+                weeklyVolume.push({ week: weekLabel, volume: Math.round(totalVolume) });
+            }
+
+            // Calculate max streak
+            let maxStreak = 0;
+            let currentStreakCount = 0;
+            let lastWorkoutDate: Date | null = null;
+
+            const sortedSessions = [...sessions].sort((a, b) => {
+                const aTime = a.performedAt?.toMillis() || 0;
+                const bTime = b.performedAt?.toMillis() || 0;
+                return aTime - bTime;
+            });
+
+            sortedSessions.forEach((session) => {
+                const sessionDate = session.performedAt?.toDate();
+                if (!sessionDate) return;
+
+                if (lastWorkoutDate) {
+                    const daysDiff = Math.floor(
+                        (sessionDate.getTime() - lastWorkoutDate.getTime()) / (1000 * 60 * 60 * 24)
+                    );
+
+                    if (daysDiff <= 2) {
+                        // Within streak window (allowing 1 rest day)
+                        const sameWeek =
+                            Math.floor(sessionDate.getTime() / (7 * 24 * 60 * 60 * 1000)) ===
+                            Math.floor(lastWorkoutDate.getTime() / (7 * 24 * 60 * 60 * 1000));
+
+                        if (!sameWeek) {
+                            currentStreakCount++;
+                        }
+                    } else {
+                        // Streak broken
+                        maxStreak = Math.max(maxStreak, currentStreakCount);
+                        currentStreakCount = 1;
+                    }
+                } else {
+                    currentStreakCount = 1;
+                }
+
+                lastWorkoutDate = sessionDate;
+            });
+
+            maxStreak = Math.max(maxStreak, currentStreakCount);
+
+            return {
+                consistency,
+                weeklyVolume,
+                maxStreak,
+            };
+        } catch (error) {
+            console.error("Error calculating user stats:", error);
+            return {
+                consistency: [],
+                weeklyVolume: [],
+                maxStreak: 0,
+            };
         }
     },
 };

@@ -161,9 +161,40 @@ const TrainScreen: React.FC = () => {
             });
 
             console.log("Workout session saved successfully with ID:", sessionId);
-            showToast.success(t('train.success_save'), t('train.success_save_subtitle'));
+
+            // Calculate metrics for summary screen
+            let totalVolume = 0;
+            let completedExerciseCount = 0;
+
+            currentDay.exercises.forEach((ex) => {
+                const sets = activeWorkout.logs[ex.id] || [];
+                const hasCompletedSet = sets.some((set) =>
+                    activeWorkout.completedSets.has(`${ex.id}-${set.setIndex}`)
+                );
+
+                if (hasCompletedSet) {
+                    completedExerciseCount++;
+                }
+
+                sets.forEach((set) => {
+                    if (activeWorkout.completedSets.has(`${ex.id}-${set.setIndex}`)) {
+                        totalVolume += (set.weight || 0) * (set.reps || 0);
+                    }
+                });
+            });
+
             finishWorkout(); // Clear context
-            router.replace("/(tabs)/home");
+
+            // Navigate to victory screen with metrics
+            router.replace({
+                pathname: "/workout/summary",
+                params: {
+                    duration: elapsedSeconds.toString(),
+                    volume: totalVolume.toString(),
+                    exerciseCount: completedExerciseCount.toString(),
+                    totalExercises: currentDay.exercises.length.toString(),
+                }
+            } as any);
         } catch (error) {
             console.error("Error saving workout:", error);
             console.error("Error type:", typeof error);

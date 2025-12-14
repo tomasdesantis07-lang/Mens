@@ -7,6 +7,7 @@ import {
     TouchableOpacityProps,
 } from "react-native";
 import { COMPONENTS } from "../../theme/theme";
+import { MensHaptics } from "../../utils/haptics";
 
 interface PrimaryButtonProps extends TouchableOpacityProps {
     title: string;
@@ -18,12 +19,21 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     loading,
     style,
     disabled,
+    onPress,
     ...props
 }) => {
+    const handlePress = (event: any) => {
+        if (!loading && !disabled) {
+            MensHaptics.light();
+            onPress?.(event);
+        }
+    };
+
     return (
         <TouchableOpacity
             style={[styles.primaryButton, loading && { opacity: 0.7 }, style]}
             disabled={loading || disabled}
+            onPress={handlePress}
             {...props}
         >
             {loading ? (

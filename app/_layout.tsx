@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Animated, Image, StatusBar, StyleSheet } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { initI18n } from '../src/config/i18n';
+import { AuthProvider } from '../src/context/AuthContext';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
 import { COLORS } from '../src/theme/theme';
 
@@ -40,22 +41,24 @@ export default function RootLayout() {
     }
 
     return (
-        <WorkoutProvider>
-            <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="language" />
-                <Stack.Screen name="auth" />
-                <Stack.Screen name="forgot" />
-                <Stack.Screen name="onboarding" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="routines/create" />
-                <Stack.Screen name="routines/manual-editor" />
-                <Stack.Screen name="routines/[id]/train" />
-                <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-            </Stack>
-            <Toast />
-        </WorkoutProvider>
+        <AuthProvider>
+            <WorkoutProvider>
+                <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="language" />
+                    <Stack.Screen name="auth" />
+                    <Stack.Screen name="forgot" />
+                    <Stack.Screen name="onboarding" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="routines/create" />
+                    <Stack.Screen name="routines/manual-editor" />
+                    <Stack.Screen name="routines/[id]/train" />
+                    <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                </Stack>
+                <Toast />
+            </WorkoutProvider>
+        </AuthProvider>
     );
 }
 

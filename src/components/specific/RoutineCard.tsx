@@ -1,4 +1,4 @@
-import { Calendar, Dumbbell, Edit } from "lucide-react-native";
+import { Calendar, Dumbbell, Edit, Zap } from "lucide-react-native";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,7 +12,8 @@ import { COLORS } from "../../theme/theme";
 interface RoutineCardProps {
     name: string;
     days: number;
-    volume: number;
+    exerciseCount: number;
+    isCurrentPlan?: boolean;
     variant?: "user" | "community";
     recommended?: boolean;
     rating?: number;
@@ -23,7 +24,8 @@ interface RoutineCardProps {
 export const RoutineCard: React.FC<RoutineCardProps> = ({
     name,
     days,
-    volume,
+    exerciseCount,
+    isCurrentPlan = false,
     variant = "user",
     recommended = false,
     rating,
@@ -36,7 +38,17 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
     return (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
-                <Text style={styles.name}>{name}</Text>
+                <View style={styles.nameContainer}>
+                    <Text style={styles.name}>{name}</Text>
+                    {isCurrentPlan && (
+                        <Zap
+                            size={18}
+                            color={COLORS.primary}
+                            fill={COLORS.primary}
+                            style={styles.zapIcon}
+                        />
+                    )}
+                </View>
                 {isUser && onEdit && (
                     <TouchableOpacity onPress={onEdit} style={styles.editButton}>
                         <Edit size={18} color={COLORS.textSecondary} />
@@ -61,7 +73,9 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                 </View>
                 <View style={styles.statItem}>
                     <Dumbbell color={COLORS.textSecondary} size={16} />
-                    <Text style={styles.statText}>{volume} {t('routine_card.vol')}</Text>
+                    <Text style={styles.statText}>
+                        {exerciseCount} {exerciseCount === 1 ? t('routine_card.exercise') : t('routine_card.exercises')}
+                    </Text>
                 </View>
                 {!isUser && rating && (
                     <View style={styles.statItem}>
@@ -94,11 +108,20 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginBottom: 12,
     },
+    nameContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        flex: 1,
+    },
     name: {
         fontSize: 16,
         fontWeight: "700",
         color: COLORS.textPrimary,
-        flex: 1,
+        flexShrink: 1,
+    },
+    zapIcon: {
+        marginLeft: 4,
     },
     editButton: {
         padding: 4,

@@ -1,40 +1,43 @@
-import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  AnimatedCard,
-  AnimatedHeader,
-  AnimatedPopIn,
-  AnimatedSection,
-} from '../../src/components/common/Animations';
-import { ConsistencyHeatmap } from '../../src/components/stats/ConsistencyHeatmap';
-import { ProgressChart } from '../../src/components/stats/ProgressChart';
-import { StatCard } from '../../src/components/stats/StatCard';
-import { useTabBarInset } from '../../src/hooks/useTabBarInset';
-import { auth } from '../../src/services/firebaseConfig';
-import { WorkoutService } from '../../src/services/workoutService';
-import { COLORS } from '../../src/theme/theme';
-import { WorkoutSession } from '../../src/types/workout';
-import {
-  calculateConsistency,
-  calculateCurrentStreak,
-  calculateEstimated1RM,
-  calculateVolume,
-} from '../../src/utils/statsUtils';
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { LineChart } from "react-native-gifted-charts";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AnimatedCard, AnimatedHeader, AnimatedSection } from "../../src/components/common/Animations";
+import { ConsistencyHeatmap } from "../../src/components/stats/ConsistencyHeatmap";
+import { MuscleBreakdown } from "../../src/components/stats/MuscleBreakdown";
+import { RankingCard } from "../../src/components/stats/RankingCard";
+import { useTabBarInset } from "../../src/hooks/useTabBarInset";
+import { auth } from "../../src/services/firebaseConfig";
+import { MuscleDistribution, StatsService, UserRank, VolumeDataPoint } from "../../src/services/statsService";
+import { WorkoutService } from "../../src/services/workoutService";
+import { COLORS } from "../../src/theme/theme";
 
 const StatsScreen: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
   const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [consistency, setConsistency] = useState<Map<string, number>>(new Map());
+  const [muscleDistribution, setMuscleDistribution] = useState<MuscleDistribution[]>([]);
+  const [volumeProgression, setVolumeProgression] = useState<VolumeDataPoint[]>([]);
+  const [userRank, setUserRank] = useState<UserRank | null>(null);
+  const [maxStreak, setMaxStreak] = useState(0);
+  const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    loadStats();
+    loadAllStats();
   }, []);
 
-  const loadStats = async () => {
+  const loadAllStats = async () => {
     const userId = auth.currentUser?.uid;
     if (!userId) {
       setLoading(false);
@@ -42,193 +45,284 @@ const StatsScreen: React.FC = () => {
     }
 
     try {
-      const allSessions = await WorkoutService.getAllUserWorkoutSessions(userId);
-      setSessions(allSessions);
+      // Load all stats in parallel
+      const [workoutStats, muscles, volume, rank, history] = await Promise.all([
+        WorkoutService.getUserStats(userId),
+        StatsService.getMuscleDistribution(userId),
+        StatsService.getVolumeProgression(userId, 8),
+        StatsService.getUserRank(userId),
+        WorkoutService.getAllUserWorkoutSessions(userId),
+      ]);
+
+      // Calculate heatmap data
+      const heatmap = StatsService.calculateHeatmapData(history);
+      setHeatmapData(heatmap);
+
+      // Convert consistency timestamps to Map
+      const consistencyMap = new Map<string, number>();
+      workoutStats.consistency.forEach((timestamp) => {
+        const date = new Date(timestamp).toISOString().split("T")[0];
+        consistencyMap.set(date, (consistencyMap.get(date) || 0) + 1);
+      });
+
+      setConsistency(consistencyMap);
+      setMuscleDistribution(muscles);
+      setVolumeProgression(volume);
+      setUserRank(rank);
+      setMaxStreak(workoutStats.maxStreak);
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error("Error loading stats:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate metrics
-  const volumeData = calculateVolume(sessions);
-  const consistencyData = calculateConsistency(sessions);
-  const progressData = calculateEstimated1RM(sessions);
-  const streak = calculateCurrentStreak(sessions);
-
-  // Loading state
   if (loading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>{t('stats.loading')}</Text>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{t("stats.loading")}</Text>
+        </View>
       </View>
     );
   }
 
-  // Empty state
-  if (sessions.length === 0) {
+  const hasData = consistency.size > 0 || muscleDistribution.length > 0;
+
+  if (!hasData) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-        <AnimatedHeader>
-          <Text style={styles.title}>{t('stats.title')}</Text>
-        </AnimatedHeader>
-        <AnimatedPopIn delay={100}>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>{t('stats.empty_title')}</Text>
-            <Text style={styles.emptyText}>
-              {t('stats.empty_text')}
-            </Text>
-            <Text style={styles.emptyHint}>
-              {t('stats.empty_hint')}
-            </Text>
-          </View>
-        </AnimatedPopIn>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <AnimatedHeader style={styles.header}>
+            <Text style={styles.headerTitle}>{t("stats.analytics_title")}</Text>
+          </AnimatedHeader>
+
+          <AnimatedSection delay={100} style={styles.emptySection}>
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyTitle}>{t("stats.no_analytics_yet")}</Text>
+              <Text style={styles.emptySubtitle}>{t("stats.empty_text")}</Text>
+              <TouchableOpacity
+                style={styles.ctaButton}
+                onPress={() => router.push("/(tabs)/home")}
+              >
+                <Text style={styles.ctaButtonText}>{t("stats.train_today_cta")}</Text>
+              </TouchableOpacity>
+            </View>
+          </AnimatedSection>
+        </ScrollView>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: tabBarInset }]}
-    >
-      {/* Header */}
-      <AnimatedHeader>
-        <Text style={styles.title}>{t('stats.title')}</Text>
-        <Text style={styles.subtitle}>
-          {t('stats.subtitle')}
-        </Text>
-      </AnimatedHeader>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <AnimatedHeader style={styles.header}>
+          <Text style={styles.headerTitle}>{t("stats.analytics_title")}</Text>
+          <Text style={styles.headerSubtitle}>{t("stats.performance_subtitle")}</Text>
+        </AnimatedHeader>
 
-      {/* Section 1: Volume & Streak */}
-      <View style={styles.section}>
-        <AnimatedSection delay={100}>
-          <Text style={styles.sectionTitle}>{t('stats.key_metrics')}</Text>
+        {/* Section 1: Consistency & Body Heatmap (unified card) */}
+        <AnimatedSection delay={100} style={styles.section}>
+          <ConsistencyHeatmap data={consistency} muscleData={heatmapData} />
         </AnimatedSection>
-        <View style={styles.statsRow}>
-          <AnimatedPopIn index={0} delay={150} style={{ flex: 1 }}>
-            <StatCard
-              label={t('stats.weekly_volume')}
-              value={volumeData.current.toLocaleString('es-AR')}
-              unit="kg"
-              trend={volumeData.percentageChange}
-            />
-          </AnimatedPopIn>
-          <AnimatedPopIn index={1} delay={150} style={{ flex: 1 }}>
-            <StatCard
-              label={t('stats.current_streak')}
-              value={streak}
-              unit={streak === 1 ? t('stats.week') : t('stats.weeks')}
-            />
-          </AnimatedPopIn>
-        </View>
-      </View>
 
-      {/* Section 2: Consistency Heatmap */}
-      <View style={styles.section}>
-        <AnimatedCard delay={300}>
-          <ConsistencyHeatmap data={consistencyData} />
-        </AnimatedCard>
-      </View>
+        {muscleDistribution.length > 0 && (
+          <AnimatedSection delay={250} style={styles.section}>
+            <MuscleBreakdown data={muscleDistribution} />
+          </AnimatedSection>
+        )}
 
-      {/* Section 3: Strength Progression */}
-      <View style={styles.section}>
-        <AnimatedCard delay={400}>
-          <ProgressChart
-            exerciseName={progressData.exerciseName}
-            dataPoints={progressData.dataPoints}
-          />
-        </AnimatedCard>
-      </View>
+        {/* Section 3: Progress - Volume Chart */}
+        {volumeProgression.length > 0 && (
+          <AnimatedSection delay={300} style={styles.section}>
+            <AnimatedCard style={styles.chartCard}>
+              <Text style={styles.chartTitle}>{t("stats.volume_progression_title")}</Text>
+              <LineChart
+                data={volumeProgression.map(point => ({
+                  value: point.value,
+                  label: point.label,
+                }))}
+                width={300}
+                height={180}
+                color={COLORS.primary}
+                thickness={3}
+                startFillColor={COLORS.primary + "40"}
+                endFillColor={COLORS.primary + "10"}
+                startOpacity={0.9}
+                endOpacity={0.2}
+                initialSpacing={20}
+                spacing={35}
+                noOfSections={4}
+                yAxisColor={COLORS.border}
+                xAxisColor={COLORS.border}
+                yAxisTextStyle={styles.chartAxisText}
+                xAxisLabelTextStyle={styles.chartAxisText}
+                hideDataPoints={false}
+                dataPointsColor={COLORS.primary}
+                dataPointsRadius={4}
+                curved
+                areaChart
+              />
+            </AnimatedCard>
+          </AnimatedSection>
+        )}
 
-      {/* Footer note */}
-      <AnimatedSection delay={500}>
-        <Text style={styles.footerNote}>
-          {t('stats.footer_note')}
-        </Text>
-      </AnimatedSection>
-    </ScrollView>
+        {/* Section 4: Status - Ranking & Best Streak */}
+        <AnimatedSection delay={400} style={styles.section}>
+          <View style={styles.statusRow}>
+            {userRank && (
+              <View style={styles.statusItem}>
+                <RankingCard rank={userRank} />
+              </View>
+            )}
+
+            {maxStreak > 0 && (
+              <View style={styles.statusItem}>
+                <AnimatedCard style={styles.streakCard}>
+                  <Text style={styles.streakLabel}>{t("stats.best_streak")}</Text>
+                  <Text style={styles.streakValue}>{maxStreak}</Text>
+                  <Text style={styles.streakUnit}>{t("stats.days")}</Text>
+                </AnimatedCard>
+              </View>
+            )}
+          </View>
+        </AnimatedSection>
+      </ScrollView>
+    </View>
   );
 };
-
-export default StatsScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  content: {
-    paddingHorizontal: 24,
+  scrollContent: {
+    padding: 16,
   },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: 24,
-    fontStyle: 'italic',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
   },
   loadingText: {
-    marginTop: 12,
     fontSize: 14,
     color: COLORS.textSecondary,
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 80,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 40,
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    paddingHorizontal: 40,
-  },
-  section: {
+  header: {
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "800",
     color: COLORS.textPrimary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
+  headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
-  footerNote: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    fontStyle: 'italic',
+  section: {
+    marginBottom: 16,
+  },
+  emptySection: {
+    marginTop: 40,
+  },
+  emptyStateContainer: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 32,
+    alignItems: "center",
+    gap: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  ctaButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
     marginTop: 8,
   },
+  ctaButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textInverse,
+  },
+  chartCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+  },
+  chartAxisText: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+  },
+  statusRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  statusItem: {
+    flex: 1,
+  },
+  streakCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+    alignItems: "center",
+  },
+  streakLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  streakValue: {
+    fontSize: 36,
+    fontWeight: "800",
+    color: COLORS.primary,
+  },
+  streakUnit: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
 });
+
+export default StatsScreen;

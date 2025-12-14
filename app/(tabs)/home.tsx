@@ -1,16 +1,19 @@
+import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
-import { Dumbbell, Flame, Play, TrendingUp } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { Dumbbell, Flame, Play } from "lucide-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -41,13 +44,12 @@ type UserData = {
 type UserMetrics = {
   streak: number;
   totalVolume30d: number;
-  weeklyImprovementPercent: number;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_GAP = 12;
 const PADDING_H = 24;
-const CARD_WIDTH = (SCREEN_WIDTH - (PADDING_H * 2) - CARD_GAP) / 2;
+const STAT_CARD_HEIGHT = 100;
 
 const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -62,7 +64,49 @@ const HomeScreen: React.FC = () => {
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
   const [nextWorkout, setNextWorkout] = useState<{ routineId: string; dayIndex: number } | null>(null);
 
-  const { startWorkout } = useWorkout();
+
+  // Floating button animation
+  const buttonWidth = useRef(new Animated.Value(1)).current; // 1 = expanded, 0 = collapsed
+  const [isButtonExpanded, setIsButtonExpanded] = useState(true);
+  const [showFloatingButton, setShowFloatingButton] = useState(true);
+  const rotateAnimation = useRef(new Animated.Value(0)).current;
+
+  const { startWorkout, activeWorkout } = useWorkout();
+
+  // Rotating border glow animation
+  useEffect(() => {
+    const rotate = Animated.loop(
+      Animated.timing(rotateAnimation, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    );
+    rotate.start();
+    return () => rotate.stop();
+  }, [rotateAnimation]);
+
+  // Reset button animation when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      setIsButtonExpanded(true);
+      setShowFloatingButton(true);
+      buttonWidth.setValue(1);
+
+      // Collapse after 3 seconds
+      const timer = setTimeout(() => {
+        Animated.timing(buttonWidth, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }).start(() => {
+          setIsButtonExpanded(false);
+        });
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }, [buttonWidth])
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -130,6 +174,7 @@ const HomeScreen: React.FC = () => {
     if (nextWorkout) {
       const routine = userRoutines.find(r => r.id === nextWorkout.routineId);
       if (routine) {
+        setShowFloatingButton(false); // Hide button when starting workout
         startWorkout(routine, nextWorkout.dayIndex);
         router.push(`../routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
       }
@@ -158,69 +203,40 @@ const HomeScreen: React.FC = () => {
               <AnimatedCard
                 index={0}
                 delay={100}
-                style={{ width: CARD_WIDTH, height: CARD_WIDTH }}
+                style={styles.statCardWrapper}
               >
                 <View style={styles.statCard}>
-                  <View style={styles.statIconContainer}>
-                    <Flame size={22} color={COLORS.primary} />
+                  <View style={styles.statContent}>
+                    <Text style={styles.statLabel}>{t('home.streak')}</Text>
+                    <View style={styles.statValueRow}>
+                      <Flame size={24} color={COLORS.primary} style={styles.statIcon} />
+                      <Text style={styles.statValue}>{metrics.streak}</Text>
+                    </View>
+                    <Text style={styles.statUnit}>{t('home.days')}</Text>
                   </View>
-                  <Text style={styles.statLabel}>{t('home.streak')}</Text>
-                  <Text style={styles.statValue}>{metrics.streak}</Text>
-                  <Text style={styles.statUnit}>{t('home.days')}</Text>
                 </View>
               </AnimatedCard>
 
-              {/* Dynamic Card: Show Improvement % if positive, otherwise Total Volume */}
+              {/* Volume Card */}
               <AnimatedCard
                 index={1}
                 delay={150}
-                style={{ width: CARD_WIDTH, height: CARD_WIDTH }}
+                style={styles.statCardWrapper}
               >
                 <View style={styles.statCard}>
-                  {metrics.weeklyImprovementPercent > 0 ? (
-                    <>
-                      <View style={styles.statIconContainer}>
-                        <TrendingUp size={22} color={COLORS.success} />
-                      </View>
-                      <Text style={styles.statLabel}>{t('home.weekly_improvement')}</Text>
-                      <Text style={[styles.statValue, styles.statValueSuccess]}>
-                        +{metrics.weeklyImprovementPercent}%
-                      </Text>
-                      <Text style={styles.statUnit}>{t('home.vs_last_week')}</Text>
-                    </>
-                  ) : (
-                    <>
-                      <View style={styles.statIconContainer}>
-                        <Dumbbell size={22} color={COLORS.primary} />
-                      </View>
-                      <Text style={styles.statLabel}>{t('home.volume_30d')}</Text>
+                  <View style={styles.statContent}>
+                    <Text style={styles.statLabel}>{t('home.volume_30d')}</Text>
+                    <View style={styles.statValueRow}>
+                      <Dumbbell size={24} color={COLORS.primary} style={styles.statIcon} />
                       <Text style={styles.statValue}>
                         {(metrics.totalVolume30d / 1000).toFixed(1)}k
                       </Text>
-                      <Text style={styles.statUnit}>{t('home.kg_lifted')}</Text>
-                    </>
-                  )}
+                    </View>
+                    <Text style={styles.statUnit}>{t('home.kg_lifted')}</Text>
+                  </View>
                 </View>
               </AnimatedCard>
             </View>
-
-            {/* Quick Start Button */}
-            {nextWorkout && (
-              <AnimatedCard index={2} delay={200}>
-                <TouchableOpacity
-                  style={styles.quickStartButton}
-                  onPress={handleQuickStart}
-                >
-                  <Play size={20} color={COLORS.primary} style={styles.quickStartIcon} />
-                  <View style={styles.quickStartTextContainer}>
-                    <Text style={styles.quickStartText}>{t('home.quick_start_button')}</Text>
-                    <Text style={styles.quickStartSubtext}>
-                      {userRoutines.find(r => r.id === nextWorkout.routineId)?.name} • {t('train.day_label', { number: nextWorkout.dayIndex + 1 })}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </AnimatedCard>
-            )}
           </AnimatedSection>
         )}
 
@@ -235,18 +251,27 @@ const HomeScreen: React.FC = () => {
               </Text>
             </AnimatedCard>
           ) : (
-            userRoutines.map((routine, index) => (
-              <AnimatedCard key={routine.id} index={index} delay={150}>
-                <RoutineCard
-                  name={routine.name}
-                  days={routine.daysPerWeek}
-                  volume={0}
-                  variant="user"
-                  onPress={() => setSelectedRoutineForTraining(routine)}
-                  onEdit={() => router.push(`../routines/edit/${routine.id}` as any)}
-                />
-              </AnimatedCard>
-            ))
+            userRoutines.map((routine, index) => {
+              // Calculate total exercise count
+              const exerciseCount = routine.days.reduce(
+                (total, day) => total + day.exercises.length,
+                0
+              );
+
+              return (
+                <AnimatedCard key={routine.id} index={index} delay={150}>
+                  <RoutineCard
+                    name={routine.name}
+                    days={routine.daysPerWeek}
+                    exerciseCount={exerciseCount}
+                    isCurrentPlan={routine.isCurrentPlan}
+                    variant="user"
+                    onPress={() => setSelectedRoutineForTraining(routine)}
+                    onEdit={() => router.push(`../routines/edit/${routine.id}` as any)}
+                  />
+                </AnimatedCard>
+              );
+            })
           )}
 
           <AnimatedCard index={userRoutines.length} delay={150}>
@@ -275,19 +300,27 @@ const HomeScreen: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalList}
             >
-              {communityRoutines.map((routine, index) => (
-                <AnimatedSlideIn key={routine.id} direction="right" index={index} delay={350}>
-                  <View style={styles.communityCard}>
-                    <RoutineCard
-                      name={routine.name}
-                      days={routine.daysPerWeek}
-                      volume={0}
-                      variant="community"
-                      onPress={() => console.log("Start:", routine.name)}
-                    />
-                  </View>
-                </AnimatedSlideIn>
-              ))}
+              {communityRoutines.map((routine, index) => {
+                // Calculate total exercise count
+                const exerciseCount = routine.days.reduce(
+                  (total, day) => total + day.exercises.length,
+                  0
+                );
+
+                return (
+                  <AnimatedSlideIn key={routine.id} direction="right" index={index} delay={350}>
+                    <View style={styles.communityCard}>
+                      <RoutineCard
+                        name={routine.name}
+                        days={routine.daysPerWeek}
+                        exerciseCount={exerciseCount}
+                        variant="community"
+                        onPress={() => console.log("Start:", routine.name)}
+                      />
+                    </View>
+                  </AnimatedSlideIn>
+                );
+              })}
             </ScrollView>
           )}
 
@@ -301,6 +334,96 @@ const HomeScreen: React.FC = () => {
           </AnimatedCard>
         </AnimatedSection>
       </ScrollView>
+
+      {/* Floating Quick Start Button */}
+      {nextWorkout && showFloatingButton && !activeWorkout && (
+        <Animated.View
+          style={[
+            styles.floatingButtonContainer,
+            {
+              bottom: tabBarInset + 6,
+              width: buttonWidth.interpolate({
+                inputRange: [0, 1],
+                outputRange: [48, 200], // collapsed: 48px, expanded: 200px
+              }),
+            },
+          ]}
+        >
+          {/* Rotating Gradient Layer (Behind) */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: 500, // Large enough to cover the button when rotating
+              height: 500,
+              marginLeft: -250, // Center it
+              marginTop: -250,
+              transform: [
+                {
+                  rotate: rotateAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            }}
+          >
+            <LinearGradient
+              colors={[COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+
+          {/* Button Content (Static Center) */}
+          <Animated.View
+            style={[
+              styles.floatingButtonInner,
+              {
+                backgroundColor: buttonWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['rgba(11, 14, 20, 0.1)', COLORS.surface], // Transparent when collapsed
+                }),
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.floatingButton}
+              onPress={handleQuickStart}
+              activeOpacity={0.8}
+            >
+              <Animated.View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: buttonWidth.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 6],
+                  }),
+                }}
+              >
+                <Play size={18} color={COLORS.textPrimary} fill={COLORS.textPrimary} />
+                <Animated.View
+                  style={{
+                    opacity: buttonWidth,
+                    overflow: "hidden",
+                    width: buttonWidth.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 160],
+                    }),
+                  }}
+                >
+                  <Text style={styles.floatingButtonText} numberOfLines={1}>
+                    Start Today Workout
+                  </Text>
+                </Animated.View>
+              </Animated.View>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
+      )}
 
       <DaySelectorSheet
         visible={!!selectedRoutineForTraining}
@@ -383,65 +506,85 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
+  statCardWrapper: {
+    flex: 1,
+    height: STAT_CARD_HEIGHT,
+  },
   statCard: {
     flex: 1,
     backgroundColor: COLORS.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 12,
-    alignItems: "center",
+    padding: 18,
     justifyContent: "center",
+    alignItems: "center",
   },
-  statIconContainer: {
-    marginBottom: 8,
+  statContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS.textSecondary,
     fontWeight: "600",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    letterSpacing: 0.8,
+    marginBottom: 8,
     textAlign: "center",
   },
-  statValue: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginBottom: 2,
-  },
-  statValueSuccess: {
-    color: COLORS.success,
-  },
-  statUnit: {
-    fontSize: 9,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-  },
-  quickStartButton: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    padding: 16,
+  statValueRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
   },
-  quickStartIcon: {
-    marginRight: 12,
+  statIcon: {
+    marginRight: 2,
   },
-  quickStartTextContainer: {
+  statValue: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    lineHeight: 36,
+  },
+  statUnit: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  floatingButtonContainer: {
+    position: "absolute",
+    alignSelf: "center",
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden", // Mask the rotating gradient
+    backgroundColor: COLORS.surface, // Fallback background
+    elevation: 12, // Higher elevation
+    shadowColor: COLORS.primary, // Blue glow shadow
+    shadowOffset: { width: 0, height: 0 }, // Centered glow
+    shadowOpacity: 0.6, // Stronger glow
+    shadowRadius: 16, // Wider spread
+  },
+  floatingButtonInner: {
     flex: 1,
+    borderRadius: 22, // Slightly smaller radius
+    margin: 2, // Create the 2px border space
+    justifyContent: 'center',
   },
-  quickStartText: {
+  floatingButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 0,
+  },
+  floatingButtonText: {
     fontSize: 14,
     fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 2,
-  },
-  quickStartSubtext: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+    marginLeft: 6,
   },
 });
