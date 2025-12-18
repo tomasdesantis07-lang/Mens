@@ -1,13 +1,18 @@
-﻿import { Stack } from 'expo-router';
+﻿import { DelaGothicOne_400Regular } from '@expo-google-fonts/dela-gothic-one';
+import { Inter_400Regular, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { LogBox, StatusBar, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Toast from 'react-native-toast-message';
 import { CustomSplashScreen } from '../src/components/splash/CustomSplashScreen';
 import { initI18n } from '../src/config/i18n';
 import { AuthProvider } from '../src/context/AuthContext';
+import { SettingsProvider } from '../src/context/SettingsContext';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
 import { auth, db } from '../src/services/firebaseConfig';
 import { COLORS } from '../src/theme/theme';
@@ -21,6 +26,14 @@ LogBox.ignoreLogs([
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+    // Load custom fonts with Antigravity aliases
+    const [fontsLoaded] = useFonts({
+        'Antigravity-Display': DelaGothicOne_400Regular,
+        'Antigravity-UI-Reg': Inter_400Regular,
+        'Antigravity-UI-Bold': Inter_700Bold,
+        'Antigravity-UI-Black': Inter_900Black,
+    });
+
     const [appIsReady, setAppIsReady] = useState(false);
     const [isNewUser, setIsNewUser] = useState(false);
     const [showCustomSplash, setShowCustomSplash] = useState(true);
@@ -28,6 +41,9 @@ export default function RootLayout() {
     useEffect(() => {
         const initializeApp = async () => {
             try {
+                // Wait for fonts to load
+                if (!fontsLoaded) return;
+
                 // Initialize i18n first
                 await initI18n();
 
@@ -66,7 +82,7 @@ export default function RootLayout() {
         };
 
         initializeApp();
-    }, []);
+    }, [fontsLoaded]);
 
     // Hide native splash once component is mounted (custom splash takes over)
     useEffect(() => {
@@ -82,36 +98,48 @@ export default function RootLayout() {
     // When app is ready, splash animates out
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000000' }}>
-            {appIsReady && (
-                <AuthProvider>
-                    <WorkoutProvider>
-                        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-                        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="language" />
-                            <Stack.Screen name="auth" />
-                            <Stack.Screen name="forgot" />
-                            <Stack.Screen name="onboarding" />
-                            <Stack.Screen name="(tabs)" />
-                            <Stack.Screen name="routines/create" />
-                            <Stack.Screen name="routines/manual-editor" />
-                            <Stack.Screen name="routines/[id]/train" />
-                            <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-                        </Stack>
-                        <Toast />
-                    </WorkoutProvider>
-                </AuthProvider>
-            )}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <View style={{ flex: 1, backgroundColor: '#000000' }}>
+                {appIsReady && (
+                    <AuthProvider>
+                        <SettingsProvider>
+                            <WorkoutProvider>
+                                <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+                                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
+                                    <Stack.Screen name="index" />
+                                    <Stack.Screen name="language" />
+                                    <Stack.Screen name="auth" />
+                                    <Stack.Screen name="forgot" />
+                                    <Stack.Screen name="onboarding" />
+                                    <Stack.Screen name="(tabs)" />
+                                    <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+                                    <Stack.Screen name="routines/create" />
+                                    <Stack.Screen name="routines/manual-editor" />
+                                    <Stack.Screen
+                                        name="routines/[id]/train"
+                                        options={{
+                                            presentation: 'transparentModal',
+                                            animation: 'slide_from_bottom',
+                                            contentStyle: { backgroundColor: 'transparent' },
+                                        }}
+                                    />
+                                    <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                                </Stack>
+                                <Toast />
+                            </WorkoutProvider>
+                        </SettingsProvider>
+                    </AuthProvider>
+                )}
 
-            {/* Custom Splash Screen - always rendered, handles its own animation */}
-            {showCustomSplash && (
-                <CustomSplashScreen
-                    isReady={appIsReady}
-                    isNewUser={isNewUser}
-                    onAnimationComplete={() => setShowCustomSplash(false)}
-                />
-            )}
-        </View>
+                {/* Custom Splash Screen - always rendered, handles its own animation */}
+                {showCustomSplash && (
+                    <CustomSplashScreen
+                        isReady={appIsReady}
+                        isNewUser={isNewUser}
+                        onAnimationComplete={() => setShowCustomSplash(false)}
+                    />
+                )}
+            </View>
+        </GestureHandlerRootView>
     );
 }

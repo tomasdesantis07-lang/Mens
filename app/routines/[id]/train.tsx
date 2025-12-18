@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronUp, Edit, Info, Plus } from "lucide-react-na
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Dimensions,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,6 +12,14 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
@@ -58,6 +67,40 @@ const TrainScreen: React.FC = () => {
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
 
+    // Drag to dismiss gesture
+    const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+    const translateY = useSharedValue(0);
+    const DISMISS_THRESHOLD = SCREEN_HEIGHT * 0.4; // 40% of screen to dismiss
+
+    const dismissScreen = () => {
+        router.back();
+    };
+
+    const panGesture = Gesture.Pan()
+        .onUpdate((event) => {
+            // Only allow dragging down (positive translateY)
+            if (event.translationY > 0) {
+                translateY.value = event.translationY;
+            }
+        })
+        .onEnd((event) => {
+            if (event.translationY > DISMISS_THRESHOLD) {
+                // Dismiss - animate out and navigate back
+                translateY.value = withTiming(SCREEN_HEIGHT, { duration: 200 }, () => {
+                    runOnJS(dismissScreen)();
+                });
+            } else {
+                // Snap back to original position
+                translateY.value = withSpring(0, {
+                    damping: 20,
+                    stiffness: 300,
+                });
+            }
+        });
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }],
+    }));
     useEffect(() => {
         const loadRoutineAndHistory = async () => {
             if (!id) return;
@@ -229,6 +272,7 @@ const TrainScreen: React.FC = () => {
         }
     };
 
+
     if (loading) {
         return (
             <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
@@ -251,180 +295,187 @@ const TrainScreen: React.FC = () => {
     const currentDay = routine.days.find((d) => d.dayIndex === selectedDayIndex);
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
-                    </TouchableOpacity>
-                    <View style={styles.timerContainer}>
-                        <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>
-                    </View>
-                    <TouchableOpacity onPress={navigateToEdit} style={styles.editButton}>
-                        <Edit size={16} color={COLORS.primary} />
-                        <Text style={styles.editButtonText}>{t('train.edit')}</Text>
-                    </TouchableOpacity>
+        <GestureDetector gesture={panGesture}>
+            <Animated.View style={[styles.container, { paddingTop: insets.top + 20 }, animatedStyle]}>
+                {/* Drag handle indicator */}
+                <View style={styles.dragHandle}>
+                    <View style={styles.dragIndicator} />
                 </View>
-                <View style={styles.headerTitle}>
-                    <Text style={styles.routineName}>{routine.name}</Text>
-                    <Text style={styles.dayLabel}>
-                        {currentDay ? currentDay.label : t('train.day_label', { number: selectedDayIndex + 1 })}
-                    </Text>
-                </View>
-            </View>
 
-
-
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-                {currentDay?.exercises.map((exercise) => {
-                    const isExpanded = expandedExerciseId === exercise.id;
-                    const completedSets = activeWorkout?.logs[exercise.id]?.filter((set) =>
-                        activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`)
-                    ).length || 0;
-                    const totalSets = activeWorkout?.logs[exercise.id]?.length || 0;
-
-                    return (
-                        <View key={exercise.id} style={styles.exerciseCard}>
-                            {/* Collapsible Header */}
-                            <TouchableOpacity
-                                style={styles.exerciseCollapsibleHeader}
-                                onPress={() => setExpandedExerciseId(isExpanded ? null : exercise.id)}
-                                activeOpacity={0.7}
-                            >
-                                <View style={styles.headerLeftTrain}>
-                                    <View style={styles.expandIconTrain}>
-                                        {isExpanded ? (
-                                            <ChevronUp size={20} color={COLORS.primary} />
-                                        ) : (
-                                            <ChevronDown size={20} color={COLORS.textSecondary} />
-                                        )}
-                                    </View>
-                                    <View style={styles.headerInfoTrain}>
-                                        <Text style={styles.exerciseNameHeader} numberOfLines={1}>
-                                            {exercise.name}
-                                        </Text>
-                                        <Text style={styles.exerciseMetaTrain}>
-                                            {completedSets}/{totalSets} {t('train.set')} • {exercise.sets.length} × {exercise.reps}
-                                        </Text>
-                                    </View>
-                                </View>
-                                {exercise.notes && (
-                                    <TouchableOpacity
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            showToast.info(exercise.notes || "");
-                                        }}
-                                        style={styles.noteButtonHeader}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                    >
-                                        <Info size={18} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                )}
-                            </TouchableOpacity>
-
-                            {/* Expandable Content */}
-                            {isExpanded && (
-                                <View style={styles.exerciseExpandedContent}>
-                                    <View style={styles.setsHeader}>
-                                        <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
-                                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
-                                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
-                                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
-                                        <View style={{ width: 40 }} />
-                                    </View>
-
-                                    {activeWorkout?.logs[exercise.id]?.map((set, index) => {
-                                        const isCompleted = activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`);
-                                        const lastSet = getLastSessionSet(exercise.id, set.setIndex);
-
-                                        return (
-                                            <View key={set.setIndex} style={[
-                                                styles.setRow,
-                                                isCompleted && styles.setRowCompleted
-                                            ]}>
-                                                <View style={styles.setNumberContainer}>
-                                                    <Text style={styles.setNumber}>{index + 1}</Text>
-                                                </View>
-
-                                                {/* Previous History */}
-                                                <View style={styles.historyContainer}>
-                                                    <Text style={styles.historyText}>
-                                                        {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
-                                                    </Text>
-                                                </View>
-
-                                                <TextInput
-                                                    style={[styles.input, isCompleted && styles.inputCompleted]}
-                                                    keyboardType="numeric"
-                                                    placeholder="0"
-                                                    placeholderTextColor={COLORS.textSecondary}
-                                                    value={set.weight > 0 ? set.weight.toString() : ""}
-                                                    onChangeText={(val) =>
-                                                        logSet(exercise.id, set.setIndex, "weight", parseFloat(val) || 0)
-                                                    }
-                                                    editable={!isCompleted}
-                                                />
-
-                                                <TextInput
-                                                    style={[styles.input, isCompleted && styles.inputCompleted]}
-                                                    keyboardType="numeric"
-                                                    placeholder="0"
-                                                    placeholderTextColor={COLORS.textSecondary}
-                                                    value={set.reps > 0 ? set.reps.toString() : ""}
-                                                    onChangeText={(val) =>
-                                                        logSet(exercise.id, set.setIndex, "reps", parseFloat(val) || 0)
-                                                    }
-                                                    editable={!isCompleted}
-                                                />
-
-                                                <TouchableOpacity
-                                                    onPress={() => handleToggleSet(exercise.id, set.setIndex, exercise.restSeconds)}
-                                                    style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
-                                                >
-                                                    <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
-                                                </TouchableOpacity>
-                                            </View>
-                                        );
-                                    })}
-
-                                    <TouchableOpacity
-                                        style={styles.addSetButton}
-                                        onPress={() => addSet(exercise.id)}
-                                    >
-                                        <Plus size={16} color={COLORS.primary} />
-                                        <Text style={styles.addSetText}>{t('train.add_set')}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+                {/* Header */}
+                <View style={styles.header}>
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                            <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
+                        </TouchableOpacity>
+                        <View style={styles.timerContainer}>
+                            <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>
                         </View>
-                    );
-                })}
-            </ScrollView>
+                        <TouchableOpacity onPress={navigateToEdit} style={styles.editButton}>
+                            <Edit size={16} color={COLORS.primary} />
+                            <Text style={styles.editButtonText}>{t('train.edit')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.headerTitle}>
+                        <Text style={styles.routineName}>{routine.name}</Text>
+                        <Text style={styles.dayLabel}>
+                            {currentDay ? currentDay.label : t('train.day_label', { number: selectedDayIndex + 1 })}
+                        </Text>
+                    </View>
+                </View>
 
-            <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                <PrimaryButton
-                    title={t('train.finish_session')}
-                    onPress={handleFinishWorkout}
-                    loading={isSaving}
+
+
+                <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
+                    {currentDay?.exercises.map((exercise) => {
+                        const isExpanded = expandedExerciseId === exercise.id;
+                        const completedSets = activeWorkout?.logs[exercise.id]?.filter((set) =>
+                            activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`)
+                        ).length || 0;
+                        const totalSets = activeWorkout?.logs[exercise.id]?.length || 0;
+
+                        return (
+                            <View key={exercise.id} style={styles.exerciseCard}>
+                                {/* Collapsible Header */}
+                                <TouchableOpacity
+                                    style={styles.exerciseCollapsibleHeader}
+                                    onPress={() => setExpandedExerciseId(isExpanded ? null : exercise.id)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.headerLeftTrain}>
+                                        <View style={styles.expandIconTrain}>
+                                            {isExpanded ? (
+                                                <ChevronUp size={20} color={COLORS.primary} />
+                                            ) : (
+                                                <ChevronDown size={20} color={COLORS.textSecondary} />
+                                            )}
+                                        </View>
+                                        <View style={styles.headerInfoTrain}>
+                                            <Text style={styles.exerciseNameHeader} numberOfLines={1}>
+                                                {exercise.name}
+                                            </Text>
+                                            <Text style={styles.exerciseMetaTrain}>
+                                                {completedSets}/{totalSets} {t('train.set')} • {exercise.sets.length} × {exercise.reps}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {exercise.notes && (
+                                        <TouchableOpacity
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                showToast.info(exercise.notes || "");
+                                            }}
+                                            style={styles.noteButtonHeader}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Info size={18} color={COLORS.primary} />
+                                        </TouchableOpacity>
+                                    )}
+                                </TouchableOpacity>
+
+                                {/* Expandable Content */}
+                                {isExpanded && (
+                                    <View style={styles.exerciseExpandedContent}>
+                                        <View style={styles.setsHeader}>
+                                            <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
+                                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
+                                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
+                                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
+                                            <View style={{ width: 40 }} />
+                                        </View>
+
+                                        {activeWorkout?.logs[exercise.id]?.map((set, index) => {
+                                            const isCompleted = activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`);
+                                            const lastSet = getLastSessionSet(exercise.id, set.setIndex);
+
+                                            return (
+                                                <View key={set.setIndex} style={[
+                                                    styles.setRow,
+                                                    isCompleted && styles.setRowCompleted
+                                                ]}>
+                                                    <View style={styles.setNumberContainer}>
+                                                        <Text style={styles.setNumber}>{index + 1}</Text>
+                                                    </View>
+
+                                                    {/* Previous History */}
+                                                    <View style={styles.historyContainer}>
+                                                        <Text style={styles.historyText}>
+                                                            {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
+                                                        </Text>
+                                                    </View>
+
+                                                    <TextInput
+                                                        style={[styles.input, isCompleted && styles.inputCompleted]}
+                                                        keyboardType="numeric"
+                                                        placeholder="0"
+                                                        placeholderTextColor={COLORS.textSecondary}
+                                                        value={set.weight > 0 ? set.weight.toString() : ""}
+                                                        onChangeText={(val) =>
+                                                            logSet(exercise.id, set.setIndex, "weight", parseFloat(val) || 0)
+                                                        }
+                                                        editable={!isCompleted}
+                                                    />
+
+                                                    <TextInput
+                                                        style={[styles.input, isCompleted && styles.inputCompleted]}
+                                                        keyboardType="numeric"
+                                                        placeholder="0"
+                                                        placeholderTextColor={COLORS.textSecondary}
+                                                        value={set.reps > 0 ? set.reps.toString() : ""}
+                                                        onChangeText={(val) =>
+                                                            logSet(exercise.id, set.setIndex, "reps", parseFloat(val) || 0)
+                                                        }
+                                                        editable={!isCompleted}
+                                                    />
+
+                                                    <TouchableOpacity
+                                                        onPress={() => handleToggleSet(exercise.id, set.setIndex, exercise.restSeconds)}
+                                                        style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
+                                                    >
+                                                        <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            );
+                                        })}
+
+                                        <TouchableOpacity
+                                            style={styles.addSetButton}
+                                            onPress={() => addSet(exercise.id)}
+                                        >
+                                            <Plus size={16} color={COLORS.primary} />
+                                            <Text style={styles.addSetText}>{t('train.add_set')}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    })}
+                </ScrollView>
+
+                <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+                    <PrimaryButton
+                        title={t('train.finish_session')}
+                        onPress={handleFinishWorkout}
+                        loading={isSaving}
+                    />
+                    <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
+                        <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Cancel Workout Confirmation Dialog */}
+                <ConfirmDialog
+                    visible={showCancelDialog}
+                    title={t('train.cancel_dialog.title')}
+                    message={t('train.cancel_dialog.message')}
+                    confirmText={t('train.cancel_dialog.confirm')}
+                    cancelText={t('train.cancel_dialog.cancel')}
+                    onConfirm={confirmCancelWorkout}
+                    onCancel={() => setShowCancelDialog(false)}
+                    variant="danger"
                 />
-                <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
-                    <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Cancel Workout Confirmation Dialog */}
-            <ConfirmDialog
-                visible={showCancelDialog}
-                title={t('train.cancel_dialog.title')}
-                message={t('train.cancel_dialog.message')}
-                confirmText={t('train.cancel_dialog.confirm')}
-                cancelText={t('train.cancel_dialog.cancel')}
-                onConfirm={confirmCancelWorkout}
-                onCancel={() => setShowCancelDialog(false)}
-                variant="danger"
-            />
-        </View>
+            </Animated.View>
+        </GestureDetector>
     );
 };
 
@@ -434,6 +485,21 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        marginTop: 40, // Space at top to see previous screen
+        overflow: 'hidden',
+    },
+    dragHandle: {
+        alignItems: 'center',
+        paddingTop: 8,
+        paddingBottom: 12,
+    },
+    dragIndicator: {
+        width: 40,
+        height: 4,
+        backgroundColor: COLORS.border,
+        borderRadius: 2,
     },
     header: {
         paddingHorizontal: 24,

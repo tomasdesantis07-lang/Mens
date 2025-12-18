@@ -7,7 +7,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { COLORS } from "../../theme/theme";
+import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
 
 interface RoutineCardProps {
     name: string;
@@ -133,8 +133,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     name: {
-        fontSize: 16,
-        fontWeight: "700",
+        ...TYPOGRAPHY.h3,
         color: COLORS.textPrimary,
         flexShrink: 1,
     },
@@ -157,8 +156,8 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     badgeText: {
-        fontSize: 10,
-        fontWeight: "600",
+        ...TYPOGRAPHY.caption,
+        fontFamily: TYPOGRAPHY.button.fontFamily,
         color: COLORS.textInverse,
     },
     stats: {
@@ -172,13 +171,14 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     statText: {
-        fontSize: 13,
+        ...TYPOGRAPHY.bodySmall,
+        fontSize: FONT_SIZE.sm + 1, // 13px
         color: COLORS.textSecondary,
     },
     ratingText: {
-        fontSize: 13,
+        ...TYPOGRAPHY.bodySmall,
+        fontSize: FONT_SIZE.sm + 1,
         color: COLORS.textPrimary,
-        fontWeight: "600",
     },
     button: {
         backgroundColor: COLORS.primary,
@@ -187,8 +187,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     buttonText: {
+        ...TYPOGRAPHY.button,
         color: COLORS.textInverse,
-        fontSize: 14,
-        fontWeight: "600",
     },
 });

@@ -4,7 +4,7 @@ import { Clock, Dumbbell } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useWorkout } from "../../context/WorkoutContext";
-import { COLORS } from "../../theme/theme";
+import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
 
 const TAB_BAR_HEIGHT = 60;
 const TAB_BAR_BOTTOM = 20;
@@ -131,8 +131,7 @@ const styles = StyleSheet.create({
         gap: 3,
     },
     routineName: {
-        fontSize: 14,
-        fontWeight: "700",
+        ...TYPOGRAPHY.h4,
         color: COLORS.textPrimary,
     },
     metaRow: {
@@ -141,14 +140,14 @@ const styles = StyleSheet.create({
         gap: 5,
     },
     duration: {
-        fontSize: 12,
+        ...TYPOGRAPHY.bodySmall,
         color: COLORS.textSecondary,
         fontVariant: ["tabular-nums"],
     },
     restText: {
-        fontSize: 12,
+        ...TYPOGRAPHY.bodySmall,
+        fontWeight: TYPOGRAPHY.button.fontWeight,
         color: COLORS.accent,
-        fontWeight: "600",
         fontVariant: ["tabular-nums"],
     },
     badge: {
@@ -160,8 +159,8 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     badgeText: {
+        ...TYPOGRAPHY.button,
+        fontSize: FONT_SIZE.xl,
         color: COLORS.primary,
-        fontSize: 18,
-        fontWeight: "600",
     },
 });

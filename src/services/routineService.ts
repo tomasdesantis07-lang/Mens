@@ -21,20 +21,36 @@ export const RoutineService = {
      * Sanitize routine data for Firestore (remove undefined values)
      */
     sanitizeRoutineForFirestore(draft: RoutineDraft) {
+        // Helper to remove undefined values from an object
+        const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
+            const result = {} as T;
+            for (const key in obj) {
+                if (obj[key] !== undefined) {
+                    result[key] = obj[key];
+                }
+            }
+            return result;
+        };
+
         return {
-            ...draft,
+            name: draft.name,
             days: draft.days.map(day => ({
-                ...day,
-                exercises: day.exercises.map(exercise => ({
-                    ...exercise,
-                    sets: exercise.sets.map(set => ({
+                dayIndex: day.dayIndex,
+                label: day.label,
+                exercises: day.exercises.map(exercise => removeUndefined({
+                    id: exercise.id,
+                    exerciseId: exercise.exerciseId,
+                    targetZone: exercise.targetZone,
+                    name: exercise.name,
+                    sets: exercise.sets.map(set => removeUndefined({
                         setIndex: set.setIndex,
-                        // Only include targetWeight/targetReps if they have values
-                        ...(set.targetWeight !== undefined && { targetWeight: set.targetWeight }),
-                        ...(set.targetReps !== undefined && { targetReps: set.targetReps }),
+                        targetWeight: set.targetWeight,
+                        targetReps: set.targetReps,
                     })),
-                    // Remove notes if undefined
-                    ...(exercise.notes !== undefined && { notes: exercise.notes }),
+                    reps: exercise.reps,
+                    restSeconds: exercise.restSeconds,
+                    notes: exercise.notes,
+                    order: exercise.order,
                 })),
             })),
         };
@@ -196,6 +212,7 @@ export const RoutineService = {
             source: "ai" as const, // Mark as AI-generated (MENS System)
             isActive: true,
             isCurrentPlan: true,
+            isGeneratedForUser: true, // Tag as generated for "For You" badge
             daysPerWeek: template.daysPerWeek,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),

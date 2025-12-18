@@ -2,7 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
-import { Dumbbell, Flame, Play } from "lucide-react-native";
+import { Dumbbell, Flame, Moon, Play, Plus } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,6 +22,7 @@ import {
   AnimatedSection,
   AnimatedSlideIn,
 } from "../../src/components/common/Animations";
+import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
 import { RoutineCard } from "../../src/components/specific/RoutineCard";
 import { useWorkout } from "../../src/context/WorkoutContext";
@@ -29,7 +30,7 @@ import { useTabBarInset } from "../../src/hooks/useTabBarInset";
 import { auth, db } from "../../src/services/firebaseConfig";
 import { RoutineService } from "../../src/services/routineService";
 import { WorkoutService } from "../../src/services/workoutService";
-import { COLORS } from "../../src/theme/theme";
+import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../src/theme/theme";
 import { Routine } from "../../src/types/routine";
 
 type UserData = {
@@ -62,7 +63,7 @@ const HomeScreen: React.FC = () => {
   const [communityRoutines, setCommunityRoutines] = useState<Routine[]>([]);
   const [selectedRoutineForTraining, setSelectedRoutineForTraining] = useState<Routine | null>(null);
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
-  const [nextWorkout, setNextWorkout] = useState<{ routineId: string; dayIndex: number } | null>(null);
+  const [nextWorkout, setNextWorkout] = useState<{ routineId: string; dayIndex: number; isRestDay: boolean } | null>(null);
 
 
   // Floating button animation
@@ -79,7 +80,7 @@ const HomeScreen: React.FC = () => {
       Animated.timing(rotateAnimation, {
         toValue: 1,
         duration: 3000,
-        useNativeDriver: true,
+        useNativeDriver: false, // Must be false because we use layout properties
       })
     );
     rotate.start();
@@ -168,6 +169,9 @@ const HomeScreen: React.FC = () => {
       ? userData.displayName
       : userData?.email ?? "Atleta";
 
+  // Check if today is a rest day (from WorkoutService)
+  const isTodayRestDay = nextWorkout?.isRestDay ?? false;
+
   const handleCreateRoutine = () => {
     router.push("../routines/create" as any);
   };
@@ -204,6 +208,21 @@ const HomeScreen: React.FC = () => {
         <AnimatedHeader>
           <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
         </AnimatedHeader>
+
+        {/* Rest Day Message */}
+        {isTodayRestDay && (
+          <AnimatedSection delay={50} style={styles.section}>
+            <View style={styles.restDayCard}>
+              <View style={styles.restDayIcon}>
+                <Moon size={28} color={COLORS.success} />
+              </View>
+              <View style={styles.restDayContent}>
+                <Text style={styles.restDayTitle}>{t('home.rest_day_title')}</Text>
+                <Text style={styles.restDayMessage}>{t('home.rest_day_message')}</Text>
+              </View>
+            </View>
+          </AnimatedSection>
+        )}
 
         {/* Stats Dashboard */}
         {metrics && (
@@ -250,49 +269,8 @@ const HomeScreen: React.FC = () => {
           </AnimatedSection>
         )}
 
-        {/* My Routines Section */}
-        <AnimatedSection delay={100} style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('home.my_routines')}</Text>
-
-          {userRoutines.length === 0 ? (
-            <AnimatedCard index={0} delay={150}>
-              <Text style={styles.emptyText}>
-                {t('home.no_routines')}
-              </Text>
-            </AnimatedCard>
-          ) : (
-            userRoutines.map((routine, index) => {
-              // Calculate total exercise count
-              const exerciseCount = routine.days.reduce(
-                (total, day) => total + day.exercises.length,
-                0
-              );
-
-              return (
-                <AnimatedCard key={routine.id} index={index} delay={150}>
-                  <RoutineCard
-                    name={routine.name}
-                    days={routine.daysPerWeek}
-                    exerciseCount={exerciseCount}
-                    isCurrentPlan={routine.isCurrentPlan}
-                    variant="user"
-                    onPress={() => handleRoutinePress(routine)}
-                    onEdit={() => handleRoutineEdit(routine.id)}
-                  />
-                </AnimatedCard>
-              );
-            })
-          )}
-
-          <AnimatedCard index={userRoutines.length} delay={150}>
-            <TouchableOpacity
-              style={styles.newRoutineCard}
-              onPress={handleCreateRoutine}
-            >
-              <Text style={styles.newRoutineText}>{t('home.new_routine')}</Text>
-            </TouchableOpacity>
-          </AnimatedCard>
-        </AnimatedSection>
+        {/* Recent Workouts Section */}
+        <RecentWorkouts />
 
         {/* Community Routines Section */}
         <AnimatedSection delay={300} style={styles.section}>
@@ -354,8 +332,13 @@ const HomeScreen: React.FC = () => {
               bottom: tabBarInset + 6,
               width: buttonWidth.interpolate({
                 inputRange: [0, 1],
-                outputRange: [48, 200], // collapsed: 48px, expanded: 200px
+                outputRange: [48, isTodayRestDay ? 140 : 230],
               }),
+              opacity: isTodayRestDay ? 0.7 : 1,
+            },
+            isTodayRestDay && {
+              shadowColor: COLORS.success,
+              backgroundColor: COLORS.success + '30',
             },
           ]}
         >
@@ -363,12 +346,13 @@ const HomeScreen: React.FC = () => {
           <Animated.View
             style={{
               position: 'absolute',
-              top: '50%',
-              left: '50%',
-              width: 500, // Large enough to cover the button when rotating
-              height: 500,
-              marginLeft: -250, // Center it
-              marginTop: -250,
+              width: 250,
+              height: 250,
+              top: -101,
+              left: buttonWidth.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-101, -10],
+              }),
               transform: [
                 {
                   rotate: rotateAnimation.interpolate({
@@ -380,7 +364,10 @@ const HomeScreen: React.FC = () => {
             }}
           >
             <LinearGradient
-              colors={[COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']}
+              colors={isTodayRestDay
+                ? [COLORS.success, 'transparent', COLORS.success, 'transparent']
+                : [COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{ flex: 1 }}
@@ -388,45 +375,131 @@ const HomeScreen: React.FC = () => {
           </Animated.View>
 
           {/* Button Content (Static Center) */}
-          <Animated.View
+          <View
             style={[
               styles.floatingButtonInner,
-              {
-                backgroundColor: buttonWidth.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['rgba(11, 14, 20, 0.1)', COLORS.surface], // Transparent when collapsed
-                }),
-              },
+              { backgroundColor: isTodayRestDay ? COLORS.success + '20' : COLORS.surface },
             ]}
           >
             <TouchableOpacity
               style={styles.floatingButton}
-              onPress={handleQuickStart}
-              activeOpacity={0.8}
+              onPress={isTodayRestDay ? undefined : handleQuickStart}
+              activeOpacity={isTodayRestDay ? 1 : 0.8}
+              disabled={isTodayRestDay}
             >
               <Animated.View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: buttonWidth.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 6],
-                  }),
                 }}
               >
-                <Play size={18} color={COLORS.textPrimary} fill={COLORS.textPrimary} />
+                {isTodayRestDay ? (
+                  <Moon size={18} color={COLORS.success} />
+                ) : (
+                  <Play size={18} color={COLORS.textPrimary} fill={COLORS.textPrimary} />
+                )}
                 <Animated.View
                   style={{
                     opacity: buttonWidth,
                     overflow: "hidden",
                     width: buttonWidth.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0, 160],
+                      outputRange: [0, isTodayRestDay ? 80 : 185],
+                    }),
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.floatingButtonText,
+                      isTodayRestDay && { color: COLORS.success }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isTodayRestDay ? t('home.rest_button') : t('home.start_today')}
+                  </Text>
+                </Animated.View>
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Upper Floating Button - Empty Workout */}
+      {showFloatingButton && (
+        <Animated.View
+          style={[
+            styles.floatingButtonContainerRight,
+            {
+              bottom: tabBarInset + 6 + 48 + 12, // Above the main button (48px height + 12px gap)
+              width: buttonWidth.interpolate({
+                inputRange: [0, 1],
+                outputRange: [48, 120],
+              }),
+            },
+          ]}
+        >
+          {/* Rotating Border Glow */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              width: 200,
+              height: 200,
+              top: -76,
+              left: buttonWidth.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-76, -10],
+              }),
+              transform: [
+                {
+                  rotate: rotateAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            }}
+          >
+            <LinearGradient
+              colors={['rgba(255,255,255,0.3)', 'transparent', 'rgba(255,255,255,0.3)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+
+          {/* Button Content */}
+          <Animated.View
+            style={[
+              styles.floatingButtonInnerOutline,
+              {
+                backgroundColor: COLORS.surface, // Solid background to hide glow
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.floatingButton}
+              onPress={() => console.log('Empty workout')}
+              activeOpacity={0.8}
+            >
+              <Animated.View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Plus size={18} color={COLORS.textPrimary} strokeWidth={2.5} />
+                <Animated.View
+                  style={{
+                    opacity: buttonWidth,
+                    overflow: "hidden",
+                    width: buttonWidth.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 55],
                     }),
                   }}
                 >
                   <Text style={styles.floatingButtonText} numberOfLines={1}>
-                    Start Today Workout
+                    {t('home.empty_workout')}
                   </Text>
                 </Animated.View>
               </Animated.View>
@@ -456,8 +529,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   greeting: {
+    ...TYPOGRAPHY.h1,
     fontSize: 28,
-    fontWeight: "700",
     color: COLORS.textPrimary,
     marginBottom: 32,
   },
@@ -465,13 +538,24 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    ...TYPOGRAPHY.h3,
+    fontSize: FONT_SIZE.xl,
     color: COLORS.textPrimary,
     marginBottom: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addNewText: {
+    ...TYPOGRAPHY.button,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.primary,
+  },
   emptyText: {
-    fontSize: 14,
+    ...TYPOGRAPHY.body,
     color: COLORS.textSecondary,
     textAlign: "center",
     paddingVertical: 20,
@@ -488,8 +572,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   newRoutineText: {
-    fontSize: 16,
-    fontWeight: "600",
+    ...TYPOGRAPHY.button,
     color: COLORS.primary,
   },
   horizontalList: {
@@ -504,9 +587,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   viewMoreText: {
-    fontSize: 14,
+    ...TYPOGRAPHY.button,
+    fontSize: FONT_SIZE.md,
     color: COLORS.primary,
-    fontWeight: "600",
   },
   statsSection: {
     marginBottom: 32,
@@ -537,11 +620,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   statLabel: {
+    ...TYPOGRAPHY.label,
     fontSize: 11,
     color: COLORS.textSecondary,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
     marginBottom: 8,
     textAlign: "center",
   },
@@ -555,20 +636,20 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   statValue: {
-    fontSize: 32,
-    fontWeight: "700",
+    ...TYPOGRAPHY.numberBig,
+    fontSize: FONT_SIZE.xxxl,
     color: COLORS.textPrimary,
     lineHeight: 36,
   },
   statUnit: {
-    fontSize: 12,
+    ...TYPOGRAPHY.bodySmall,
     color: COLORS.textSecondary,
-    fontWeight: "500",
     textAlign: "center",
   },
   floatingButtonContainer: {
     position: "absolute",
-    alignSelf: "center",
+    alignSelf: "flex-start",
+    marginLeft: 24,
     height: 48,
     borderRadius: 24,
     overflow: "hidden", // Mask the rotating gradient
@@ -579,10 +660,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6, // Stronger glow
     shadowRadius: 16, // Wider spread
   },
+  floatingButtonContainerRight: {
+    position: "absolute",
+    alignSelf: "flex-start",
+    marginLeft: 24,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    elevation: 8,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
   floatingButtonInner: {
     flex: 1,
     borderRadius: 22, // Slightly smaller radius
     margin: 2, // Create the 2px border space
+    justifyContent: 'center',
+  },
+  floatingButtonInnerOutline: {
+    flex: 1,
+    borderRadius: 22,
     justifyContent: 'center',
   },
   floatingButton: {
@@ -592,9 +693,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   floatingButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
+    ...TYPOGRAPHY.button,
     color: COLORS.textPrimary,
     marginLeft: 6,
+  },
+  restDayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.success + '15',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.success + '30',
+    gap: 16,
+  },
+  restDayIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.success + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restDayContent: {
+    flex: 1,
+    gap: 4,
+  },
+  restDayTitle: {
+    ...TYPOGRAPHY.h4,
+    color: COLORS.success,
+  },
+  restDayMessage: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
 });

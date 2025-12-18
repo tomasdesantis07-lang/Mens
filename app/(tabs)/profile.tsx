@@ -1,9 +1,10 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { Award, Dumbbell, Menu, Trophy } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { Award, Dumbbell, Plus, Settings, Trophy } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
@@ -15,9 +16,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  AnimatedCard,
   AnimatedPopIn,
-  AnimatedSection,
+  AnimatedSection
 } from '../../src/components/common/Animations';
 import { AchievementCard } from '../../src/components/profile/AchievementCard';
 import { ProfileMenuSheet } from '../../src/components/profile/ProfileMenuSheet';
@@ -26,12 +26,13 @@ import { RoutinePreviewSheet } from '../../src/components/profile/RoutinePreview
 import { useTabBarInset } from '../../src/hooks/useTabBarInset';
 import { auth, db } from '../../src/services/firebaseConfig';
 import { RoutineService } from '../../src/services/routineService';
-import { COLORS } from '../../src/theme/theme';
+import { COLORS, FONT_FAMILY } from '../../src/theme/theme';
 import { Routine } from '../../src/types/routine';
 
 type UserData = {
   email?: string;
   displayName?: string;
+  username?: string;
   photoURL?: string;
 };
 
@@ -45,9 +46,12 @@ const ProfileScreen: React.FC = () => {
   const [userRoutines, setUserRoutines] = useState<Routine[]>([]);
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  // Reload routines when screen is focused (after editing)
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData();
+    }, [])
+  );
 
   const loadUserData = async () => {
     const user = auth.currentUser;
@@ -76,7 +80,7 @@ const ProfileScreen: React.FC = () => {
   };
 
   const displayName = userData?.displayName || auth.currentUser?.email?.split('@')[0] || 'Usuario';
-  const email = userData?.email || auth.currentUser?.email || '';
+  const username = userData?.username || '';
 
   // Mock achievements data
   const achievements = [
@@ -112,10 +116,10 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.appBarTitle}>{t('profile.title')}</Text>
           <TouchableOpacity
             style={styles.menuButton}
-            onPress={() => setMenuVisible(true)}
+            onPress={() => router.push('/settings' as any)}
             activeOpacity={0.7}
           >
-            <Menu size={24} color={COLORS.textPrimary} strokeWidth={2} />
+            <Settings size={24} color={COLORS.textPrimary} strokeWidth={2} />
           </TouchableOpacity>
         </BlurView>
 
@@ -142,33 +146,36 @@ const ProfileScreen: React.FC = () => {
                 )}
               </View>
               <Text style={styles.displayName}>{displayName}</Text>
-              <Text style={styles.email}>{email}</Text>
+              {username && <Text style={styles.username}>{username}</Text>}
             </View>
           </AnimatedSection>
 
-          {/* My Routines Section */}
           <AnimatedSection delay={100} style={styles.section}>
             <Text style={styles.sectionTitle}>{t('profile.my_routines')}</Text>
 
-            {userRoutines.length === 0 ? (
-              <AnimatedCard delay={150}>
-                <Text style={styles.emptyText}>
-                  No tenés rutinas guardadas aún
-                </Text>
-              </AnimatedCard>
-            ) : (
-              <View style={styles.routinesGrid}>
-                {userRoutines.map((routine, index) => (
-                  <AnimatedPopIn key={routine.id} index={index} delay={150} style={styles.routineItem}>
-                    <RoutinePreviewCard
-                      name={routine.name}
-                      daysPerWeek={routine.daysPerWeek}
-                      onPress={() => setSelectedRoutine(routine)}
-                    />
-                  </AnimatedPopIn>
-                ))}
-              </View>
-            )}
+            <View style={styles.routinesGrid}>
+              {userRoutines.map((routine, index) => (
+                <AnimatedPopIn key={routine.id} index={index} delay={150} style={styles.routineItem}>
+                  <RoutinePreviewCard
+                    name={routine.name}
+                    daysPerWeek={routine.daysPerWeek}
+                    isGeneratedForUser={routine.isGeneratedForUser}
+                    onPress={() => setSelectedRoutine(routine)}
+                  />
+                </AnimatedPopIn>
+              ))}
+
+              {/* Add New Routine Card */}
+              <AnimatedPopIn index={userRoutines.length} delay={150} style={styles.routineItem}>
+                <TouchableOpacity
+                  style={styles.addRoutineCard}
+                  onPress={() => router.push('/routines/create' as any)}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={32} color={COLORS.textTertiary} strokeWidth={1.5} />
+                </TouchableOpacity>
+              </AnimatedPopIn>
+            </View>
           </AnimatedSection>
 
           {/* Achievements Section */}
@@ -231,7 +238,7 @@ const styles = StyleSheet.create({
   },
   appBarTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textPrimary,
   },
   menuButton: {
@@ -267,16 +274,16 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 40,
-    fontWeight: '700',
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textInverse,
   },
   displayName: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
-  email: {
+  username: {
     fontSize: 14,
     color: COLORS.textSecondary,
   },
@@ -285,15 +292,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textPrimary,
     marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    paddingVertical: 20,
   },
   routinesGrid: {
     flexDirection: 'row',
@@ -302,6 +303,16 @@ const styles = StyleSheet.create({
   },
   routineItem: {
     width: '48%',
+  },
+  addRoutineCard: {
+    aspectRatio: 1,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   achievementsGrid: {
     flexDirection: 'row',

@@ -9,7 +9,18 @@
         "loading": "Cargando...",
         "coming_soon": "Próximamente",
         "yes": "Sí",
-        "no": "No"
+        "no": "No",
+        "for_you": "Para Vos",
+        "days": "días",
+        "weekdays": [
+            "Lunes",
+            "Martes",
+            "Miércoles",
+            "Jueves",
+            "Viernes",
+            "Sábado",
+            "Domingo"
+        ]
     },
     "welcome": {
         "title": "MENS",
@@ -71,7 +82,23 @@
         "weekly_improvement": "Mejora Semanal",
         "vs_last_week": "vs. semana pasada",
         "volume_30d": "Volumen (30d)",
-        "kg_lifted": "kg levantados"
+        "kg_lifted": "kg levantados",
+        "rest_day_title": "Día de Descanso",
+        "rest_day_message": "Ya has hecho el trabajo duro. Aprovecha hoy para descansar y comer mucha proteína para recuperarte.",
+        "today_badge": "HOY",
+        "start_today": "Entrenamiento de hoy",
+        "empty_workout": "Vacío",
+        "rest_button": "Descansa"
+    },
+    "recent_workouts": {
+        "title": "Entrenamientos Recientes",
+        "empty": "No hay entrenamientos registrados aún",
+        "empty_hint": "Completa tu primer entrenamiento para verlo aquí",
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "days_ago": "días",
+        "view_all": "Ver Todos",
+        "show_less": "Mostrar menos"
     },
     "routines": {
         "create_title": "Crear Rutina",
@@ -439,5 +466,25 @@
         "cardio_jump_rope": "Saltar la Soga",
         "plyo_box_jump": "Salto al Cajón",
         "plyo_burpee": "Burpees"
+    },
+    "settings": {
+        "title": "Ajustes",
+        "section_profile": "PERFIL Y SUSCRIPCIÓN",
+        "section_workout": "ENTRENAMIENTO",
+        "section_general": "GENERAL",
+        "section_account": "CUENTA",
+        "edit_profile": "Editar Perfil",
+        "physical_data": "Datos Físicos",
+        "subscription": "Suscripción MENS Elite",
+        "free_plan": "Plan Gratis",
+        "weight_units": "Unidades de Peso",
+        "auto_timer": "Temporizador Automático",
+        "haptics": "Vibración (Haptics)",
+        "sounds": "Sonidos",
+        "language": "Idioma",
+        "notifications": "Notificaciones",
+        "delete_account": "Eliminar Cuenta",
+        "delete_account_warning": "¿Estás seguro que deseas eliminar tu cuenta? Esta acción es irreversible y perderás todos tus datos.",
+        "delete_confirm": "Eliminar"
     }
 }

@@ -63,3 +63,13 @@ export const COMPONENTS = {
   },
 };
 export const theme = { COLORS, COMPONENTS };
+
+// Re-export typography for convenience
+export {
+  FONT_FAMILY,
+  FONT_SIZE,
+  FONT_WEIGHT,
+  LETTER_SPACING,
+  LINE_HEIGHT,
+  TYPOGRAPHY
+} from './typography';

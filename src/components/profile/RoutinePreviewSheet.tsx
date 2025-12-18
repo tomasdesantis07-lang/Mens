@@ -1,10 +1,20 @@
 import { BlurView } from 'expo-blur';
-import { X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ChevronRight, Edit2, Moon, Play, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { auth } from '../../services/firebaseConfig';
 import { WorkoutService } from '../../services/workoutService';
-import { COLORS } from '../../theme/theme';
+import { COLORS, TYPOGRAPHY } from '../../theme/theme';
 import { Routine } from '../../types/routine';
 import { WorkoutSession } from '../../types/workout';
 
@@ -19,12 +29,21 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
     routine,
     onClose,
 }) => {
+    const { t } = useTranslation();
+    const router = useRouter();
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [loading, setLoading] = useState(false);
+
+    // Get today's day of week (Monday=0, Tuesday=1, ..., Sunday=6)
+    const jsDay = new Date().getDay();
+    const todayDayIndex = jsDay === 0 ? 6 : jsDay - 1;
 
     useEffect(() => {
         if (visible && routine) {
             loadLastSession();
+        } else {
+            // Reset state when closing
+            setLastSession(null);
         }
     }, [visible, routine]);
 
@@ -38,9 +57,9 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
         try {
             const sessions = await WorkoutService.getWorkoutSessionsByRoutine(userId, routine.id);
             if (sessions.length > 0) {
-                // Get the most recent session
-                const sorted = sessions.sort((a, b) => b.performedAt.seconds - a.performedAt.seconds);
-                setLastSession(sorted[0]);
+                // Get the most recent session (already sorted newest first)
+                const mostRecent = sessions[0];
+                setLastSession(mostRecent);
             }
         } catch (error) {
             console.error('Error loading last session:', error);
@@ -49,19 +68,45 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
         }
     };
 
-    const getExerciseStats = (exerciseId: string, dayIndex: number) => {
-        if (!lastSession || lastSession.dayIndex !== dayIndex) return null;
+    const handleDayPress = (dayIndex: number) => {
+        if (!routine) return;
 
-        const exerciseLog = lastSession.exercises.find(e => e.exerciseId === exerciseId);
-        if (!exerciseLog || exerciseLog.sets.length === 0) return null;
-
-        // Get average or first set data
-        const firstSet = exerciseLog.sets[0];
-        return {
-            weight: firstSet.weight,
-            reps: firstSet.reps,
-        };
+        onClose();
+        // Navigate to training screen with pre-selected day
+        router.push({
+            pathname: '/routines/[id]/train',
+            params: { id: routine.id, dayIndex: dayIndex.toString() }
+        } as any);
     };
+
+    const formatLastTrainedDate = (timestamp: any): string => {
+        if (!timestamp) return '';
+        const date = timestamp.toDate();
+        const now = new Date();
+        const diffTime = now.getTime() - date.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return t('recent_workouts.today') || 'Hoy';
+        if (diffDays === 1) return t('recent_workouts.yesterday') || 'Ayer';
+        if (diffDays < 7) return `Hace ${diffDays} días`;
+
+        return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    };
+
+    // Get weekday names from translations
+    const weekdays = t('common.weekdays', { returnObjects: true }) as string[];
+
+    // Build complete 7 days array, filling in rest days where routine has no data
+    const allDays = Array.from({ length: 7 }, (_, index) => {
+        const routineDay = routine?.days.find(d => d.dayIndex === index);
+        return {
+            dayIndex: index,
+            dayName: weekdays[index] || `Día ${index + 1}`,
+            label: routineDay?.label || '',
+            exercises: routineDay?.exercises || [],
+            isRestDay: !routineDay || routineDay.exercises.length === 0,
+        };
+    });
 
     if (!routine) return null;
 
@@ -69,7 +114,7 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
+            animationType="fade"
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
@@ -87,78 +132,129 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                         <View style={styles.headerContent}>
                             <Text style={styles.title}>{routine.name}</Text>
                             <Text style={styles.subtitle}>
-                                {routine.daysPerWeek} días de entrenamiento
+                                {routine.daysPerWeek} {t('routine_card.days_per_week') || 'días/semana'}
+                                {lastSession && (
+                                    <Text style={styles.lastTrained}>
+                                        {' • '}Último: {formatLastTrainedDate(lastSession.performedAt)}
+                                    </Text>
+                                )}
                             </Text>
                         </View>
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={onClose}
-                            activeOpacity={0.7}
-                        >
-                            <X size={24} color={COLORS.textPrimary} />
-                        </TouchableOpacity>
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity
+                                style={styles.editButton}
+                                onPress={() => {
+                                    onClose();
+                                    router.push(`/routines/edit/${routine.id}` as any);
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Edit2 size={20} color={COLORS.textPrimary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={onClose}
+                                activeOpacity={0.7}
+                            >
+                                <X size={24} color={COLORS.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Content */}
-                    <ScrollView
-                        style={styles.content}
-                        contentContainerStyle={styles.contentContainer}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {routine.days.map((day, dayIndex) => (
-                            <View key={dayIndex} style={styles.daySection}>
-                                <Text style={styles.dayTitle}>
-                                    Día {dayIndex + 1}
-                                    {day.label ? `: ${day.label}` : ''}
-                                </Text>
+                    {loading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={COLORS.primary} />
+                            <Text style={styles.loadingText}>Cargando...</Text>
+                        </View>
+                    ) : (
+                        <ScrollView
+                            style={styles.content}
+                            contentContainerStyle={styles.contentContainer}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {/* Days List - Always show 7 days */}
+                            {allDays.map((day) => {
+                                const isToday = day.dayIndex === todayDayIndex;
+                                const exerciseCount = day.exercises.length;
 
-                                {day.exercises.length === 0 ? (
-                                    <Text style={styles.emptyText}>Sin ejercicios</Text>
-                                ) : (
-                                    <View style={styles.exercisesList}>
-                                        {day.exercises.map((exercise, exIndex) => {
-                                            const lastStats = getExerciseStats(exercise.id, dayIndex);
-                                            const hasTarget = exercise.sets.length > 0 &&
-                                                (exercise.sets[0].targetReps || exercise.sets[0].targetWeight);
+                                return (
+                                    <TouchableOpacity
+                                        key={day.dayIndex}
+                                        style={[
+                                            styles.dayCard,
+                                            isToday && !day.isRestDay && styles.dayCardActive,
+                                            isToday && day.isRestDay && styles.dayCardRest
+                                        ]}
+                                        onPress={() => !day.isRestDay && handleDayPress(day.dayIndex)}
+                                        activeOpacity={day.isRestDay ? 1 : 0.7}
+                                        disabled={day.isRestDay}
+                                    >
+                                        {/* Today Badge */}
+                                        {isToday && (
+                                            <View style={[styles.nextBadge, day.isRestDay && styles.restBadge]}>
+                                                <Text style={styles.nextBadgeText}>
+                                                    {t('home.today_badge')}
+                                                </Text>
+                                            </View>
+                                        )}
 
-                                            return (
-                                                <View key={exIndex} style={styles.exerciseItem}>
-                                                    <Text style={styles.exerciseName}>
-                                                        {exIndex + 1}. {exercise.name || 'Ejercicio sin nombre'}
+                                        <View style={styles.dayCardContent}>
+                                            <View style={styles.dayInfo}>
+                                                <Text style={[
+                                                    styles.dayTitle,
+                                                    isToday && !day.isRestDay && styles.dayTitleActive
+                                                ]}>
+                                                    {day.dayName}
+                                                </Text>
+                                                {day.isRestDay ? (
+                                                    <Text style={styles.restDayLabel}>{t('home.rest_day_title')}</Text>
+                                                ) : day.label ? (
+                                                    <Text style={styles.dayLabel}>{day.label}</Text>
+                                                ) : null}
+                                                <Text style={styles.exerciseCount}>
+                                                    {day.isRestDay
+                                                        ? t('routines.rest_days_tip').split(',')[0]
+                                                        : `${exerciseCount} ${exerciseCount === 1
+                                                            ? t('routine_card.exercise')
+                                                            : t('routine_card.exercises')}`
+                                                    }
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.dayAction}>
+                                                {day.isRestDay ? (
+                                                    <Moon size={20} color={COLORS.success} />
+                                                ) : isToday ? (
+                                                    <View style={styles.playButton}>
+                                                        <Play size={18} color={COLORS.textInverse} fill={COLORS.textInverse} />
+                                                    </View>
+                                                ) : (
+                                                    <ChevronRight size={20} color={COLORS.textTertiary} />
+                                                )}
+                                            </View>
+                                        </View>
+
+                                        {/* Preview of exercises */}
+                                        {day.exercises.length > 0 && (
+                                            <View style={styles.exercisePreview}>
+                                                {day.exercises.slice(0, 3).map((ex, i) => (
+                                                    <Text key={i} style={styles.exercisePreviewText} numberOfLines={1}>
+                                                        • {ex.name || 'Sin nombre'}
                                                     </Text>
-                                                    <Text style={styles.exerciseDetails}>
-                                                        {exercise.sets.length} series
-                                                        {hasTarget ? (
-                                                            <>
-                                                                {exercise.sets[0].targetReps &&
-                                                                    ` • ${exercise.sets[0].targetReps} reps`}
-                                                                {exercise.sets[0].targetWeight &&
-                                                                    ` • ${exercise.sets[0].targetWeight} kg`}
-                                                            </>
-                                                        ) : lastStats ? (
-                                                            <>
-                                                                {lastStats.reps && ` • ${lastStats.reps} reps`}
-                                                                {lastStats.weight && ` • ${lastStats.weight} kg`}
-                                                                <Text style={styles.lastSessionLabel}> (última sesión)</Text>
-                                                            </>
-                                                        ) : (
-                                                            <Text style={styles.noDataLabel}> • Sin datos</Text>
-                                                        )}
+                                                ))}
+                                                {day.exercises.length > 3 && (
+                                                    <Text style={styles.moreExercises}>
+                                                        +{day.exercises.length - 3} más
                                                     </Text>
-                                                    {exercise.notes && exercise.notes.trim() !== '' && (
-                                                        <Text style={styles.exerciseNotes}>
-                                                            📝 {exercise.notes}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                )}
-                            </View>
-                        ))}
-                    </ScrollView>
-
+                                                )}
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    )}
                 </View>
             </View>
         </Modal>
@@ -168,22 +264,22 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
     },
     backdrop: {
-        flex: 1,
+        ...StyleSheet.absoluteFillObject,
     },
     sheetContainer: {
         maxHeight: '80%',
-        minHeight: '40%', // Ensure it has some height even if content is empty
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        width: '100%',
+        borderRadius: 24,
         overflow: 'hidden',
         borderWidth: 1,
-        borderBottomWidth: 0,
         borderColor: 'rgba(255, 255, 255, 0.15)',
-        backgroundColor: 'rgba(10, 10, 15, 0.95)', // More opaque background
+        backgroundColor: 'rgba(10, 10, 15, 0.98)',
     },
     header: {
         flexDirection: 'row',
@@ -200,14 +296,29 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     title: {
-        fontSize: 22,
-        fontWeight: '700',
+        ...TYPOGRAPHY.h2,
         color: COLORS.textPrimary,
         marginBottom: 4,
     },
     subtitle: {
-        fontSize: 13,
+        ...TYPOGRAPHY.bodySmall,
         color: COLORS.textSecondary,
+    },
+    lastTrained: {
+        color: COLORS.textTertiary,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    editButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     closeButton: {
         width: 40,
@@ -221,67 +332,128 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 40,
+        paddingVertical: 60,
+        gap: 12,
+    },
+    loadingText: {
+        ...TYPOGRAPHY.body,
+        color: COLORS.textSecondary,
     },
     content: {
-        flex: 1,
+        maxHeight: 400,
     },
     contentContainer: {
-        padding: 24,
-        paddingBottom: 40,
+        padding: 16,
+        paddingBottom: 24,
+        gap: 12,
         flexGrow: 1,
     },
-    daySection: {
-        marginBottom: 28,
+    // Day Cards
+    dayCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    dayCardActive: {
+        backgroundColor: COLORS.primary + '15',
+        borderColor: COLORS.primary,
+        borderWidth: 2,
+    },
+    dayCardRest: {
+        backgroundColor: COLORS.success + '10',
+        borderColor: COLORS.success,
+        borderWidth: 2,
+        opacity: 0.85,
+    },
+    nextBadge: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderBottomLeftRadius: 8,
+    },
+    restBadge: {
+        backgroundColor: COLORS.success,
+    },
+    nextBadgeText: {
+        ...TYPOGRAPHY.caption,
+        fontWeight: '700',
+        color: COLORS.textInverse,
+        letterSpacing: 1,
+    },
+    dayCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    dayInfo: {
+        flex: 1,
+        gap: 2,
     },
     dayTitle: {
-        fontSize: 16,
-        fontWeight: '700',
+        ...TYPOGRAPHY.h4,
         color: COLORS.textPrimary,
-        marginBottom: 12,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    emptyText: {
-        fontSize: 14,
-        color: COLORS.textTertiary,
-        fontStyle: 'italic',
-        paddingVertical: 8,
+    dayTitleActive: {
+        color: COLORS.primary,
     },
-    exercisesList: {
-        gap: 16,
-    },
-    exerciseItem: {
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: 12,
-        padding: 12,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.primary,
-    },
-    exerciseName: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: COLORS.textPrimary,
-        marginBottom: 4,
-    },
-    exerciseDetails: {
-        fontSize: 13,
+    dayLabel: {
+        ...TYPOGRAPHY.body,
         color: COLORS.textSecondary,
     },
-    lastSessionLabel: {
-        fontSize: 11,
-        color: COLORS.textTertiary,
-        fontStyle: 'italic',
+    restDayLabel: {
+        ...TYPOGRAPHY.bodySmall,
+        color: COLORS.success,
+        fontWeight: '500',
     },
-    noDataLabel: {
-        fontSize: 12,
+    exerciseCount: {
+        ...TYPOGRAPHY.bodySmall,
         color: COLORS.textTertiary,
-        fontStyle: 'italic',
+        marginTop: 2,
     },
-    exerciseNotes: {
-        fontSize: 12,
+    dayAction: {
+        marginLeft: 12,
+    },
+    playButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    // Exercise Preview
+    exercisePreview: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.05)',
+        gap: 4,
+    },
+    exercisePreviewText: {
+        ...TYPOGRAPHY.bodySmall,
         color: COLORS.textTertiary,
-        marginTop: 6,
-        fontStyle: 'italic',
+    },
+    moreExercises: {
+        ...TYPOGRAPHY.caption,
+        color: COLORS.primary,
+        marginTop: 4,
+    },
+    emptyDays: {
+        padding: 24,
+        alignItems: 'center',
+    },
+    emptyText: {
+        ...TYPOGRAPHY.body,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
     },
 });

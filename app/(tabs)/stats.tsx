@@ -19,7 +19,7 @@ import { useTabBarInset } from "../../src/hooks/useTabBarInset";
 import { auth } from "../../src/services/firebaseConfig";
 import { MuscleDistribution, StatsService, UserRank, VolumeDataPoint } from "../../src/services/statsService";
 import { WorkoutService } from "../../src/services/workoutService";
-import { COLORS } from "../../src/theme/theme";
+import { COLORS, FONT_FAMILY } from "../../src/theme/theme";
 
 const StatsScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: "800",
+    fontFamily: FONT_FAMILY.heavy,
     color: COLORS.textPrimary,
     letterSpacing: 1,
     marginBottom: 8,
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textPrimary,
     textAlign: "center",
   },
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   },
   ctaButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textInverse,
   },
   chartCard: {
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   chartTitle: {
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textPrimary,
     marginBottom: 16,
   },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   },
   streakLabel: {
     fontSize: 12,
-    fontWeight: "600",
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   },
   streakValue: {
     fontSize: 36,
-    fontWeight: "800",
+    fontFamily: FONT_FAMILY.heavy,
     color: COLORS.primary,
   },
   streakUnit: {

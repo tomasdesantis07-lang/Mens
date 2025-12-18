@@ -1,7 +1,7 @@
 import { TrendingDown, TrendingUp } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS } from "../../theme/theme";
+import { COLORS, FONT_FAMILY } from "../../theme/theme";
 
 interface StatCardProps {
     label: string;
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 12,
-        fontWeight: "600",
+        fontFamily: FONT_FAMILY.bold,
         color: COLORS.textSecondary,
         textTransform: "uppercase",
         letterSpacing: 0.5,
@@ -62,13 +62,13 @@ const styles = StyleSheet.create({
     },
     value: {
         fontSize: 32,
-        fontWeight: "700",
+        fontFamily: FONT_FAMILY.bold,
         color: COLORS.primary,
         fontVariant: ["tabular-nums"],
     },
     unit: {
         fontSize: 16,
-        fontWeight: "600",
+        fontFamily: FONT_FAMILY.bold,
         color: COLORS.textSecondary,
         marginLeft: 4,
     },
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     },
     trendText: {
         fontSize: 13,
-        fontWeight: "600",
+        fontFamily: FONT_FAMILY.bold,
         fontVariant: ["tabular-nums"],
     },
     trendPositive: {

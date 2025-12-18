@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../src/context/AuthContext';
 import { db } from '../src/services/firebaseConfig';
-import { COLORS } from '../src/theme/theme';
+import { COLORS, LETTER_SPACING, TYPOGRAPHY } from '../src/theme/theme';
 
 const WelcomeScreen: React.FC = () => {
   const router = useRouter();
@@ -104,14 +104,13 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   title: {
-    fontSize: 40,
-    fontWeight: '700',
+    ...TYPOGRAPHY.display,
     color: COLORS.textPrimary,
-    letterSpacing: 2,
+    letterSpacing: LETTER_SPACING.widest,
   },
   subtitle: {
+    ...TYPOGRAPHY.body,
     marginTop: 8,
-    fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
   },
@@ -123,8 +122,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   buttonText: {
+    ...TYPOGRAPHY.button,
     color: COLORS.textInverse,
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

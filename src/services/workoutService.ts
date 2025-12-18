@@ -204,11 +204,13 @@ export const WorkoutService = {
     },
 
     /**
-     * Get the workout that should be done today
+     * Get the workout that should be done today based on actual day of week
+     * Monday = 0, Tuesday = 1, ..., Sunday = 6
      */
     async getWorkoutForToday(userId: string): Promise<{
         routineId: string;
         dayIndex: number;
+        isRestDay: boolean;
     } | null> {
         try {
             const { RoutineService } = await import('./routineService');
@@ -235,20 +237,40 @@ export const WorkoutService = {
                 return null;
             }
 
-            // Find last session for this routine
-            const sessions = await this.getWorkoutSessionsByRoutine(userId, currentRoutine.id);
+            // Get today's day of week (JavaScript: Sunday=0, Monday=1, ..., Saturday=6)
+            // We want: Monday=0, Tuesday=1, ..., Sunday=6
+            const jsDay = new Date().getDay();
+            const todayDayIndex = jsDay === 0 ? 6 : jsDay - 1; // Convert to Monday=0 format
 
-            let nextDayIndex = 0;
-            if (sessions.length > 0) {
-                const lastSession = sessions[0]; // Already sorted newest first
-                const lastDayIndex = lastSession.dayIndex;
-                const totalDays = currentRoutine.days.length;
-                nextDayIndex = (lastDayIndex + 1) % totalDays;
+            // Check if this day has exercises (is not a rest day)
+            const todayRoutineDay = currentRoutine.days.find(d => d.dayIndex === todayDayIndex);
+
+            // Determine if today is a rest day:
+            // - If the routine explicitly has this day defined, check if it has exercises
+            // - If the day is NOT in the routine, check if routine uses full weekday structure
+            let isRestDay = false;
+            if (todayRoutineDay) {
+                // Routine explicitly has this day
+                isRestDay = todayRoutineDay.exercises.length === 0;
+            } else {
+                // Day not in routine - only mark as rest if routine uses full 7-day weekday structure
+                // This handles backward compatibility with old routines that only have days 0, 1, 2...
+                const maxDayIndex = Math.max(...currentRoutine.days.map(d => d.dayIndex));
+                const hasWeekendDays = currentRoutine.days.some(d => d.dayIndex >= 5);
+
+                // If routine has weekend days (5=Sat, 6=Sun) or spans full week, use weekday logic
+                if (hasWeekendDays || maxDayIndex >= 6) {
+                    isRestDay = true; // Missing day = rest day
+                } else {
+                    // Old routine without weekday structure - not a rest day for messaging purposes
+                    isRestDay = false;
+                }
             }
 
             return {
                 routineId: currentRoutine.id,
-                dayIndex: nextDayIndex,
+                dayIndex: todayDayIndex,
+                isRestDay,
             };
         } catch (error) {
             console.error("Error getting workout for today:", error);

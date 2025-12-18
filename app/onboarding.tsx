@@ -31,7 +31,7 @@ import {
 } from "react-native";
 import { auth, db } from "../src/services/firebaseConfig";
 import { RoutineService } from "../src/services/routineService";
-import { COLORS } from "../src/theme/theme";
+import { COLORS, FONT_FAMILY, FONT_SIZE, LETTER_SPACING, TYPOGRAPHY } from "../src/theme/theme";
 import { UserBiometrics } from "../src/types/user";
 
 // Enable LayoutAnimation on Android
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   stepCounter: {
     color: COLORS.textTertiary,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: FONT_FAMILY.bold,
     textAlign: 'right',
   },
   content: {
@@ -579,32 +579,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   appTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
+    ...TYPOGRAPHY.display,
+    fontSize: 48,
+    letterSpacing: LETTER_SPACING.widest,
     color: COLORS.primary,
     marginBottom: 16,
-    textTransform: 'uppercase',
   },
   stepTitle: {
-    fontSize: 32,
-    fontWeight: '700',
+    ...TYPOGRAPHY.h1,
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
   stepSubtitle: {
-    fontSize: 16,
+    ...TYPOGRAPHY.body,
     color: COLORS.textSecondary,
     marginBottom: 32,
     lineHeight: 24,
   },
   // Inputs
   label: {
+    ...TYPOGRAPHY.label,
     color: COLORS.textSecondary,
     marginBottom: 8,
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -620,8 +616,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: '500',
+    ...TYPOGRAPHY.body,
+    fontSize: FONT_SIZE.lg,
+    fontFamily: FONT_FAMILY.regular,
   },
   inputIcon: {
     marginRight: 12,
@@ -632,12 +629,12 @@ const styles = StyleSheet.create({
   prefixIcon: {
     color: COLORS.textTertiary,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: FONT_FAMILY.regular,
     marginRight: 4,
   },
   helperText: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.textTertiary,
-    fontSize: 12,
     marginTop: -8,
   },
   row: {
@@ -666,9 +663,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   genderText: {
+    ...TYPOGRAPHY.button,
     color: COLORS.textTertiary,
-    fontWeight: '600',
-    fontSize: 16,
   },
   genderTextActive: {
     color: COLORS.primary,
@@ -706,8 +702,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...TYPOGRAPHY.h4,
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
@@ -715,13 +710,12 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   cardDesc: {
-    fontSize: 14,
+    ...TYPOGRAPHY.body,
     color: COLORS.textSecondary,
   },
   // Days Grid
   sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...TYPOGRAPHY.h4,
     color: COLORS.textSecondary,
     marginBottom: 12,
     textTransform: 'uppercase',
@@ -745,13 +739,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   dayText: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...TYPOGRAPHY.h3,
+    fontSize: FONT_SIZE.xl + 2,
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
   dayLabel: {
-    fontSize: 10,
+    ...TYPOGRAPHY.caption,
     color: COLORS.textSecondary,
     textTransform: 'uppercase',
   },
@@ -788,11 +782,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nextButtonText: {
+    ...TYPOGRAPHY.button,
     color: COLORS.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
   },
   errorText: {
+    ...TYPOGRAPHY.body,
     color: COLORS.error,
     textAlign: 'center',
     marginBottom: 16,
@@ -806,9 +800,8 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   loadingText: {
+    ...TYPOGRAPHY.button,
     marginTop: 20,
     color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

@@ -35,6 +35,7 @@ export interface Routine {
     source: "manual" | "ai";
     isActive: boolean;
     isCurrentPlan: boolean;      // Only one routine can be the current plan
+    isGeneratedForUser?: boolean; // True if generated during onboarding "For You"
     daysPerWeek: number;
     createdAt: Timestamp;
     updatedAt: Timestamp;

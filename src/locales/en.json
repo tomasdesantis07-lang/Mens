@@ -9,7 +9,18 @@
         "loading": "Loading...",
         "coming_soon": "Coming Soon",
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "for_you": "For You",
+        "days": "days",
+        "weekdays": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+        ]
     },
     "welcome": {
         "title": "MENS",
@@ -71,7 +82,23 @@
         "weekly_improvement": "Weekly Improvement",
         "vs_last_week": "vs. last week",
         "volume_30d": "Volume (30d)",
-        "kg_lifted": "kg lifted"
+        "kg_lifted": "kg lifted",
+        "rest_day_title": "Rest Day",
+        "rest_day_message": "You've done the hard work. Take today to rest and eat plenty of protein to recover.",
+        "today_badge": "TODAY",
+        "start_today": "Start Today Workout",
+        "empty_workout": "Empty",
+        "rest_button": "Rest"
+    },
+    "recent_workouts": {
+        "title": "Recent Workouts",
+        "empty": "No workouts recorded yet",
+        "empty_hint": "Complete your first workout to see it here",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "days_ago": "days",
+        "view_all": "View All",
+        "show_less": "Show less"
     },
     "routines": {
         "create_title": "Create Routine",
@@ -439,5 +466,25 @@
         "cardio_jump_rope": "Jump Rope",
         "plyo_box_jump": "Box Jump",
         "plyo_burpee": "Burpees"
+    },
+    "settings": {
+        "title": "Settings",
+        "section_profile": "PROFILE & SUBSCRIPTION",
+        "section_workout": "WORKOUT",
+        "section_general": "GENERAL",
+        "section_account": "ACCOUNT",
+        "edit_profile": "Edit Profile",
+        "physical_data": "Physical Data",
+        "subscription": "MENS Elite Subscription",
+        "free_plan": "Free Plan",
+        "weight_units": "Weight Units",
+        "auto_timer": "Auto Timer",
+        "haptics": "Haptic Feedback",
+        "sounds": "Sounds",
+        "language": "Language",
+        "notifications": "Notifications",
+        "delete_account": "Delete Account",
+        "delete_account_warning": "Are you sure you want to delete your account? This action is irreversible and you will lose all your data.",
+        "delete_confirm": "Delete"
     }
 }
