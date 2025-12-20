@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Clock, Dumbbell, Flame } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     LayoutAnimation,
@@ -21,7 +21,7 @@ interface RecentWorkoutsProps {
 
 const VISIBLE_COUNT = 2;
 
-export const RecentWorkouts: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => {
+const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => {
     const { t } = useTranslation();
     const [workouts, setWorkouts] = useState<WorkoutSession[]>([]);
     const [expanded, setExpanded] = useState(false);
@@ -32,10 +32,9 @@ export const RecentWorkouts: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => 
         if (!user) return;
 
         try {
-            const sessions = await WorkoutService.getAllUserWorkoutSessions(user.uid);
-            // Sort by date, most recent first
-            sessions.sort((a, b) => b.performedAt.toMillis() - a.performedAt.toMillis());
-            setWorkouts(sessions.slice(0, 10)); // Keep last 10
+            // Use optimized query with limit instead of fetching all sessions
+            const sessions = await WorkoutService.getRecentSessions(user.uid, 10);
+            setWorkouts(sessions);
         } catch (error) {
             console.error('Error loading recent workouts:', error);
         } finally {
@@ -201,8 +200,11 @@ export const RecentWorkouts: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => 
                 )}
             </View>
         </View>
-    );
+    )
 };
+
+// Memoized export to prevent unnecessary re-renders
+export const RecentWorkouts = memo(RecentWorkoutsComponent);
 
 const styles = StyleSheet.create({
     container: {

@@ -2,6 +2,7 @@ import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import {
     ChevronLeft,
     Crown,
@@ -15,13 +16,16 @@ import {
     Vibrate,
     Volume2,
 } from 'lucide-react-native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // Removed ScrollView/Platform/Image unused imports if any
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import { DeleteAccountDialog } from '../src/components/common/DeleteAccountDialog';
 import { SettingsRow } from '../src/components/settings/SettingsRow';
 import { useSettings } from '../src/context/SettingsContext';
-import { auth } from '../src/services/firebaseConfig';
+import { AuthService } from '../src/services/authService';
+import { auth, db } from '../src/services/firebaseConfig';
 import { COLORS, FONT_FAMILY } from '../src/theme/theme';
 
 export default function SettingsScreen() {
@@ -38,6 +42,32 @@ export default function SettingsScreen() {
         soundsEnabled,
         setSoundsEnabled,
     } = useSettings();
+
+    // Delete account dialog state
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [username, setUsername] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Fetch username on mount
+    useEffect(() => {
+        const fetchUsername = async () => {
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        // Use displayName or email prefix as fallback
+                        setUsername(data.displayName || data.username || user.email?.split('@')[0] || 'usuario');
+                    }
+                } catch (error) {
+                    console.error('Error fetching username:', error);
+                    setUsername(user.email?.split('@')[0] || 'usuario');
+                }
+            }
+        };
+        fetchUsername();
+    }, []);
 
     const handleSignOut = async () => {
         try {
@@ -64,21 +94,30 @@ export default function SettingsScreen() {
         );
     };
 
-    const checkDeleteAccount = () => {
-        Alert.alert(
-            t('settings.delete_account'),
-            t('settings.delete_account_warning'),
-            [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                    text: t('settings.delete_confirm'),
-                    style: 'destructive',
-                    onPress: () => {
-                        console.log("Delete account logic to be implemented");
-                    }
-                },
-            ]
-        );
+    const handleDeleteAccount = async (password: string) => {
+        setIsDeleting(true);
+        try {
+            await AuthService.deleteAccount(password);
+            setShowDeleteDialog(false);
+            Toast.show({
+                type: 'success',
+                text1: 'Cuenta eliminada',
+                text2: 'Tu cuenta ha sido eliminada permanentemente.',
+            });
+            // Navigate to auth screen after a short delay
+            setTimeout(() => {
+                router.replace('/auth' as any);
+            }, 500);
+        } catch (error: any) {
+            console.error('Error deleting account:', error);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.message || 'No se pudo eliminar la cuenta.',
+            });
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     // Language display
@@ -197,7 +236,7 @@ export default function SettingsScreen() {
                         label={t('settings.delete_account')}
                         icon={Trash2}
                         isDestructive
-                        onPress={checkDeleteAccount}
+                        onPress={() => setShowDeleteDialog(true)}
                     />
                 </View>
 
@@ -206,6 +245,15 @@ export default function SettingsScreen() {
                 </Text>
 
             </ScrollView>
+
+            {/* Delete Account Confirmation Dialog */}
+            <DeleteAccountDialog
+                visible={showDeleteDialog}
+                username={username}
+                onConfirm={handleDeleteAccount}
+                onCancel={() => setShowDeleteDialog(false)}
+                isLoading={isDeleting}
+            />
         </View>
     );
 }

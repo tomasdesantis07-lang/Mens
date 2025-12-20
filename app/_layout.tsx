@@ -111,6 +111,7 @@ export default function RootLayout() {
                                     <Stack.Screen name="auth" />
                                     <Stack.Screen name="forgot" />
                                     <Stack.Screen name="onboarding" />
+                                    <Stack.Screen name="warning" />
                                     <Stack.Screen name="(tabs)" />
                                     <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
                                     <Stack.Screen name="routines/create" />

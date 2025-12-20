@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "189708988644",
+    "project_id": "mens-app-database",
+    "storage_bucket": "mens-app-database.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:189708988644:android:9e1fe05e3c05211736fcf1",
+        "android_client_info": {
+          "package_name": "com.mens.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6N3-Gx3wAnksHkXvoqGLIMqR2oHk70po"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -74,13 +74,15 @@ const HomeScreen: React.FC = () => {
 
   const { startWorkout, activeWorkout } = useWorkout();
 
-  // Rotating border glow animation
+  // Rotating border glow animation - OPTIMIZED: Use transform rotation
+  // Note: useNativeDriver: true only works with transform/opacity on RN
+  // The interpolated width/left values cannot use native driver
   useEffect(() => {
     const rotate = Animated.loop(
       Animated.timing(rotateAnimation, {
         toValue: 1,
         duration: 3000,
-        useNativeDriver: false, // Must be false because we use layout properties
+        useNativeDriver: false,
       })
     );
     rotate.start();
@@ -109,6 +111,7 @@ const HomeScreen: React.FC = () => {
     }, [buttonWidth])
   );
 
+  // PHASE 1: Load immediate UI data (user, routines)
   useEffect(() => {
     const loadData = async () => {
       const user = auth.currentUser;
@@ -130,10 +133,7 @@ const HomeScreen: React.FC = () => {
         const community = await RoutineService.getCommunityRoutines();
         setCommunityRoutines(community);
 
-        // Load metrics and next workout
-        const userMetrics = await WorkoutService.calculateUserMetrics(user.uid);
-        setMetrics(userMetrics);
-
+        // Load next workout (lightweight query)
         const workout = await WorkoutService.getWorkoutForToday(user.uid);
         setNextWorkout(workout);
       } catch (e) {
@@ -145,6 +145,28 @@ const HomeScreen: React.FC = () => {
 
     loadData();
   }, []);
+
+  // PHASE 2: Lazy load metrics AFTER initial paint
+  // This prevents blocking the initial render with heavy calculations
+  useEffect(() => {
+    if (loading) return; // Wait for initial load to complete
+
+    const loadMetrics = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const userMetrics = await WorkoutService.calculateUserMetrics(user.uid);
+        setMetrics(userMetrics);
+      } catch (e) {
+        console.log("Error loading metrics", e);
+      }
+    };
+
+    // Use requestAnimationFrame to defer until after paint
+    const timeoutId = setTimeout(loadMetrics, 100);
+    return () => clearTimeout(timeoutId);
+  }, [loading]);
 
   // Memoized handlers for RoutineCard callbacks (performance optimization)
   // MUST be declared before any conditional returns to follow Rules of Hooks
@@ -208,6 +230,14 @@ const HomeScreen: React.FC = () => {
         <AnimatedHeader>
           <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
         </AnimatedHeader>
+
+        {/* TEMPORARY DEBUG BUTTON: Go to Warning Screen */}
+        <TouchableOpacity
+          style={styles.debugWarningBtn}
+          onPress={() => router.push('/warning' as any)}
+        >
+          <Text style={styles.debugWarningText}>⚠️ TEST WARNING</Text>
+        </TouchableOpacity>
 
         {/* Rest Day Message */}
         {isTodayRestDay && (
@@ -727,5 +757,19 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodySmall,
     color: COLORS.textSecondary,
     lineHeight: 20,
+  },
+  debugWarningBtn: {
+    backgroundColor: COLORS.error + '20',
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 24,
+    alignSelf: 'flex-start',
+  },
+  debugWarningText: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.error,
+    fontWeight: 'bold',
   },
 });

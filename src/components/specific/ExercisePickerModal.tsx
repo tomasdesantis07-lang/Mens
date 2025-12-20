@@ -1,11 +1,10 @@
-import { Activity, Dumbbell, PlusCircle, Search, X } from "lucide-react-native";
+import { Activity, Dumbbell, Filter, PlusCircle, Search, X } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     FlatList,
     Modal,
     Platform,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -17,34 +16,15 @@ import { EXERCISE_CATALOG } from "../../data/exerciseCatalog";
 import { COLORS } from "../../theme/theme";
 import { BodyPartSlug } from "../../types/bodyParts";
 import { CatalogExercise } from "../../types/exercise";
+import { BodyHeatmap } from "../stats/BodyHeatmap";
 
 interface ExercisePickerModalProps {
     visible: boolean;
     onSelect: (exercise: CatalogExercise, translatedName: string) => void;
     onCustomExercise: () => void;
     onClose: () => void;
+    recommendedExercises?: CatalogExercise[];
 }
-
-type FilterOption =
-    | 'all'
-    | 'chest'
-    | 'back'
-    | 'legs'
-    | 'shoulders'
-    | 'arms'
-    | 'abs'
-    | 'cardio';
-
-const FILTER_KEYS: { key: FilterOption; muscles: BodyPartSlug[] }[] = [
-    { key: 'all', muscles: [] },
-    { key: 'chest', muscles: ['chest'] },
-    { key: 'back', muscles: ['upper-back', 'lower-back', 'lats', 'trapezius'] },
-    { key: 'legs', muscles: ['quadriceps', 'hamstring', 'gluteal', 'calves', 'adductors'] },
-    { key: 'shoulders', muscles: ['deltoids'] },
-    { key: 'arms', muscles: ['biceps', 'triceps', 'forearm'] },
-    { key: 'abs', muscles: ['abs', 'obliques'] },
-    { key: 'cardio', muscles: [] },
-];
 
 const getEquipmentIcon = (equipment: string) => {
     switch (equipment) {
@@ -60,38 +40,58 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
     onSelect,
     onCustomExercise,
     onClose,
+    recommendedExercises,
 }) => {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedFilter, setSelectedFilter] = useState<FilterOption>('all');
+    const [isBodyFilterVisible, setIsBodyFilterVisible] = useState(false);
+    const [selectedMuscles, setSelectedMuscles] = useState<BodyPartSlug[]>([]);
 
-    // Memoize translated filters
-    const filters = useMemo(() => {
-        return FILTER_KEYS.map(f => ({
-            ...f,
-            label: t(`body_parts.${f.key}`)
-        }));
-    }, [t]);
+    // Reset state when modal opens/closes
+    React.useEffect(() => {
+        if (visible) {
+            // If we have recommendations, don't reset. Otherwise clear.
+            if (!recommendedExercises || recommendedExercises.length === 0) {
+                setSelectedMuscles([]);
+                setIsBodyFilterVisible(false);
+            }
+        }
+    }, [visible, recommendedExercises]);
 
-    // Filter based on selected category
+    const handleMuscleSelect = (muscle: BodyPartSlug) => {
+        setSelectedMuscles(prev => {
+            if (prev.includes(muscle)) {
+                return prev.filter(m => m !== muscle);
+            } else {
+                return [...prev, muscle];
+            }
+        });
+    };
+
+    const clearFilters = () => {
+        setSelectedMuscles([]);
+    };
+
+    // Filter exercises based on selected muscles
     const filteredByCategory = useMemo(() => {
-        if (selectedFilter === 'all') return EXERCISE_CATALOG;
-
-        if (selectedFilter === 'cardio') {
-            return EXERCISE_CATALOG.filter(ex => ex.equipment === 'cardio');
+        // If we have recommendations and no manual filters, show recommendations
+        if (recommendedExercises && recommendedExercises.length > 0 && selectedMuscles.length === 0 && !isBodyFilterVisible) {
+            return recommendedExercises;
         }
 
-        const filterConfig = FILTER_KEYS.find(f => f.key === selectedFilter);
-        if (!filterConfig) return EXERCISE_CATALOG;
+        // If no muscles selected, show all
+        if (selectedMuscles.length === 0) {
+            return EXERCISE_CATALOG;
+        }
 
+        // Filter by selected muscles
         return EXERCISE_CATALOG.filter(ex =>
-            ex.primaryMuscles.some(muscle => filterConfig.muscles.includes(muscle))
+            ex.primaryMuscles.some(muscle => selectedMuscles.includes(muscle))
         );
-    }, [selectedFilter]);
+    }, [selectedMuscles, recommendedExercises, isBodyFilterVisible]);
 
     // Further filter by search query
-    // Also attach translated name for searching
     const filteredExercises = useMemo(() => {
         const withTranslations = filteredByCategory.map(ex => ({
             ...ex,
@@ -105,27 +105,6 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
             ex.displayName.toLowerCase().includes(query)
         );
     }, [searchQuery, filteredByCategory, t]);
-
-    const renderFilterChip = (filter: typeof filters[0]) => {
-        const isSelected = selectedFilter === filter.key;
-        return (
-            <TouchableOpacity
-                key={filter.key}
-                style={[
-                    styles.filterChip,
-                    isSelected && styles.filterChipActive
-                ]}
-                onPress={() => setSelectedFilter(filter.key)}
-            >
-                <Text style={[
-                    styles.filterChipText,
-                    isSelected && styles.filterChipTextActive
-                ]}>
-                    {filter.label}
-                </Text>
-            </TouchableOpacity>
-        );
-    };
 
     const renderItem = ({ item }: { item: CatalogExercise & { displayName: string } }) => {
         const Icon = getEquipmentIcon(item.equipment);
@@ -153,6 +132,8 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
         );
     };
 
+    const hasActiveFilters = selectedMuscles.length > 0;
+
     return (
         <Modal
             visible={visible}
@@ -169,32 +150,63 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                     </TouchableOpacity>
                 </View>
 
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder={t('exercise_picker.search_placeholder')}
-                        placeholderTextColor={COLORS.textTertiary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery("")}>
-                            <X color={COLORS.textSecondary} size={16} />
-                        </TouchableOpacity>
-                    )}
+                {/* Search Bar + Filter Button */}
+                <View style={styles.searchRow}>
+                    <View style={styles.searchContainer}>
+                        <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder={t('exercise_picker.search_placeholder')}
+                            placeholderTextColor={COLORS.textTertiary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery("")}>
+                                <X color={COLORS.textSecondary} size={16} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <TouchableOpacity
+                        style={[
+                            styles.filterButton,
+                            (isBodyFilterVisible || hasActiveFilters) && styles.filterButtonActive
+                        ]}
+                        onPress={() => setIsBodyFilterVisible(!isBodyFilterVisible)}
+                    >
+                        <Filter size={20} color={(isBodyFilterVisible || hasActiveFilters) ? COLORS.textInverse : COLORS.textSecondary} />
+                        {hasActiveFilters && (
+                            <View style={styles.filterBadge}>
+                                <Text style={styles.filterBadgeText}>{selectedMuscles.length}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
-                {/* Filter Chips */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.filterScrollContent}
-                    style={styles.filterScroll}
-                >
-                    {filters.map(renderFilterChip)}
-                </ScrollView>
+                {/* Body Filter (Collapsible) */}
+                {isBodyFilterVisible && (
+                    <View style={styles.bodyFilterContainer}>
+                        <BodyHeatmap
+                            mode="selector"
+                            selectedMuscles={selectedMuscles}
+                            onMuscleSelect={handleMuscleSelect}
+                        />
+                        {hasActiveFilters && (
+                            <TouchableOpacity style={styles.clearFiltersButton} onPress={clearFilters}>
+                                <Text style={styles.clearFiltersText}>{t('exercise_picker.clear_filters') || 'Limpiar filtros'}</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
+                {/* Recommendations Badge (only when showing recommendations) */}
+                {recommendedExercises && recommendedExercises.length > 0 && selectedMuscles.length === 0 && !isBodyFilterVisible && (
+                    <View style={styles.recommendedBadge}>
+                        <Text style={styles.recommendedBadgeText}>
+                            {t('exercise_picker.showing_recommended') || 'Mostrando sugerencias'}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Exercise List */}
                 <FlatList
@@ -227,6 +239,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
     );
 };
 
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -249,12 +262,18 @@ const styles = StyleSheet.create({
     closeButton: {
         padding: 4,
     },
+    searchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        marginTop: 16,
+        gap: 12,
+    },
     searchContainer: {
+        flex: 1,
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: COLORS.surface,
-        marginHorizontal: 16,
-        marginTop: 16,
         paddingHorizontal: 12,
         borderRadius: 12,
         height: 48,
@@ -270,33 +289,63 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         height: "100%",
     },
-    filterScroll: {
-        marginTop: 16,
-        maxHeight: 44,
-    },
-    filterScrollContent: {
-        paddingHorizontal: 16,
-        gap: 8,
-    },
-    filterChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
+    filterButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
         backgroundColor: COLORS.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
         borderWidth: 1,
         borderColor: COLORS.border,
     },
-    filterChipActive: {
+    filterButtonActive: {
         backgroundColor: COLORS.primary,
         borderColor: COLORS.primary,
     },
-    filterChipText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: COLORS.textSecondary,
+    filterBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: COLORS.error,
+        borderRadius: 10,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    filterChipTextActive: {
-        color: '#000000',
+    filterBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    bodyFilterContainer: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    clearFiltersButton: {
+        marginTop: 12,
+        alignItems: 'center',
+    },
+    clearFiltersText: {
+        color: COLORS.error,
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    recommendedBadge: {
+        backgroundColor: COLORS.primary + '20',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginHorizontal: 16,
+        marginTop: 12,
+        borderRadius: 8,
+    },
+    recommendedBadgeText: {
+        color: COLORS.primary,
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
     },
     listContent: {
         paddingVertical: 16,

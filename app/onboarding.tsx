@@ -15,7 +15,6 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -136,7 +135,7 @@ const OnboardingScreen: React.FC = () => {
         setCurrentStep(prev => prev + 1);
         setErrorMsg("");
       } else {
-        setErrorMsg(t('common.fill_required')); // Generic error, could be more specific
+        setErrorMsg(t('onboarding.fill_required'));
       }
     } else {
       handleSave();
@@ -148,6 +147,9 @@ const OnboardingScreen: React.FC = () => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setCurrentStep(prev => prev - 1);
       setErrorMsg("");
+    } else {
+      // If we are on step 1, go back to auth
+      router.replace("/auth");
     }
   };
 
@@ -200,7 +202,7 @@ const OnboardingScreen: React.FC = () => {
       const remainingTime = Math.max(0, 2500 - elapsed);
       if (remainingTime > 0) await new Promise(r => setTimeout(r, remainingTime));
 
-      router.replace("/(tabs)/home");
+      router.replace("/warning");
     } catch (err) {
       console.error(err);
       setErrorMsg("Error saving profile. Please try again.");
@@ -213,25 +215,26 @@ const OnboardingScreen: React.FC = () => {
   const renderStep1_Identity = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.appTitle}>MENS</Text>
-      <Text style={styles.stepTitle}>{t('onboarding.step1_title') || "Identity"}</Text>
-      <Text style={styles.stepSubtitle}>{t('onboarding.step1_subtitle') || "How should we call you?"}</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.step1_title')}</Text>
+      <Text style={[styles.stepSubtitle, { marginBottom: 16 }]}>{t('onboarding.step1_subtitle')}</Text>
 
       <View style={styles.inputContainer}>
         <User size={20} color={COLORS.textTertiary} style={styles.inputIcon} />
         <TextInput
           style={styles.input}
-          placeholder="Display Name"
+          placeholder={t('onboarding.display_name')}
           placeholderTextColor={COLORS.textTertiary}
           value={data.displayName}
           onChangeText={(text) => setData({ ...data, displayName: text })}
         />
       </View>
 
+      <Text style={[styles.stepSubtitle, { marginTop: 16, marginBottom: 12 }]}>{t('onboarding.username_question')}</Text>
       <View style={styles.inputContainer}>
         <Text style={styles.prefixIcon}>@</Text>
         <TextInput
-          style={[styles.input, { paddingLeft: 0 }]} // Adjust for prefix
-          placeholder="username"
+          style={[styles.input, { paddingLeft: 0 }]}
+          placeholder={t('onboarding.username_placeholder')}
           placeholderTextColor={COLORS.textTertiary}
           value={data.username.startsWith('@') ? data.username.substring(1) : data.username}
           onChangeText={(text) => {
@@ -241,80 +244,102 @@ const OnboardingScreen: React.FC = () => {
           autoCapitalize="none"
         />
       </View>
-      <Text style={styles.helperText}>Only lowercase letters, numbers, and underscores.</Text>
+      <Text style={styles.helperText}>{t('onboarding.username_helper')}</Text>
     </View>
   );
 
   const renderStep2_Biometrics = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>{t('onboarding.step2_title') || "Biometrics"}</Text>
-      <Text style={styles.stepSubtitle}>{t('onboarding.step2_subtitle') || "Customize your training loads."}</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.step2_title')}</Text>
+      <Text style={styles.stepSubtitle}>{t('onboarding.step2_subtitle')}</Text>
 
       <View style={styles.row}>
-        <View style={[styles.inputContainer, { flex: 1 }]}>
-          <Text style={styles.label}>Age</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Years"
-            placeholderTextColor={COLORS.textTertiary}
-            keyboardType="numeric"
-            value={data.biometrics.age?.toString() || ''}
-            onChangeText={(t) => setData({ ...data, biometrics: { ...data.biometrics, age: parseInt(t) || null } })}
-          />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>{t('onboarding.age_label')}</Text>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={t('onboarding.age_placeholder')}
+              placeholderTextColor={COLORS.textTertiary}
+              keyboardType="numeric"
+              value={data.biometrics.age?.toString() || ""}
+              onChangeText={(text) => {
+                const val = parseInt(text.replace(/[^0-9]/g, '')) || null;
+                setData({ ...data, biometrics: { ...data.biometrics, age: val } });
+              }}
+              maxLength={3}
+            />
+          </View>
         </View>
         <View style={{ width: 16 }} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.label}>Gender</Text>
+          <Text style={styles.label}>{t('onboarding.gender_label')}</Text>
           <View style={styles.genderToggle}>
             <TouchableOpacity
               style={[styles.genderBtn, data.biometrics.gender === 'male' && styles.genderBtnActive]}
               onPress={() => setData({ ...data, biometrics: { ...data.biometrics, gender: 'male' } })}
             >
-              <Text style={[styles.genderText, data.biometrics.gender === 'male' && styles.genderTextActive]}>M</Text>
+              <Text style={[styles.genderText, data.biometrics.gender === 'male' && styles.genderTextActive]}>{t('onboarding.gender_male')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.genderBtn, data.biometrics.gender === 'female' && styles.genderBtnActive]}
               onPress={() => setData({ ...data, biometrics: { ...data.biometrics, gender: 'female' } })}
             >
-              <Text style={[styles.genderText, data.biometrics.gender === 'female' && styles.genderTextActive]}>F</Text>
+              <Text style={[styles.genderText, data.biometrics.gender === 'female' && styles.genderTextActive]}>{t('onboarding.gender_female')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
       <View style={styles.row}>
-        <View style={[styles.inputContainer, { flex: 1 }]}>
-          <Weight size={18} color={COLORS.textTertiary} style={styles.fieldIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Weight (kg)"
-            placeholderTextColor={COLORS.textTertiary}
-            keyboardType="numeric"
-            value={data.biometrics.weight?.toString() || ''}
-            onChangeText={(t) => setData({ ...data, biometrics: { ...data.biometrics, weight: parseFloat(t) || null } })}
-          />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>{t('onboarding.weight_placeholder')}</Text>
+          <View style={[styles.inputContainer, { marginBottom: 0 }]}>
+            <Weight size={18} color={COLORS.textTertiary} style={styles.fieldIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor={COLORS.textTertiary}
+              keyboardType="numeric"
+              value={data.biometrics.weight?.toString() || ""}
+              onChangeText={(text) => {
+                const val = parseInt(text.replace(/[^0-9]/g, '')) || null;
+                setData({ ...data, biometrics: { ...data.biometrics, weight: val } });
+              }}
+              maxLength={3}
+            />
+            <Text style={{ color: COLORS.textTertiary, marginLeft: 4 }}>kg</Text>
+          </View>
         </View>
         <View style={{ width: 16 }} />
-        <View style={[styles.inputContainer, { flex: 1 }]}>
-          <Ruler size={18} color={COLORS.textTertiary} style={styles.fieldIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Height (cm)"
-            placeholderTextColor={COLORS.textTertiary}
-            keyboardType="numeric"
-            value={data.biometrics.height?.toString() || ''}
-            onChangeText={(t) => setData({ ...data, biometrics: { ...data.biometrics, height: parseInt(t) || null } })}
-          />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>{t('onboarding.height_placeholder')}</Text>
+          <View style={[styles.inputContainer, { marginBottom: 0 }]}>
+            <Ruler size={18} color={COLORS.textTertiary} style={styles.fieldIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor={COLORS.textTertiary}
+              keyboardType="numeric"
+              value={data.biometrics.height?.toString() || ""}
+              onChangeText={(text) => {
+                const val = parseInt(text.replace(/[^0-9]/g, '')) || null;
+                setData({ ...data, biometrics: { ...data.biometrics, height: val } });
+              }}
+              maxLength={3}
+            />
+            <Text style={{ color: COLORS.textTertiary, marginLeft: 4 }}>cm</Text>
+          </View>
         </View>
       </View>
     </View>
   );
 
   const renderStep3_Experience = () => {
-    const levels: { id: ExperienceLevel; title: string; desc: string }[] = [
-      { id: 'beginner', title: "Recién empiezo", desc: "0-6 months" },
-      { id: 'intermediate', title: "Intermedio", desc: "6 months - 2 years" },
-      { id: 'advanced', title: "Avanzado", desc: "+2 years" },
+    const levels: { id: ExperienceLevel; titleKey: string; descKey: string }[] = [
+      { id: 'beginner', titleKey: 'onboarding.levels.beginner', descKey: 'onboarding.levels.beginner_desc' },
+      { id: 'intermediate', titleKey: 'onboarding.levels.intermediate', descKey: 'onboarding.levels.intermediate_desc' },
+      { id: 'advanced', titleKey: 'onboarding.levels.advanced', descKey: 'onboarding.levels.advanced_desc' },
     ];
 
     // 3, 4, 5, 6 days
@@ -322,10 +347,10 @@ const OnboardingScreen: React.FC = () => {
 
     return (
       <ScrollView style={styles.stepScroll} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
-        <Text style={styles.stepTitle}>Experience</Text>
-        <Text style={styles.stepSubtitle}>Define your starting point.</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.step3_title')}</Text>
+        <Text style={styles.stepSubtitle}>{t('onboarding.step3_subtitle')}</Text>
 
-        <Text style={styles.sectionLabel}>How long have you been training?</Text>
+        <Text style={styles.sectionLabel}>{t('onboarding.experience_question')}</Text>
         {levels.map((lvl) => (
           <TouchableOpacity
             key={lvl.id}
@@ -334,15 +359,15 @@ const OnboardingScreen: React.FC = () => {
           >
             <View>
               <Text style={[styles.cardTitle, data.experienceLevel === lvl.id && styles.cardTitleActive]}>
-                {lvl.title}
+                {t(lvl.titleKey)}
               </Text>
-              <Text style={styles.cardDesc}>{lvl.desc}</Text>
+              <Text style={styles.cardDesc}>{t(lvl.descKey)}</Text>
             </View>
             {data.experienceLevel === lvl.id && <Check size={20} color={COLORS.textInverse} />}
           </TouchableOpacity>
         ))}
 
-        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Weekly Training Days</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>{t('onboarding.days_question')}</Text>
         <View style={styles.daysGrid}>
           {dayOpts.map(d => (
             <TouchableOpacity
@@ -351,7 +376,7 @@ const OnboardingScreen: React.FC = () => {
               onPress={() => setData({ ...data, daysPerWeek: d })}
             >
               <Text style={[styles.dayText, data.daysPerWeek === d && styles.dayTextActive]}>{d}</Text>
-              <Text style={[styles.dayLabel, data.daysPerWeek === d && styles.dayTextActive]}>Days</Text>
+              <Text style={[styles.dayLabel, data.daysPerWeek === d && styles.dayTextActive]}>{t('onboarding.days_label')}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -361,10 +386,10 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep4_Goals = () => {
     // Only these 3 options as per requested logic (max 2)
-    const goals: { id: Goal; title: string; icon: any }[] = [
-      { id: 'strength', title: "Strength", icon: Dumbbell },
-      { id: 'hypertrophy', title: "Hypertrophy", icon: Activity }, // Using Activity as placeholder for Muscle
-      { id: 'weight_loss', title: "Weight Loss", icon: Target },
+    const goals: { id: Goal; titleKey: string; icon: any }[] = [
+      { id: 'strength', titleKey: 'onboarding.goals.strength', icon: Dumbbell },
+      { id: 'hypertrophy', titleKey: 'onboarding.goals.hypertrophy', icon: Activity },
+      { id: 'weight_loss', titleKey: 'onboarding.goals.weight_loss', icon: Target },
     ];
 
     const toggleGoal = (id: Goal) => {
@@ -382,8 +407,8 @@ const OnboardingScreen: React.FC = () => {
 
     return (
       <View style={styles.stepContainer}>
-        <Text style={styles.stepTitle}>Goals</Text>
-        <Text style={styles.stepSubtitle}>Select up to 2 priorities.</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.step4_title')}</Text>
+        <Text style={styles.stepSubtitle}>{t('onboarding.step4_subtitle')}</Text>
 
         {goals.map((item) => {
           const isSelected = data.goals.includes(item.id);
@@ -397,7 +422,7 @@ const OnboardingScreen: React.FC = () => {
               <View style={styles.cardHeader}>
                 <Icon size={24} color={isSelected ? COLORS.textInverse : COLORS.primary} />
                 <Text style={[styles.cardTitle, { marginBottom: 0 }, isSelected && styles.cardTitleActive]}>
-                  {item.title}
+                  {t(item.titleKey)}
                 </Text>
               </View>
               {isSelected && <Check size={20} color={COLORS.textInverse} />}
@@ -409,12 +434,12 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const renderStep5_Safety = () => {
-    const injuries: { id: Injury; title: string }[] = [
-      { id: 'shoulders', title: "Shoulders" },
-      { id: 'knees', title: "Knees" },
-      { id: 'lower_back', title: "Lower Back" },
-      { id: 'wrists', title: "Wrists" },
-      { id: 'none', title: "No Injuries" },
+    const injuries: { id: Injury; titleKey: string }[] = [
+      { id: 'shoulders', titleKey: 'onboarding.injuries.shoulders' },
+      { id: 'knees', titleKey: 'onboarding.injuries.knees' },
+      { id: 'lower_back', titleKey: 'onboarding.injuries.lower_back' },
+      { id: 'wrists', titleKey: 'onboarding.injuries.wrists' },
+      { id: 'none', titleKey: 'onboarding.injuries.none' },
     ];
 
     const toggleInjury = (id: Injury) => {
@@ -436,8 +461,8 @@ const OnboardingScreen: React.FC = () => {
 
     return (
       <ScrollView style={styles.stepScroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.stepTitle}>Safety Protocol</Text>
-        <Text style={styles.stepSubtitle}>Do you have any accumulated fatigue or injuries?</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.step5_title')}</Text>
+        <Text style={styles.stepSubtitle}>{t('onboarding.step5_subtitle')}</Text>
 
         {injuries.map((item) => {
           const isSelected = data.injuries.includes(item.id);
@@ -459,7 +484,7 @@ const OnboardingScreen: React.FC = () => {
                   { marginBottom: 0 },
                   isSelected && { color: isNone ? COLORS.textInverse : COLORS.background }
                 ]}>
-                  {item.title}
+                  {t(item.titleKey)}
                 </Text>
               </View>
               {isSelected && <Check size={20} color={isNone ? COLORS.textInverse : COLORS.background} />}
@@ -471,8 +496,7 @@ const OnboardingScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <View
       style={styles.container}
     >
       {/* Header Progress */}
@@ -490,28 +514,37 @@ const OnboardingScreen: React.FC = () => {
             ]}
           />
         </Animated.View>
-        <Text style={styles.stepCounter}>Step {currentStep} of {STEPS}</Text>
+        <Text style={styles.stepCounter}>{t('onboarding.step_counter', { current: currentStep, total: STEPS })}</Text>
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {currentStep === 1 && renderStep1_Identity()}
-        {currentStep === 2 && renderStep2_Biometrics()}
-        {currentStep === 3 && renderStep3_Experience()}
-        {currentStep === 4 && renderStep4_Goals()}
-        {currentStep === 5 && renderStep5_Safety()}
-      </View>
+      {/* Content - Auto-scrolls when keyboard appears */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {currentStep === 1 && renderStep1_Identity()}
+          {currentStep === 2 && renderStep2_Biometrics()}
+          {currentStep === 3 && renderStep3_Experience()}
+          {currentStep === 4 && renderStep4_Goals()}
+          {currentStep === 5 && renderStep5_Safety()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Footer Actions */}
       <View style={styles.footer}>
         {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
         <View style={styles.footerButtons}>
-          {currentStep > 1 ? (
-            <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={saving}>
-              <ArrowLeft size={24} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          ) : <View style={{ width: 50 }} />}
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={saving}>
+            <ArrowLeft size={24} color={COLORS.textSecondary} />
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.nextButton, saving && { opacity: 0.7 }]}
@@ -519,21 +552,15 @@ const OnboardingScreen: React.FC = () => {
             disabled={saving}
           >
             <Text style={styles.nextButtonText}>
-              {currentStep === STEPS ? (saving ? "Saving..." : "Finish") : "Continue"}
+              {currentStep === STEPS ? (saving ? t('onboarding.saving') : t('onboarding.finish')) : t('onboarding.continue')}
             </Text>
             {!saving && currentStep !== STEPS && <ArrowRight size={20} color={COLORS.textInverse} />}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Loading Overlay */}
-      {saving && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{loadingMessages[loadingMessageIndex]}</Text>
-        </View>
-      )}
-    </KeyboardAvoidingView>
+
+    </View>
   );
 };
 
@@ -650,6 +677,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 4,
+    alignSelf: 'stretch',
   },
   genderBtn: {
     flex: 1,

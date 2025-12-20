@@ -2,6 +2,8 @@ import {
     addDoc,
     collection,
     getDocs,
+    limit,
+    orderBy,
     query,
     serverTimestamp,
     where
@@ -32,6 +34,33 @@ export const WorkoutService = {
             console.error("Error creating workout session:", error);
             console.error("Error details:", JSON.stringify(error, null, 2));
             throw error;
+        }
+    },
+
+    /**
+     * Get recent workout sessions for a user with a limit
+     * Optimized for Home screen to prevent fetching entire history
+     */
+    async getRecentSessions(
+        userId: string,
+        limitCount: number = 10
+    ): Promise<WorkoutSession[]> {
+        try {
+            const q = query(
+                collection(db, "workoutSessions"),
+                where("userId", "==", userId),
+                orderBy("performedAt", "desc"),
+                limit(limitCount)
+            );
+
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as WorkoutSession[];
+        } catch (error) {
+            console.error("Error fetching recent sessions:", error);
+            return [];
         }
     },
 

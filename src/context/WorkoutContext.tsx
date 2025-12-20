@@ -19,36 +19,47 @@ interface WorkoutContextType {
     toggleSetComplete: (exerciseId: string, setIndex: number) => void;
     addSet: (exerciseId: string) => void;
     removeSet: (exerciseId: string, setIndex: number) => void;
-    elapsedSeconds: number;
     restTimerDuration: number;
     isResting: boolean;
     startRestTimer: (seconds: number) => void;
     stopRestTimer: () => void;
+    replaceExercise: (oldExerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => void;
 }
 
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 
+/**
+ * Hook to get the elapsed workout time locally.
+ * This runs its own interval to avoid re-rendering the entire context tree.
+ */
+export const useWorkoutTimer = (startTime: number | null): number => {
+    const [elapsed, setElapsed] = useState(() =>
+        startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
+    );
+
+    useEffect(() => {
+        if (!startTime) {
+            setElapsed(0);
+            return;
+        }
+
+        // Initial sync
+        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+
+        const interval = setInterval(() => {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [startTime]);
+
+    return elapsed;
+};
+
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
-    const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [restTimerDuration, setRestTimerDuration] = useState(0);
     const [isResting, setIsResting] = useState(false);
-
-    // Global timer effect
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        if (activeWorkout) {
-            // Update elapsed time every second
-            // We calculate diff from startTime to be accurate even if backgrounded (though JS timers might pause)
-            // For a robust background timer, we'd rely on AppState, but this is a good start.
-            interval = setInterval(() => {
-                setElapsedSeconds(Math.floor((Date.now() - activeWorkout.startTime) / 1000));
-            }, 1000);
-        } else {
-            setElapsedSeconds(0);
-        }
-        return () => clearInterval(interval);
-    }, [activeWorkout]);
 
     // Rest timer effect
     useEffect(() => {
@@ -179,6 +190,66 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setRestTimerDuration(0);
     };
 
+    const replaceExercise = (exerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => {
+        if (!activeWorkout) return;
+
+        setActiveWorkout(prev => {
+            if (!prev) return null;
+
+            // 1. Clone routine to avoid direct mutation
+            const updatedRoutine = { ...prev.routine };
+            const days = [...updatedRoutine.days];
+            const dayIndexInRoutine = days.findIndex(d => d.dayIndex === prev.dayIndex);
+
+            if (dayIndexInRoutine === -1) return prev;
+
+            const updatedDay = { ...days[dayIndexInRoutine] };
+            const exercises = [...updatedDay.exercises];
+            const exerciseIndex = exercises.findIndex(e => e.id === exerciseId);
+
+            if (exerciseIndex === -1) return prev;
+
+            // 2. Update exercise details
+            const oldExercise = exercises[exerciseIndex];
+            exercises[exerciseIndex] = {
+                ...oldExercise,
+                name: newExerciseData.name,
+                exerciseId: newExerciseData.id,
+                targetZone: newExerciseData.targetZone,
+            };
+
+            updatedDay.exercises = exercises;
+            days[dayIndexInRoutine] = updatedDay;
+            updatedRoutine.days = days;
+
+            // 3. Reset performed logs (weights/reps) but keep structure
+            // We want to keep the same number of sets, but clear the recorded values
+            // because strict weight/reps from previous exercise likely don't apply.
+            const oldLogs = prev.logs[exerciseId] || [];
+            const newLogs = oldLogs.map(log => ({
+                ...log,
+                weight: 0,
+                reps: 0
+            }));
+
+            // 4. Clear completion status for these sets
+            const nextCompleted = new Set(prev.completedSets);
+            oldLogs.forEach(log => {
+                nextCompleted.delete(`${exerciseId}-${log.setIndex}`);
+            });
+
+            return {
+                ...prev,
+                routine: updatedRoutine,
+                logs: {
+                    ...prev.logs,
+                    [exerciseId]: newLogs
+                },
+                completedSets: nextCompleted
+            };
+        });
+    };
+
     return (
         <WorkoutContext.Provider value={{
             activeWorkout,
@@ -189,11 +260,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             toggleSetComplete,
             addSet,
             removeSet,
-            elapsedSeconds,
             restTimerDuration,
             isResting,
             startRestTimer,
-            stopRestTimer
+            stopRestTimer,
+            replaceExercise
         }}>
             {children}
         </WorkoutContext.Provider>

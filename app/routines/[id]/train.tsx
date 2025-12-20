@@ -1,14 +1,12 @@
-import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Check, ChevronDown, ChevronUp, Edit, Info, Plus } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { Edit } from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Dimensions,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
@@ -23,11 +21,15 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
-import { useWorkout } from "../../../src/context/WorkoutContext";
+import { ExercisePickerModal } from "../../../src/components/specific/ExercisePickerModal";
+import { WorkoutExerciseCard } from "../../../src/components/specific/WorkoutExerciseCard";
+import { useWorkout, useWorkoutTimer } from "../../../src/context/WorkoutContext";
+import { ExerciseRecommendationService } from "../../../src/services/ExerciseRecommendationService";
 import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
 import { WorkoutService } from "../../../src/services/workoutService";
 import { COLORS } from "../../../src/theme/theme";
+import { CatalogExercise } from "../../../src/types/exercise";
 import { Routine } from "../../../src/types/routine";
 import { WorkoutExerciseLog, WorkoutSession } from "../../../src/types/workout";
 import { showToast } from "../../../src/utils/toast";
@@ -58,14 +60,22 @@ const TrainScreen: React.FC = () => {
         removeSet,
         finishWorkout,
         cancelWorkout,
-        elapsedSeconds,
-        startRestTimer
+        startRestTimer,
+        replaceExercise
     } = useWorkout();
+
+    // Use local timer hook instead of global context value
+    const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
 
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+
+    // Replacement state
+    const [replacementModalVisible, setReplacementModalVisible] = useState(false);
+    const [exerciseToReplace, setExerciseToReplace] = useState<string | null>(null);
+    const [recommendations, setRecommendations] = useState<CatalogExercise[]>([]);
 
     // Drag to dismiss gesture
     const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -135,30 +145,20 @@ const TrainScreen: React.FC = () => {
         loadRoutineAndHistory();
     }, [id, selectedDayIndex]);
 
-
-
-
-
-    const handleToggleSet = (exerciseId: string, setIndex: number, restSeconds: number) => {
-        const key = `${exerciseId}-${setIndex}`;
-        const wasCompleted = activeWorkout?.completedSets.has(key);
-
+    const handleToggleSet = useCallback((exerciseId: string, setIndex: number, restSeconds: number) => {
         toggleSetComplete(exerciseId, setIndex);
+        startRestTimer(restSeconds);
+    }, [toggleSetComplete, startRestTimer]);
 
-        // If we are marking as complete (not unchecking), trigger haptics and start rest timer
-        if (!wasCompleted) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            startRestTimer(restSeconds);
-        }
-    };
-
-    const getLastSessionSet = (exerciseId: string, setIndex: number) => {
+    const getLastSessionSet = useCallback((exerciseId: string, setIndex: number): { weight: number; reps: number } | null => {
         if (!lastSession) return null;
         // Try to find matching exercise by routineExerciseId
         const exLog = lastSession.exercises.find(e => e.routineExerciseId === exerciseId);
         if (!exLog) return null;
-        return exLog.sets.find(s => s.setIndex === setIndex);
-    };
+        const foundSet = exLog.sets.find(s => s.setIndex === setIndex);
+        if (!foundSet) return null;
+        return { weight: foundSet.weight, reps: foundSet.reps };
+    }, [lastSession]);
 
     const handleFinishWorkout = async () => {
         if (!routine || !auth.currentUser || !activeWorkout) {
@@ -272,6 +272,34 @@ const TrainScreen: React.FC = () => {
         }
     };
 
+    const handleInitiateReplace = (exerciseId: string) => {
+        // Find current exercise to get recommendations
+        const currentDay = activeWorkout?.routine.days.find(d => d.dayIndex === activeWorkout.dayIndex);
+        const exercise = currentDay?.exercises.find(e => e.id === exerciseId);
+
+        if (exercise && exercise.exerciseId) {
+            const recs = ExerciseRecommendationService.getRecommendedSubstitutes(exercise.exerciseId);
+            setRecommendations(recs);
+        } else {
+            setRecommendations([]);
+        }
+        setExerciseToReplace(exerciseId);
+        setReplacementModalVisible(true);
+    };
+
+    const handleConfirmReplace = (newExercise: CatalogExercise, translatedName: string) => {
+        if (exerciseToReplace) {
+            replaceExercise(exerciseToReplace, {
+                id: newExercise.id,
+                name: translatedName,
+                targetZone: newExercise.primaryMuscles[0]
+            });
+            showToast.success(t('train.replaced_success') || "Ejercicio reemplazado");
+        }
+        setReplacementModalVisible(false);
+        setExerciseToReplace(null);
+    };
+
 
     if (loading) {
         return (
@@ -327,129 +355,23 @@ const TrainScreen: React.FC = () => {
 
 
                 <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-                    {currentDay?.exercises.map((exercise) => {
-                        const isExpanded = expandedExerciseId === exercise.id;
-                        const completedSets = activeWorkout?.logs[exercise.id]?.filter((set) =>
-                            activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`)
-                        ).length || 0;
-                        const totalSets = activeWorkout?.logs[exercise.id]?.length || 0;
-
-                        return (
-                            <View key={exercise.id} style={styles.exerciseCard}>
-                                {/* Collapsible Header */}
-                                <TouchableOpacity
-                                    style={styles.exerciseCollapsibleHeader}
-                                    onPress={() => setExpandedExerciseId(isExpanded ? null : exercise.id)}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.headerLeftTrain}>
-                                        <View style={styles.expandIconTrain}>
-                                            {isExpanded ? (
-                                                <ChevronUp size={20} color={COLORS.primary} />
-                                            ) : (
-                                                <ChevronDown size={20} color={COLORS.textSecondary} />
-                                            )}
-                                        </View>
-                                        <View style={styles.headerInfoTrain}>
-                                            <Text style={styles.exerciseNameHeader} numberOfLines={1}>
-                                                {exercise.name}
-                                            </Text>
-                                            <Text style={styles.exerciseMetaTrain}>
-                                                {completedSets}/{totalSets} {t('train.set')} • {exercise.sets.length} × {exercise.reps}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    {exercise.notes && (
-                                        <TouchableOpacity
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                showToast.info(exercise.notes || "");
-                                            }}
-                                            style={styles.noteButtonHeader}
-                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                        >
-                                            <Info size={18} color={COLORS.primary} />
-                                        </TouchableOpacity>
-                                    )}
-                                </TouchableOpacity>
-
-                                {/* Expandable Content */}
-                                {isExpanded && (
-                                    <View style={styles.exerciseExpandedContent}>
-                                        <View style={styles.setsHeader}>
-                                            <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
-                                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
-                                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
-                                            <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
-                                            <View style={{ width: 40 }} />
-                                        </View>
-
-                                        {activeWorkout?.logs[exercise.id]?.map((set, index) => {
-                                            const isCompleted = activeWorkout.completedSets.has(`${exercise.id}-${set.setIndex}`);
-                                            const lastSet = getLastSessionSet(exercise.id, set.setIndex);
-
-                                            return (
-                                                <View key={set.setIndex} style={[
-                                                    styles.setRow,
-                                                    isCompleted && styles.setRowCompleted
-                                                ]}>
-                                                    <View style={styles.setNumberContainer}>
-                                                        <Text style={styles.setNumber}>{index + 1}</Text>
-                                                    </View>
-
-                                                    {/* Previous History */}
-                                                    <View style={styles.historyContainer}>
-                                                        <Text style={styles.historyText}>
-                                                            {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
-                                                        </Text>
-                                                    </View>
-
-                                                    <TextInput
-                                                        style={[styles.input, isCompleted && styles.inputCompleted]}
-                                                        keyboardType="numeric"
-                                                        placeholder="0"
-                                                        placeholderTextColor={COLORS.textSecondary}
-                                                        value={set.weight > 0 ? set.weight.toString() : ""}
-                                                        onChangeText={(val) =>
-                                                            logSet(exercise.id, set.setIndex, "weight", parseFloat(val) || 0)
-                                                        }
-                                                        editable={!isCompleted}
-                                                    />
-
-                                                    <TextInput
-                                                        style={[styles.input, isCompleted && styles.inputCompleted]}
-                                                        keyboardType="numeric"
-                                                        placeholder="0"
-                                                        placeholderTextColor={COLORS.textSecondary}
-                                                        value={set.reps > 0 ? set.reps.toString() : ""}
-                                                        onChangeText={(val) =>
-                                                            logSet(exercise.id, set.setIndex, "reps", parseFloat(val) || 0)
-                                                        }
-                                                        editable={!isCompleted}
-                                                    />
-
-                                                    <TouchableOpacity
-                                                        onPress={() => handleToggleSet(exercise.id, set.setIndex, exercise.restSeconds)}
-                                                        style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
-                                                    >
-                                                        <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            );
-                                        })}
-
-                                        <TouchableOpacity
-                                            style={styles.addSetButton}
-                                            onPress={() => addSet(exercise.id)}
-                                        >
-                                            <Plus size={16} color={COLORS.primary} />
-                                            <Text style={styles.addSetText}>{t('train.add_set')}</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
-                            </View>
-                        );
-                    })}
+                    {currentDay?.exercises.map((exercise) => (
+                        <WorkoutExerciseCard
+                            key={exercise.id}
+                            exercise={exercise}
+                            logs={activeWorkout?.logs[exercise.id] || []}
+                            completedSets={activeWorkout?.completedSets || new Set()}
+                            isExpanded={expandedExerciseId === exercise.id}
+                            onToggleExpand={() => setExpandedExerciseId(
+                                expandedExerciseId === exercise.id ? null : exercise.id
+                            )}
+                            onLogSet={logSet}
+                            onToggleSetComplete={handleToggleSet}
+                            onAddSet={addSet}
+                            getLastSessionSet={getLastSessionSet}
+                            onReplace={handleInitiateReplace}
+                        />
+                    ))}
                 </ScrollView>
 
                 <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -473,6 +395,17 @@ const TrainScreen: React.FC = () => {
                     onConfirm={confirmCancelWorkout}
                     onCancel={() => setShowCancelDialog(false)}
                     variant="danger"
+                />
+
+                <ExercisePickerModal
+                    visible={replacementModalVisible}
+                    onClose={() => setReplacementModalVisible(false)}
+                    onSelect={handleConfirmReplace}
+                    onCustomExercise={() => {
+                        // TODO: Handle custom exercise creation flow if needed or show toast
+                        showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente");
+                    }}
+                    recommendedExercises={recommendations}
                 />
             </Animated.View>
         </GestureDetector>

@@ -3,12 +3,13 @@ import { useRouter } from "expo-router";
 import { Clock, Dumbbell } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useWorkout } from "../../context/WorkoutContext";
+import { useWorkout, useWorkoutTimer } from "../../context/WorkoutContext";
 import { COLORS } from "../../theme/theme";
 
 export const TabBarWithWorkout: React.FC = () => {
     const router = useRouter();
-    const { activeWorkout, elapsedSeconds, restTimerDuration, isResting } = useWorkout();
+    const { activeWorkout, restTimerDuration, isResting } = useWorkout();
+    const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
 
     const formatTime = (seconds: number) => {
         const h = Math.floor(seconds / 3600);

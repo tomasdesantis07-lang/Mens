@@ -3,7 +3,7 @@ import { usePathname, useRouter } from "expo-router";
 import { Clock, Dumbbell } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useWorkout } from "../../context/WorkoutContext";
+import { useWorkout, useWorkoutTimer } from "../../context/WorkoutContext";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
 
 const TAB_BAR_HEIGHT = 60;
@@ -12,7 +12,8 @@ const TAB_BAR_BOTTOM = 20;
 export const ActiveWorkoutOverlay: React.FC = () => {
     const router = useRouter();
     const pathname = usePathname();
-    const { activeWorkout, elapsedSeconds, restTimerDuration, isResting } = useWorkout();
+    const { activeWorkout, restTimerDuration, isResting } = useWorkout();
+    const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
 
     // Hide if no active workout or if we're on the train screen
     if (!activeWorkout || pathname.includes('/train')) return null;

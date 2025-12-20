@@ -10,7 +10,7 @@ interface StatCardProps {
     unit?: string;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ label, value, trend, unit }) => {
+const StatCardComponent: React.FC<StatCardProps> = ({ label, value, trend, unit }) => {
     const hasTrend = trend !== undefined && trend !== 0;
     const isPositive = trend && trend > 0;
 
@@ -36,6 +36,9 @@ export const StatCard: React.FC<StatCardProps> = ({ label, value, trend, unit })
         </View>
     );
 };
+
+// Memoized export to prevent unnecessary re-renders
+export const StatCard = React.memo(StatCardComponent);
 
 const styles = StyleSheet.create({
     card: {

@@ -8,12 +8,12 @@ export interface PredefinedSet {
     targetReps?: number;    // Optional preset
 }
 
-import { BodyZone } from "./exercise";
+import { BodyPartSlug } from "./bodyParts";
 
 export interface RoutineExercise {
     id: string;                  // UUID generated with uuidv4()
     exerciseId?: string;         // Catalog reference
-    targetZone?: BodyZone;       // Cached zone for quick access
+    targetZone?: BodyPartSlug;   // Cached zone for quick access
     name: string;
     sets: PredefinedSet[];       // Changed from number to array
     reps: string;                // Flexible: "8-12", "AMRAP", etc. (kept for reference)
@@ -68,9 +68,20 @@ export const createEmptyExercise = (order: number): RoutineExercise => ({
     order,
 });
 
+// Weekday names for default day labels
+const WEEKDAY_NAMES = [
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo"
+];
+
 export const createEmptyDay = (dayIndex: number): RoutineDay => ({
     dayIndex,
-    label: `Día ${dayIndex + 1}`,
+    label: WEEKDAY_NAMES[dayIndex] || `Día ${dayIndex + 1}`,
     exercises: [],
 });
 

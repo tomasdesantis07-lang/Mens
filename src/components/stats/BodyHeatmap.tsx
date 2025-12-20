@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { G, Path } from "react-native-svg";
 import { BODY_BACK_DATA, BODY_FRONT_DATA } from "../../data/bodyPartsData";
 import { COLORS } from "../../theme/theme";
-import { BodyPart, BodyPartSlug } from "../../types/bodyParts";
+import { BodyPartSlug } from "../../types/bodyParts";
 import { MuscleId } from "../../types/muscles";
 
 interface BodyHeatmapProps {
-    data: Record<string, number>;
+    data?: Record<string, number>;
+    mode?: 'heatmap' | 'selector';
+    selectedMuscles?: BodyPartSlug[];
+    onMuscleSelect?: (muscle: BodyPartSlug) => void;
 }
 
 const mapSlugToMuscleId = (slug: BodyPartSlug, view: 'anterior' | 'posterior'): MuscleId | null => {
@@ -31,10 +34,21 @@ const mapSlugToMuscleId = (slug: BodyPartSlug, view: 'anterior' | 'posterior'): 
     }
 };
 
-const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({ data }) => {
+const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({
+    data = {},
+    mode = 'heatmap',
+    selectedMuscles = [],
+    onMuscleSelect
+}) => {
     const [view, setView] = useState<"anterior" | "posterior">("anterior");
 
-    const getIntensityColor = (muscleId: MuscleId | null): string => {
+    const getMuscleColor = (slug: BodyPartSlug, view: 'anterior' | 'posterior'): string => {
+        if (mode === 'selector') {
+            return selectedMuscles.includes(slug) ? COLORS.primary : COLORS.surface;
+        }
+
+        // Heatmap mode
+        const muscleId = mapSlugToMuscleId(slug, view);
         if (!muscleId) return COLORS.surface;
 
         const intensity = data[muscleId] || 0;
@@ -44,10 +58,10 @@ const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({ data }) => {
         return `rgba(41, 98, 255, ${opacity})`;
     };
 
-    const renderBodyParts = (parts: BodyPart[], currentView: 'anterior' | 'posterior') => {
-        return parts.map((part, index) => {
-            const muscleId = mapSlugToMuscleId(part.slug, currentView);
-            const color = getIntensityColor(muscleId);
+    // Memoize body part rendering to avoid recalculating on every render
+    const frontBodyParts = useMemo(() => {
+        return BODY_FRONT_DATA.map((part, index) => {
+            const color = getMuscleColor(part.slug, "anterior");
 
             const allPaths = [
                 ...(part.path.common || []),
@@ -56,7 +70,10 @@ const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({ data }) => {
             ];
 
             return (
-                <G key={`${part.slug}-${index}`}>
+                <G
+                    key={`${part.slug}-${index}`}
+                    onPress={() => mode === 'selector' && onMuscleSelect?.(part.slug)}
+                >
                     {allPaths.map((d, i) => (
                         <Path
                             key={i}
@@ -69,13 +86,42 @@ const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({ data }) => {
                 </G>
             );
         });
-    };
+    }, [data, mode, selectedMuscles, onMuscleSelect]);
+
+    const backBodyParts = useMemo(() => {
+        return BODY_BACK_DATA.map((part, index) => {
+            const color = getMuscleColor(part.slug, "posterior");
+
+            const allPaths = [
+                ...(part.path.common || []),
+                ...(part.path.left || []),
+                ...(part.path.right || [])
+            ];
+
+            return (
+                <G
+                    key={`${part.slug}-${index}`}
+                    onPress={() => mode === 'selector' && onMuscleSelect?.(part.slug)}
+                >
+                    {allPaths.map((d, i) => (
+                        <Path
+                            key={i}
+                            d={d}
+                            fill={color}
+                            stroke={COLORS.border}
+                            strokeWidth="1"
+                        />
+                    ))}
+                </G>
+            );
+        });
+    }, [data, mode, selectedMuscles, onMuscleSelect]);
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Mapa de Calor Corporal</Text>
-                <View style={styles.toggleContainer}>
+                {mode === 'heatmap' && <Text style={styles.title}>Mapa de Calor Corporal</Text>}
+                <View style={[styles.toggleContainer, mode === 'selector' && { marginLeft: 'auto', marginRight: 'auto' }]}>
                     <TouchableOpacity
                         style={[styles.toggleButton, view === "anterior" && styles.activeToggle]}
                         onPress={() => setView("anterior")}
@@ -93,22 +139,21 @@ const BodyHeatmapComponent: React.FC<BodyHeatmapProps> = ({ data }) => {
 
             <View style={styles.svgContainer}>
                 <Svg height="400" width="300" viewBox={view === "anterior" ? "100 100 600 1300" : "900 100 600 1300"}>
-                    {view === "anterior"
-                        ? renderBodyParts(BODY_FRONT_DATA, "anterior")
-                        : renderBodyParts(BODY_BACK_DATA, "posterior")
-                    }
+                    {view === "anterior" ? frontBodyParts : backBodyParts}
                 </Svg>
             </View>
 
-            <View style={styles.legend}>
-                <Text style={styles.legendText}>Intensidad:</Text>
-                <View style={[styles.legendColor, { backgroundColor: COLORS.surface }]} />
-                <Text style={styles.legendLabel}>0%</Text>
-                <View style={[styles.legendColor, { backgroundColor: 'rgba(41, 98, 255, 0.3)' }]} />
-                <Text style={styles.legendLabel}>30%</Text>
-                <View style={[styles.legendColor, { backgroundColor: 'rgba(41, 98, 255, 1.0)' }]} />
-                <Text style={styles.legendLabel}>100%</Text>
-            </View>
+            {mode === 'heatmap' && (
+                <View style={styles.legend}>
+                    <Text style={styles.legendText}>Intensidad:</Text>
+                    <View style={[styles.legendColor, { backgroundColor: COLORS.surface }]} />
+                    <Text style={styles.legendLabel}>0%</Text>
+                    <View style={[styles.legendColor, { backgroundColor: 'rgba(41, 98, 255, 0.3)' }]} />
+                    <Text style={styles.legendLabel}>30%</Text>
+                    <View style={[styles.legendColor, { backgroundColor: 'rgba(41, 98, 255, 1.0)' }]} />
+                    <Text style={styles.legendLabel}>100%</Text>
+                </View>
+            )}
         </View>
     );
 };

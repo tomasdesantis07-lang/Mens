@@ -6,13 +6,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 // Copiá tus valores desde Firebase aquí
 const firebaseConfig = {
-  apiKey: "AIzaSyCSb4W-S0DO4fuNfm9C3lHp5eaAlV_bScw",
-  authDomain: "mens-app-19d42.firebaseapp.com",
-  projectId: "mens-app-19d42",
-  storageBucket: "mens-app-19d42.firebasestorage.app",
-  messagingSenderId: "632055478450",
-  appId: "1:632055478450:web:e1b5e6c921113a0d8871ab",
-  measurementId: "G-0P4J9LV1RB"
+  apiKey: "AIzaSyB4LsHJcapHaZNMxcdSnWOArTREq-f3lIw",
+  authDomain: "mens-app-database.firebaseapp.com",
+  projectId: "mens-app-database",
+  storageBucket: "mens-app-database.firebasestorage.app",
+  messagingSenderId: "189708988644",
+  appId: "1:189708988644:web:5aecbbef9f93068236fcf1",
+  measurementId: "G-YMPRF7KDBN"
 };
 const app = initializeApp(firebaseConfig);
 export const auth = initializeAuth(app, {
