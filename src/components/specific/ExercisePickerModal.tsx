@@ -1,10 +1,11 @@
-import { Activity, Dumbbell, Filter, PlusCircle, Search, X } from "lucide-react-native";
+import { Activity, Dumbbell, PlusCircle, Search, X } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     FlatList,
     Modal,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -16,7 +17,6 @@ import { EXERCISE_CATALOG } from "../../data/exerciseCatalog";
 import { COLORS } from "../../theme/theme";
 import { BodyPartSlug } from "../../types/bodyParts";
 import { CatalogExercise } from "../../types/exercise";
-import { BodyHeatmap } from "../stats/BodyHeatmap";
 
 interface ExercisePickerModalProps {
     visible: boolean;
@@ -25,6 +25,46 @@ interface ExercisePickerModalProps {
     onClose: () => void;
     recommendedExercises?: CatalogExercise[];
 }
+
+// Muscle filter categories organized by body zone
+const MUSCLE_CATEGORIES: { label: string; muscles: { slug: BodyPartSlug; label: string }[] }[] = [
+    {
+        label: "Tren Superior",
+        muscles: [
+            { slug: "chest", label: "Pecho" },
+            { slug: "deltoids", label: "Hombros" },
+            { slug: "triceps", label: "Tríceps" },
+            { slug: "biceps", label: "Bíceps" },
+            { slug: "forearm", label: "Antebrazos" },
+        ],
+    },
+    {
+        label: "Espalda",
+        muscles: [
+            { slug: "lats", label: "Dorsales" },
+            { slug: "upper-back", label: "Espalda Alta" },
+            { slug: "trapezius", label: "Trapecios" },
+            { slug: "lower-back", label: "Lumbar" },
+        ],
+    },
+    {
+        label: "Core",
+        muscles: [
+            { slug: "abs", label: "Abdominales" },
+            { slug: "obliques", label: "Oblicuos" },
+        ],
+    },
+    {
+        label: "Tren Inferior",
+        muscles: [
+            { slug: "quadriceps", label: "Cuádriceps" },
+            { slug: "hamstring", label: "Isquios" },
+            { slug: "gluteal", label: "Glúteos" },
+            { slug: "calves", label: "Pantorrillas" },
+            { slug: "adductors", label: "Aductores" },
+        ],
+    },
+];
 
 const getEquipmentIcon = (equipment: string) => {
     switch (equipment) {
@@ -45,51 +85,38 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const [searchQuery, setSearchQuery] = useState("");
-    const [isBodyFilterVisible, setIsBodyFilterVisible] = useState(false);
-    const [selectedMuscles, setSelectedMuscles] = useState<BodyPartSlug[]>([]);
+    const [selectedMuscle, setSelectedMuscle] = useState<BodyPartSlug | null>(null);
 
     // Reset state when modal opens/closes
     React.useEffect(() => {
         if (visible) {
-            // If we have recommendations, don't reset. Otherwise clear.
             if (!recommendedExercises || recommendedExercises.length === 0) {
-                setSelectedMuscles([]);
-                setIsBodyFilterVisible(false);
+                setSelectedMuscle(null);
             }
         }
     }, [visible, recommendedExercises]);
 
     const handleMuscleSelect = (muscle: BodyPartSlug) => {
-        setSelectedMuscles(prev => {
-            if (prev.includes(muscle)) {
-                return prev.filter(m => m !== muscle);
-            } else {
-                return [...prev, muscle];
-            }
-        });
+        setSelectedMuscle(prev => prev === muscle ? null : muscle);
     };
 
-    const clearFilters = () => {
-        setSelectedMuscles([]);
-    };
-
-    // Filter exercises based on selected muscles
+    // Filter exercises based on selected muscle
     const filteredByCategory = useMemo(() => {
         // If we have recommendations and no manual filters, show recommendations
-        if (recommendedExercises && recommendedExercises.length > 0 && selectedMuscles.length === 0 && !isBodyFilterVisible) {
+        if (recommendedExercises && recommendedExercises.length > 0 && !selectedMuscle) {
             return recommendedExercises;
         }
 
-        // If no muscles selected, show all
-        if (selectedMuscles.length === 0) {
+        // If no muscle selected, show all
+        if (!selectedMuscle) {
             return EXERCISE_CATALOG;
         }
 
-        // Filter by selected muscles
+        // Filter by selected muscle
         return EXERCISE_CATALOG.filter(ex =>
-            ex.primaryMuscles.some(muscle => selectedMuscles.includes(muscle))
+            ex.primaryMuscles.includes(selectedMuscle)
         );
-    }, [selectedMuscles, recommendedExercises, isBodyFilterVisible]);
+    }, [selectedMuscle, recommendedExercises]);
 
     // Further filter by search query
     const filteredExercises = useMemo(() => {
@@ -115,24 +142,17 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                 style={styles.exerciseCard}
                 onPress={() => onSelect(item, item.displayName)}
             >
-                {/* Icon Box */}
                 <View style={styles.iconBox}>
                     <Icon color={COLORS.primary} size={24} />
                 </View>
-
-                {/* Info */}
                 <View style={styles.exerciseInfo}>
                     <Text style={styles.exerciseName}>{item.displayName}</Text>
                     <Text style={styles.exerciseSubtitle}>{subtitle}</Text>
                 </View>
-
-                {/* Action */}
                 <PlusCircle color={COLORS.primary} size={24} />
             </TouchableOpacity>
         );
     };
-
-    const hasActiveFilters = selectedMuscles.length > 0;
 
     return (
         <Modal
@@ -150,63 +170,76 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                     </TouchableOpacity>
                 </View>
 
-                {/* Search Bar + Filter Button */}
-                <View style={styles.searchRow}>
-                    <View style={styles.searchContainer}>
-                        <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder={t('exercise_picker.search_placeholder')}
-                            placeholderTextColor={COLORS.textTertiary}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery("")}>
-                                <X color={COLORS.textSecondary} size={16} />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                    <TouchableOpacity
-                        style={[
-                            styles.filterButton,
-                            (isBodyFilterVisible || hasActiveFilters) && styles.filterButtonActive
-                        ]}
-                        onPress={() => setIsBodyFilterVisible(!isBodyFilterVisible)}
-                    >
-                        <Filter size={20} color={(isBodyFilterVisible || hasActiveFilters) ? COLORS.textInverse : COLORS.textSecondary} />
-                        {hasActiveFilters && (
-                            <View style={styles.filterBadge}>
-                                <Text style={styles.filterBadgeText}>{selectedMuscles.length}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder={t('exercise_picker.search_placeholder')}
+                        placeholderTextColor={COLORS.textTertiary}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery("")}>
+                            <X color={COLORS.textSecondary} size={16} />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
-                {/* Body Filter (Collapsible) */}
-                {isBodyFilterVisible && (
-                    <View style={styles.bodyFilterContainer}>
-                        <BodyHeatmap
-                            mode="selector"
-                            selectedMuscles={selectedMuscles}
-                            onMuscleSelect={handleMuscleSelect}
-                        />
-                        {hasActiveFilters && (
-                            <TouchableOpacity style={styles.clearFiltersButton} onPress={clearFilters}>
-                                <Text style={styles.clearFiltersText}>{t('exercise_picker.clear_filters') || 'Limpiar filtros'}</Text>
+                {/* Muscle Filter Chips - Simple horizontal row */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipsContainer}
+                    style={styles.chipsScroll}
+                >
+                    {[
+                        { slug: "chest" as BodyPartSlug, label: "Pecho" },
+                        { slug: "deltoids" as BodyPartSlug, label: "Hombros" },
+                        { slug: "triceps" as BodyPartSlug, label: "Tríceps" },
+                        { slug: "biceps" as BodyPartSlug, label: "Bíceps" },
+                        { slug: "lats" as BodyPartSlug, label: "Dorsales" },
+                        { slug: "upper-back" as BodyPartSlug, label: "Espalda Media" },
+                        { slug: "trapezius" as BodyPartSlug, label: "Trapecios" },
+                        { slug: "abs" as BodyPartSlug, label: "Abdomen" },
+                        { slug: "quadriceps" as BodyPartSlug, label: "Cuádriceps" },
+                        { slug: "hamstring" as BodyPartSlug, label: "Isquios" },
+                        { slug: "gluteal" as BodyPartSlug, label: "Glúteos" },
+                        { slug: "calves" as BodyPartSlug, label: "Pantorrillas" },
+                    ].map((muscle) => {
+                        const isSelected = selectedMuscle === muscle.slug;
+                        return (
+                            <TouchableOpacity
+                                key={muscle.slug}
+                                style={[
+                                    styles.chip,
+                                    isSelected && styles.chipSelected
+                                ]}
+                                onPress={() => handleMuscleSelect(muscle.slug)}
+                            >
+                                <Text style={[
+                                    styles.chipText,
+                                    isSelected && styles.chipTextSelected
+                                ]}>
+                                    {muscle.label}
+                                </Text>
                             </TouchableOpacity>
-                        )}
-                    </View>
-                )}
+                        );
+                    })}
+                </ScrollView>
 
-                {/* Recommendations Badge (only when showing recommendations) */}
-                {recommendedExercises && recommendedExercises.length > 0 && selectedMuscles.length === 0 && !isBodyFilterVisible && (
-                    <View style={styles.recommendedBadge}>
-                        <Text style={styles.recommendedBadgeText}>
-                            {t('exercise_picker.showing_recommended') || 'Mostrando sugerencias'}
-                        </Text>
-                    </View>
-                )}
+                {/* Results count */}
+                <View style={styles.resultsBar}>
+                    <Text style={styles.resultsText}>
+                        {filteredExercises.length} {filteredExercises.length === 1 ? 'ejercicio' : 'ejercicios'}
+                    </Text>
+                    {selectedMuscle && (
+                        <TouchableOpacity onPress={() => setSelectedMuscle(null)}>
+                            <Text style={styles.clearText}>Limpiar</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
 
                 {/* Exercise List */}
                 <FlatList
@@ -224,7 +257,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                 />
 
                 {/* Custom Exercise Button */}
-                <View style={styles.customButtonContainer}>
+                <View style={[styles.customButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
                     <TouchableOpacity
                         style={styles.customButton}
                         onPress={onCustomExercise}
@@ -238,7 +271,6 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
         </Modal>
     );
 };
-
 
 const styles = StyleSheet.create({
     container: {
@@ -262,18 +294,12 @@ const styles = StyleSheet.create({
     closeButton: {
         padding: 4,
     },
-    searchRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        marginTop: 16,
-        gap: 12,
-    },
     searchContainer: {
-        flex: 1,
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: COLORS.surface,
+        marginHorizontal: 16,
+        marginTop: 16,
         paddingHorizontal: 12,
         borderRadius: 12,
         height: 48,
@@ -289,66 +315,60 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         height: "100%",
     },
-    filterButton: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: COLORS.surface,
-        justifyContent: 'center',
+    chipsScroll: {
+        marginTop: 12,
+        flexGrow: 0,
+        flexShrink: 0, // No permitir que se comprima
+        minHeight: 56,
+    },
+    chipsContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 8,
         alignItems: 'center',
+        minHeight: 56,
+    },
+    chip: {
+        paddingHorizontal: 16,
+        paddingVertical: 12, // Más altura interna
+        borderRadius: 24,    // Más redondeado
+        backgroundColor: COLORS.surface,
         borderWidth: 1,
         borderColor: COLORS.border,
     },
-    filterButtonActive: {
+    chipSelected: {
         backgroundColor: COLORS.primary,
         borderColor: COLORS.primary,
     },
-    filterBadge: {
-        position: 'absolute',
-        top: -4,
-        right: -4,
-        backgroundColor: COLORS.error,
-        borderRadius: 10,
-        width: 20,
-        height: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
+    chipText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: COLORS.textPrimary,
+        lineHeight: 18,
     },
-    filterBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '700',
+    chipTextSelected: {
+        color: COLORS.textInverse,
     },
-    bodyFilterContainer: {
-        padding: 16,
+    resultsBar: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
-    clearFiltersButton: {
-        marginTop: 12,
-        alignItems: 'center',
-    },
-    clearFiltersText: {
-        color: COLORS.error,
-        fontWeight: '600',
-        fontSize: 14,
-    },
-    recommendedBadge: {
-        backgroundColor: COLORS.primary + '20',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        marginHorizontal: 16,
-        marginTop: 12,
-        borderRadius: 8,
-    },
-    recommendedBadgeText: {
-        color: COLORS.primary,
+    resultsText: {
         fontSize: 13,
-        fontWeight: '600',
-        textAlign: 'center',
+        color: COLORS.textSecondary,
+    },
+    clearText: {
+        fontSize: 13,
+        color: COLORS.primary,
+        fontWeight: "600",
     },
     listContent: {
-        paddingVertical: 16,
+        paddingVertical: 8,
     },
     exerciseCard: {
         flexDirection: "row",
@@ -359,8 +379,8 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
     },
     iconBox: {
-        width: 56,
-        height: 56,
+        width: 48,
+        height: 48,
         borderRadius: 8,
         backgroundColor: COLORS.surface,
         justifyContent: "center",
@@ -371,10 +391,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     exerciseName: {
-        fontSize: 16,
-        fontWeight: "700",
+        fontSize: 15,
+        fontWeight: "600",
         color: COLORS.textPrimary,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     exerciseSubtitle: {
         fontSize: 12,
@@ -390,7 +410,6 @@ const styles = StyleSheet.create({
     },
     customButtonContainer: {
         padding: 16,
-        paddingBottom: 24,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
         backgroundColor: COLORS.background,
@@ -401,7 +420,7 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: COLORS.primary,
         borderStyle: "dashed",
-        paddingVertical: 16,
+        paddingVertical: 14,
         alignItems: "center",
     },
     customButtonText: {

@@ -36,7 +36,9 @@
         "switch_to_register": "¿No tenés cuenta? Crear una",
         "switch_to_login": "¿Ya tenés cuenta? Iniciá sesión",
         "create_action": "Crear",
-        "login_action": "Iniciar sesión"
+        "login_action": "Iniciar sesión",
+        "create_title": "Crear Cuenta",
+        "login_title": "Bienvenido"
     },
     "onboarding": {
         "title": "Bienvenido a MENS",
@@ -57,6 +59,10 @@
         "username_question": "¿Cómo querés que te busquen?",
         "username_placeholder": "nombre de usuario",
         "username_helper": "Solo letras minúsculas, números y guiones bajos.",
+        "username_taken": "Este nombre de usuario ya está en uso",
+        "username_checking": "Verificando...",
+        "username_available": "Disponible",
+        "username_suggestions": "Sugerencias:",
         "display_name": "Apodo",
         "age_label": "Edad",
         "age_placeholder": "Años",
@@ -97,17 +103,111 @@
             "weight_loss": "Pérdida de Peso"
         },
         "injuries": {
+            "title": "Lesiones Activas",
             "shoulders": "Hombros",
             "knees": "Rodillas",
             "lower_back": "Espalda Baja",
             "wrists": "Muñecas",
             "none": "Sin Lesiones"
         },
+        "postural_problems": {
+            "title": "Problemas Posturales",
+            "scoliosis": "Escoliosis",
+            "kyphosis": "Cifosis",
+            "hyperlordosis": "Hiperlordosis",
+            "none": "No lo sé / Muy leve"
+        },
         "loading": {
             "analyzing": "Analizando perfil...",
             "calculating": "Calculando volumen óptimo...",
             "structuring": "Estructurando Sistema MENS...",
             "assigning": "Asignando Rutina..."
+        },
+        "privacy_warning": "Sé honesto. Los cálculos de tu plan dependen de datos precisos. Tu información es privada y segura.",
+        "birth_date_label": "Fecha Nacimiento",
+        "birth_date_placeholder": "YYYY / MM / DD",
+        "years_old": "años",
+        "experience": {
+            "newcomer": "Iniciado",
+            "newcomer_sub": "< 2 meses",
+            "beginner": "Principiante",
+            "beginner_sub": "2 - 6 meses",
+            "intermediate": "Intermedio",
+            "intermediate_sub": "6 - 12 meses",
+            "advanced": "Base sólida",
+            "advanced_sub": "1 - 3 años",
+            "expert": "Experimentado",
+            "expert_sub": "+ 3 años",
+            "select_subtitle": "Selecciona tu nivel según constancia."
+        },
+        "goals_options": {
+            "recomp": "Recomposición",
+            "recomp_sub": "Perder grasa y ganar músculo simultáneamente.",
+            "strength": "Fuerza Máxima",
+            "strength_sub": "Prioridad en cargas altas y performance.",
+            "endurance": "Resistencia",
+            "endurance_sub": "Complemento deportivo o salud general.",
+            "select_subtitle": "Define el norte de tu entrenamiento."
+        },
+        "equipment": {
+            "title": "Equipo Disponible",
+            "subtitle": "¿Con qué entrenas normalmente?",
+            "full_gym": "Gimnasio Completo",
+            "full_gym_sub": "Acceso a barras, máquinas y poleas.",
+            "home_weights": "Casa con Pesas",
+            "home_weights_sub": "Mancuernas, barra o kettlebells.",
+            "bodyweight": "Peso Corporal",
+            "bodyweight_sub": "Sin equipamiento adicional."
+        },
+        "frequency": {
+            "title": "Frecuencia Semanal",
+            "subtitle": "¿Cuántos días por semana puedes entrenar?",
+            "days_label": "Días",
+            "warning_beginner": "Para principiantes, 5-6 días puede ser excesivo. Recomendamos 3-4 días para mejores resultados."
+        },
+        "expert_branch": {
+            "title": "Nivel detectado: Arquitecto",
+            "message": "Sabemos que ya tenés experiencia. ¿Cómo querés empezar tu camino en MENS?",
+            "option_complete": "Completar perfil de salud",
+            "option_complete_desc": "Incluye análisis postural y registro de lesiones para que la IA sea ultra-precisa con tus ajustes biológicos.",
+            "option_direct": "Ir directo a crear rutinas",
+            "option_direct_desc": "Ideal si ya conocés tus límites y solo querés usar MENS como tu tablero de control y analítica."
+        },
+        "injuries_subtitle": "Para filtrar ejercicios peligrosos.",
+        "acquisition": {
+            "title": "¿Cómo nos conociste?",
+            "subtitle": "Ayúdanos a llegar a más personas.",
+            "skip": "Omitir",
+            "friend": "Amigo",
+            "other": "Otro",
+            "country_label": "¿De dónde nos visitas?",
+            "country_placeholder": "Seleccionar País",
+            "country_search": "Buscar país..."
+        },
+        "diagnosis": {
+            "title": "DIAGNÓSTICO",
+            "subtitle": "Análisis de tu perfil biométrico",
+            "bmr_label": "TASA METABÓLICA BASAL",
+            "bmr_unit": "kcal/día",
+            "bmr_desc": "Gasto energético mínimo para funciones vitales (respirar, pensar, etc).",
+            "maintenance_label": "MANTENIMIENTO",
+            "activity_label": "ACTIVIDAD DIARIA",
+            "base_label": "BASE",
+            "total_label": "TOTAL",
+            "bmi_label": "IMC (BMI)",
+            "bmi_unit": "kg/m²",
+            "underweight": "BAJO",
+            "normal": "NORMAL",
+            "overweight": "SOBREPESO",
+            "obese": "OBESO",
+            "start_plan": "COMENZAR PLAN"
+        },
+        "pre_onboarding": {
+            "title": "Antes de empezar...",
+            "message": "En fin de no ser una app genérica queremos hacerte un mini formulario para que tu experiencia con nosotros se sienta lo más personalizada posible. Sé honesto en tus respuestas.",
+            "time_estimate": "No te robaremos más de 2-3 minutos.",
+            "thanks": "Gracias...",
+            "continue": "Continuar"
         }
     },
     "home": {
@@ -516,7 +616,7 @@
         "section_general": "GENERAL",
         "section_account": "CUENTA",
         "edit_profile": "Editar Perfil",
-        "physical_data": "Datos Físicos",
+        "health_card": "Ficha de salud",
         "subscription": "Suscripción MENS Elite",
         "free_plan": "Plan Gratis",
         "weight_units": "Unidades de Peso",

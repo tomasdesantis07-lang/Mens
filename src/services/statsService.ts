@@ -47,7 +47,7 @@ export const StatsService = {
                     if (exercise.exerciseId) {
                         const catalogExercise = EXERCISE_CATALOG.find(e => e.id === exercise.exerciseId);
                         if (catalogExercise) {
-                            targetZone = catalogExercise.targetZone;
+                            targetZone = catalogExercise.primaryMuscles[0] || "Unknown";
                         }
                     }
 

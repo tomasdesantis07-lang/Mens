@@ -178,6 +178,29 @@ const HomeScreen: React.FC = () => {
     router.push(`../routines/edit/${routineId}` as any);
   }, [router]);
 
+  const handleCreateRoutine = useCallback(() => {
+    router.push("../routines/create" as any);
+  }, [router]);
+
+  const handleSelectDay = useCallback((dayIndex: number) => {
+    if (selectedRoutineForTraining) {
+      startWorkout(selectedRoutineForTraining, dayIndex);
+      setSelectedRoutineForTraining(null);
+      router.push(`../routines/${selectedRoutineForTraining.id}/train?dayIndex=${dayIndex}` as any);
+    }
+  }, [selectedRoutineForTraining, startWorkout, router]);
+
+  const handleQuickStart = useCallback(() => {
+    if (nextWorkout) {
+      const routine = userRoutines.find(r => r.id === nextWorkout.routineId);
+      if (routine) {
+        setShowFloatingButton(false);
+        startWorkout(routine, nextWorkout.dayIndex);
+        router.push(`../routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
+      }
+    }
+  }, [nextWorkout, userRoutines, startWorkout, router]);
+
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
@@ -193,29 +216,6 @@ const HomeScreen: React.FC = () => {
 
   // Check if today is a rest day (from WorkoutService)
   const isTodayRestDay = nextWorkout?.isRestDay ?? false;
-
-  const handleCreateRoutine = () => {
-    router.push("../routines/create" as any);
-  };
-
-  const handleSelectDay = (dayIndex: number) => {
-    if (selectedRoutineForTraining) {
-      startWorkout(selectedRoutineForTraining, dayIndex);
-      setSelectedRoutineForTraining(null);
-      router.push(`../routines/${selectedRoutineForTraining.id}/train?dayIndex=${dayIndex}` as any);
-    }
-  };
-
-  const handleQuickStart = () => {
-    if (nextWorkout) {
-      const routine = userRoutines.find(r => r.id === nextWorkout.routineId);
-      if (routine) {
-        setShowFloatingButton(false); // Hide button when starting workout
-        startWorkout(routine, nextWorkout.dayIndex);
-        router.push(`../routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
-      }
-    }
-  };
 
   return (
     <>

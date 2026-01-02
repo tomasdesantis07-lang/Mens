@@ -34,16 +34,16 @@ const WelcomeScreen: React.FC = () => {
               router.replace('/(tabs)/home');
             } else {
               // User document exists but is incomplete, complete onboarding
-              router.replace('/onboarding');
+              router.replace('/pre_onboarding');
             }
           } else {
             // User needs to complete onboarding
-            router.replace('/onboarding');
+            router.replace('/pre_onboarding');
           }
         } catch (error) {
           console.error('Error checking user status:', error);
           // On error, assume onboarding needed
-          router.replace('/onboarding');
+          router.replace('/pre_onboarding');
         } finally {
           setCheckingOnboarding(false);
         }
@@ -82,6 +82,25 @@ const WelcomeScreen: React.FC = () => {
         onPress={handleStart}
       >
         <Text style={styles.buttonText}>{t('welcome.start')}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            const { RoutineMigrationService } = await import('../src/services/migrationService');
+            const res = await RoutineMigrationService.uploadRoutineTemplates();
+            if (res.success) {
+              alert(`DB Populated! ${res.count} templates uploaded.`);
+            } else {
+              alert(`Error: ${(res.error as { message?: string })?.message || JSON.stringify(res.error)}`);
+            }
+          } catch (err: any) {
+            alert(`Exception: ${err?.message || JSON.stringify(err)}`);
+          }
+        }}
+        style={{ marginTop: 20, opacity: 0.3 }}
+      >
+        <Text style={{ color: COLORS.textSecondary, fontSize: 10 }}>[SEED DB]</Text>
       </TouchableOpacity>
     </View>
   );

@@ -18,7 +18,7 @@ import { COLORS } from "../src/theme/theme";
 const AuthScreen: React.FC = () => {
   const router = useRouter();
   const { t } = useTranslation();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +32,7 @@ const AuthScreen: React.FC = () => {
     try {
       if (mode === "register") {
         await AuthService.register(email.trim(), password);
-        router.replace("/onboarding");
+        router.replace("/pre_onboarding");
       } else {
         await AuthService.login(email.trim(), password);
         router.replace("/(tabs)/home");
@@ -56,6 +56,10 @@ const AuthScreen: React.FC = () => {
 
       <View style={styles.card}>
         <AuthTabs mode={mode} setMode={setMode} />
+
+        <Text style={styles.title}>
+          {isRegister ? t('auth.create_title') : t('auth.login_title')}
+        </Text>
 
         <CustomInput
           placeholder={t('auth.email_placeholder')}
@@ -146,6 +150,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  title: {
+    color: COLORS.textPrimary,
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 24,
+    marginTop: 8,
   },
   passwordRow: {
     position: "relative",

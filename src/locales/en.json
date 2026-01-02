@@ -36,7 +36,9 @@
         "switch_to_register": "Don't have an account? Sign up",
         "switch_to_login": "Already have an account? Log in",
         "create_action": "Create",
-        "login_action": "Log In"
+        "login_action": "Log In",
+        "create_title": "Create Account",
+        "login_title": "Welcome Back"
     },
     "onboarding": {
         "title": "Welcome to MENS",
@@ -57,6 +59,10 @@
         "username_question": "How do you want others to find you?",
         "username_placeholder": "username",
         "username_helper": "Only lowercase letters, numbers, and underscores.",
+        "username_taken": "This username is already taken",
+        "username_checking": "Checking...",
+        "username_available": "Available",
+        "username_suggestions": "Suggestions:",
         "display_name": "Nickname",
         "age_label": "Age",
         "age_placeholder": "Years",
@@ -108,6 +114,92 @@
             "calculating": "Calculating optimal volume...",
             "structuring": "Structuring MENS System...",
             "assigning": "Assigning Routine..."
+        },
+        "privacy_warning": "Be honest. Your plan calculations depend on accurate data. Your information is private and secure.",
+        "birth_date_label": "Birth Date",
+        "birth_date_placeholder": "YYYY / MM / DD",
+        "years_old": "years old",
+        "experience": {
+            "newcomer": "Newcomer",
+            "newcomer_sub": "< 2 months",
+            "beginner": "Beginner",
+            "beginner_sub": "2 - 6 months",
+            "intermediate": "Intermediate",
+            "intermediate_sub": "6 - 12 months",
+            "advanced": "Solid Base",
+            "advanced_sub": "1 - 3 years",
+            "expert": "Experienced",
+            "expert_sub": "+ 3 years",
+            "select_subtitle": "Select your level based on consistency."
+        },
+        "goals_options": {
+            "recomp": "Recomposition",
+            "recomp_sub": "Lose fat and build muscle simultaneously.",
+            "strength": "Max Strength",
+            "strength_sub": "Focus on heavy loads and performance.",
+            "endurance": "Endurance",
+            "endurance_sub": "Sports complement or general health.",
+            "select_subtitle": "Define your training goal."
+        },
+        "equipment": {
+            "title": "Available Equipment",
+            "subtitle": "What do you usually train with?",
+            "full_gym": "Full Gym",
+            "full_gym_sub": "Access to barbells, machines and cables.",
+            "home_weights": "Home Weights",
+            "home_weights_sub": "Dumbbells, barbell or kettlebells.",
+            "bodyweight": "Bodyweight",
+            "bodyweight_sub": "No additional equipment."
+        },
+        "frequency": {
+            "title": "Weekly Frequency",
+            "subtitle": "How many days per week can you train?",
+            "days_label": "Days",
+            "warning_beginner": "For beginners, 5-6 days might be excessive. We recommend 3-4 days for best results."
+        },
+        "expert_branch": {
+            "title": "Level Detected: Architect",
+            "message": "We know you have experience. How do you want to start your MENS journey?",
+            "option_complete": "Complete Health Profile",
+            "option_complete_desc": "Includes postural analysis and injury log for ultra-precise AI biological adjustments.",
+            "option_direct": "Go straight to routine creation",
+            "option_direct_desc": "Ideal if you already know your limits and just want to use MENS as your control panel and analytics dashboard."
+        },
+        "injuries_subtitle": "To filter dangerous exercises.",
+        "acquisition": {
+            "title": "How did you find us?",
+            "subtitle": "Help us reach more people.",
+            "skip": "Skip",
+            "friend": "Friend",
+            "other": "Other",
+            "country_label": "Where are you visiting from?",
+            "country_placeholder": "Select Country",
+            "country_search": "Search country..."
+        },
+        "diagnosis": {
+            "title": "DIAGNOSIS",
+            "subtitle": "Analysis of your biometric profile",
+            "bmr_label": "BASAL METABOLIC RATE",
+            "bmr_unit": "kcal/day",
+            "bmr_desc": "Minimum energy expenditure for vital functions (breathing, thinking, etc).",
+            "maintenance_label": "MAINTENANCE",
+            "activity_label": "DAILY ACTIVITY",
+            "base_label": "BASE",
+            "total_label": "TOTAL",
+            "bmi_label": "BMI",
+            "bmi_unit": "kg/m²",
+            "underweight": "UNDERWEIGHT",
+            "normal": "NORMAL",
+            "overweight": "OVERWEIGHT",
+            "obese": "OBESE",
+            "start_plan": "START PLAN"
+        },
+        "pre_onboarding": {
+            "title": "Before we start...",
+            "message": "To avoid being a generic app, we want to ask you a few questions so your experience with us feels as personalized as possible. Be honest in your answers.",
+            "time_estimate": "We won't take more than 2-3 minutes.",
+            "thanks": "Thank you...",
+            "continue": "Continue"
         }
     },
     "home": {
@@ -516,7 +608,7 @@
         "section_general": "GENERAL",
         "section_account": "ACCOUNT",
         "edit_profile": "Edit Profile",
-        "physical_data": "Physical Data",
+        "health_card": "Health Card",
         "subscription": "MENS Elite Subscription",
         "free_plan": "Free Plan",
         "weight_units": "Weight Units",

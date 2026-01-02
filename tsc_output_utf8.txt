@@ -1,0 +1,2 @@
+﻿src/components/specific/DayEditorSheet.tsx(65,43): error TS2339: Property 'targetZone' does not exist on type 'CatalogExercise'.
+src/services/statsService.ts(50,58): error TS2339: Property 'targetZone' does not exist on type 'CatalogExercise'.

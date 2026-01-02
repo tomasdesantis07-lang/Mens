@@ -6,15 +6,15 @@ import { doc, getDoc } from 'firebase/firestore';
 import {
     ChevronLeft,
     Crown,
+    FileText,
     Globe,
     LogOut,
-    Ruler,
     Scale,
     Timer,
     Trash2,
     User,
     Vibrate,
-    Volume2,
+    Volume2
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -71,6 +71,7 @@ export default function SettingsScreen() {
 
     const handleSignOut = async () => {
         try {
+            await AuthService.cleanLocalData();
             await signOut(auth);
             router.replace('/auth' as any);
         } catch (error) {
@@ -166,10 +167,9 @@ export default function SettingsScreen() {
                         onPress={() => console.log('Edit Profile')}
                     />
                     <SettingsRow
-                        label={t('settings.physical_data')}
-                        icon={Ruler}
-                        value="178cm / 80kg"
-                        onPress={() => console.log('Physical Data')}
+                        label={t('settings.health_card')}
+                        icon={FileText}
+                        onPress={() => console.log('Health Card')}
                     />
                     <SettingsRow
                         label={t('settings.subscription')}

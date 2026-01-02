@@ -62,7 +62,7 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
     const handleExerciseSelect = (exercise: CatalogExercise, translatedName: string) => {
         const newExercise = createEmptyExercise(editedDay.exercises.length);
         newExercise.exerciseId = exercise.id;
-        newExercise.targetZone = exercise.targetZone;
+        newExercise.targetZone = exercise.primaryMuscles[0];
         newExercise.name = translatedName;
 
         setEditedDay((prev) => ({

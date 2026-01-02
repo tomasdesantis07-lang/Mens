@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Routine } from "../types/routine";
 import { WorkoutSetLog } from "../types/workout";
 
@@ -24,6 +24,7 @@ interface WorkoutContextType {
     startRestTimer: (seconds: number) => void;
     stopRestTimer: () => void;
     replaceExercise: (oldExerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => void;
+    restEndTime: number | null;
 }
 
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
@@ -56,29 +57,59 @@ export const useWorkoutTimer = (startTime: number | null): number => {
     return elapsed;
 };
 
+/**
+ * Hook to get the remaining rest time locally.
+ */
+export const useRestTimer = (endTime: number | null): number => {
+    const [remaining, setRemaining] = useState(0);
+
+    useEffect(() => {
+        if (!endTime) {
+            setRemaining(0);
+            return;
+        }
+
+        const update = () => {
+            const diff = Math.ceil((endTime - Date.now()) / 1000);
+            setRemaining(Math.max(0, diff));
+        };
+
+        update();
+        const interval = setInterval(update, 1000);
+        return () => clearInterval(interval);
+    }, [endTime]);
+
+    return remaining;
+};
+
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
-    const [restTimerDuration, setRestTimerDuration] = useState(0);
+    const [restEndTime, setRestEndTime] = useState<number | null>(null);
     const [isResting, setIsResting] = useState(false);
 
-    // Rest timer effect
+    // Auto-turn off resting state when time expires
+    // This uses a timeout instead of an interval, so it only triggers once at the end
     useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        if (isResting && restTimerDuration > 0) {
-            interval = setInterval(() => {
-                setRestTimerDuration((prev) => {
-                    if (prev <= 1) {
-                        setIsResting(false);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isResting, restTimerDuration]);
+        if (isResting && restEndTime) {
+            const now = Date.now();
+            const msRemaining = restEndTime - now;
 
-    const startWorkout = (routine: Routine, dayIndex: number) => {
+            if (msRemaining <= 0) {
+                setIsResting(false);
+                setRestEndTime(null);
+                return;
+            }
+
+            const timeout = setTimeout(() => {
+                setIsResting(false);
+                setRestEndTime(null);
+            }, msRemaining);
+
+            return () => clearTimeout(timeout);
+        }
+    }, [isResting, restEndTime]);
+
+    const startWorkout = useCallback((routine: Routine, dayIndex: number) => {
         // Initialize logs based on the routine day
         const day = routine.days.find(d => d.dayIndex === dayIndex);
         const initialLogs: Record<string, WorkoutSetLog[]> = {};
@@ -101,20 +132,22 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             logs: initialLogs,
             completedSets: new Set(),
         });
-    };
+    }, []);
 
-    const cancelWorkout = () => {
+    const cancelWorkout = useCallback(() => {
         setActiveWorkout(null);
-    };
+        setRestEndTime(null);
+        setIsResting(false);
+    }, []);
 
-    const finishWorkout = () => {
+    const finishWorkout = useCallback(() => {
         // Logic to save is handled in the UI/Service, context just clears state
         setActiveWorkout(null);
-    };
+        setRestEndTime(null);
+        setIsResting(false);
+    }, []);
 
-    const logSet = (exerciseId: string, setIndex: number, field: "weight" | "reps", value: number) => {
-        if (!activeWorkout) return;
-
+    const logSet = useCallback((exerciseId: string, setIndex: number, field: "weight" | "reps", value: number) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
             const currentSets = prev.logs[exerciseId] ? [...prev.logs[exerciseId]] : [];
@@ -126,11 +159,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             return { ...prev, logs: { ...prev.logs, [exerciseId]: currentSets } };
         });
-    };
+    }, []);
 
-    const toggleSetComplete = (exerciseId: string, setIndex: number) => {
-        if (!activeWorkout) return;
-
+    const toggleSetComplete = useCallback((exerciseId: string, setIndex: number) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
             const key = `${exerciseId}-${setIndex}`;
@@ -142,11 +173,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
             return { ...prev, completedSets: nextCompleted };
         });
-    };
+    }, []);
 
-    const addSet = (exerciseId: string) => {
-        if (!activeWorkout) return;
-
+    const addSet = useCallback((exerciseId: string) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
             const currentSets = prev.logs[exerciseId] ? [...prev.logs[exerciseId]] : [];
@@ -162,11 +191,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
             };
         });
-    };
+    }, []);
 
-    const removeSet = (exerciseId: string, setIndex: number) => {
-        if (!activeWorkout) return;
-
+    const removeSet = useCallback((exerciseId: string, setIndex: number) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
             const currentSets = prev.logs[exerciseId] ? [...prev.logs[exerciseId]] : [];
@@ -178,21 +205,20 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
             };
         });
-    };
+    }, []);
 
-    const startRestTimer = (seconds: number) => {
-        setRestTimerDuration(seconds);
+    const startRestTimer = useCallback((seconds: number) => {
+        // Set timestamp for when it ends
+        setRestEndTime(Date.now() + seconds * 1000);
         setIsResting(true);
-    };
+    }, []);
 
-    const stopRestTimer = () => {
+    const stopRestTimer = useCallback(() => {
         setIsResting(false);
-        setRestTimerDuration(0);
-    };
+        setRestEndTime(null);
+    }, []);
 
-    const replaceExercise = (exerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => {
-        if (!activeWorkout) return;
-
+    const replaceExercise = useCallback((exerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
 
@@ -248,7 +274,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 completedSets: nextCompleted
             };
         });
-    };
+    }, []);
 
     return (
         <WorkoutContext.Provider value={{
@@ -260,7 +286,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             toggleSetComplete,
             addSet,
             removeSet,
-            restTimerDuration,
+            restTimerDuration: restEndTime ? Math.ceil((restEndTime - Date.now()) / 1000) : 0, // Computed for compatibility
+            restEndTime, // New
             isResting,
             startRestTimer,
             stopRestTimer,

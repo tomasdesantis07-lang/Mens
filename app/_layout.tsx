@@ -19,7 +19,6 @@ import { COLORS } from '../src/theme/theme';
 
 // Ignore specific warnings
 LogBox.ignoreLogs([
-    'setLayoutAnimationEnabledExperimental', // New Arch compatibility
     'Mismatch between C++ code version', // Reanimated version mismatch (usually dev client issue)
 ]);
 
@@ -38,6 +37,8 @@ export default function RootLayout() {
     const [isNewUser, setIsNewUser] = useState(false);
     const [showCustomSplash, setShowCustomSplash] = useState(true);
 
+    const [sessionKey, setSessionKey] = useState<string>('init');
+
     useEffect(() => {
         const initializeApp = async () => {
             try {
@@ -55,13 +56,18 @@ export default function RootLayout() {
                             try {
                                 const userDoc = await getDoc(doc(db, 'users', user.uid));
                                 setIsNewUser(!userDoc.exists());
+                                // Update session key to user ID to ensure providers use this user's context
+                                setSessionKey(user.uid);
                             } catch (error) {
                                 console.error('Error checking user data:', error);
                                 setIsNewUser(false);
+                                setSessionKey(`error-${Date.now()}`);
                             }
                         } else {
                             // No user logged in, treat as new user
                             setIsNewUser(true);
+                            // Generate a random key for guest/logout state to clear previous user data
+                            setSessionKey(`guest-${Date.now()}`);
                         }
                         unsubscribe();
                         resolve();
@@ -70,7 +76,7 @@ export default function RootLayout() {
 
                 // DEV: Minimum splash screen delay to see animation (5 seconds)
                 // TODO: Remove this in production or reduce to ~2 seconds
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Mark app as ready
                 setAppIsReady(true);
@@ -101,9 +107,9 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={{ flex: 1, backgroundColor: '#000000' }}>
                 {appIsReady && (
-                    <AuthProvider>
-                        <SettingsProvider>
-                            <WorkoutProvider>
+                    <AuthProvider key={`auth-${sessionKey}`}>
+                        <SettingsProvider key={`settings-${sessionKey}`}>
+                            <WorkoutProvider key={`workout-${sessionKey}`}>
                                 <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
                                 <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
                                     <Stack.Screen name="index" />

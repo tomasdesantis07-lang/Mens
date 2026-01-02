@@ -33,7 +33,7 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
 
         try {
             // Use optimized query with limit instead of fetching all sessions
-            const sessions = await WorkoutService.getRecentSessions(user.uid, 10);
+            const sessions = await WorkoutService.getRecentSessions(user.uid, 5);
             setWorkouts(sessions);
         } catch (error) {
             console.error('Error loading recent workouts:', error);

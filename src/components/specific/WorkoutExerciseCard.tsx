@@ -27,6 +27,86 @@ interface WorkoutExerciseCardProps {
     onReplace: (exerciseId: string) => void;
 }
 
+// Memoized Set Row Component
+const SetRow = memo(({
+    set,
+    index,
+    isCompleted,
+    lastSet,
+    exerciseId,
+    onLogSet,
+    onToggleSet,
+    restSeconds // Add restSeconds prop
+}: {
+    set: WorkoutSetLog;
+    index: number;
+    isCompleted: boolean;
+    lastSet: { weight: number; reps: number } | null;
+    exerciseId: string;
+    onLogSet: (exerciseId: string, setIndex: number, field: "weight" | "reps", value: number) => void;
+    onToggleSet: (setIndex: number) => void;
+    restSeconds: number;
+}) => {
+    return (
+        <View style={[
+            styles.setRow,
+            isCompleted && styles.setRowCompleted
+        ]}>
+            <View style={styles.setNumberContainer}>
+                <Text style={styles.setNumber}>{index + 1}</Text>
+            </View>
+
+            {/* Previous History */}
+            <View style={styles.historyContainer}>
+                <Text style={styles.historyText}>
+                    {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
+                </Text>
+            </View>
+
+            <TextInput
+                style={[styles.input, isCompleted && styles.inputCompleted]}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.textSecondary}
+                value={set.weight > 0 ? set.weight.toString() : ""}
+                onChangeText={(val) =>
+                    onLogSet(exerciseId, set.setIndex, "weight", parseFloat(val) || 0)
+                }
+                editable={!isCompleted}
+            />
+
+            <TextInput
+                style={[styles.input, isCompleted && styles.inputCompleted]}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.textSecondary}
+                value={set.reps > 0 ? set.reps.toString() : ""}
+                onChangeText={(val) =>
+                    onLogSet(exerciseId, set.setIndex, "reps", parseFloat(val) || 0)
+                }
+                editable={!isCompleted}
+            />
+
+            <TouchableOpacity
+                onPress={() => onToggleSet(set.setIndex)}
+                style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
+            >
+                <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
+            </TouchableOpacity>
+        </View>
+    );
+}, (prev, next) => {
+    return (
+        prev.isCompleted === next.isCompleted &&
+        prev.set.weight === next.set.weight &&
+        prev.set.reps === next.set.reps &&
+        prev.set.setIndex === next.set.setIndex &&
+        prev.lastSet === next.lastSet && // Reference comparison should be stable
+        prev.onToggleSet === next.onToggleSet && // Should be stable via useCallback
+        prev.onLogSet === next.onLogSet // Should be stable via Context
+    );
+});
+
 const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
     exercise,
     logs,
@@ -126,52 +206,17 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                         const lastSet = getLastSessionSet(exercise.id, set.setIndex);
 
                         return (
-                            <View key={set.setIndex} style={[
-                                styles.setRow,
-                                isCompleted && styles.setRowCompleted
-                            ]}>
-                                <View style={styles.setNumberContainer}>
-                                    <Text style={styles.setNumber}>{index + 1}</Text>
-                                </View>
-
-                                {/* Previous History */}
-                                <View style={styles.historyContainer}>
-                                    <Text style={styles.historyText}>
-                                        {lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}
-                                    </Text>
-                                </View>
-
-                                <TextInput
-                                    style={[styles.input, isCompleted && styles.inputCompleted]}
-                                    keyboardType="numeric"
-                                    placeholder="0"
-                                    placeholderTextColor={COLORS.textSecondary}
-                                    value={set.weight > 0 ? set.weight.toString() : ""}
-                                    onChangeText={(val) =>
-                                        onLogSet(exercise.id, set.setIndex, "weight", parseFloat(val) || 0)
-                                    }
-                                    editable={!isCompleted}
-                                />
-
-                                <TextInput
-                                    style={[styles.input, isCompleted && styles.inputCompleted]}
-                                    keyboardType="numeric"
-                                    placeholder="0"
-                                    placeholderTextColor={COLORS.textSecondary}
-                                    value={set.reps > 0 ? set.reps.toString() : ""}
-                                    onChangeText={(val) =>
-                                        onLogSet(exercise.id, set.setIndex, "reps", parseFloat(val) || 0)
-                                    }
-                                    editable={!isCompleted}
-                                />
-
-                                <TouchableOpacity
-                                    onPress={() => handleToggleSet(set.setIndex)}
-                                    style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
-                                >
-                                    <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
-                                </TouchableOpacity>
-                            </View>
+                            <SetRow
+                                key={set.setIndex}
+                                set={set}
+                                index={index}
+                                isCompleted={isCompleted}
+                                lastSet={lastSet}
+                                exerciseId={exercise.id}
+                                onLogSet={onLogSet}
+                                onToggleSet={handleToggleSet}
+                                restSeconds={exercise.restSeconds}
+                            />
                         );
                     })}
 

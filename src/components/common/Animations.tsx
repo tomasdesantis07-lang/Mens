@@ -1,11 +1,9 @@
-import { useIsFocused } from "@react-navigation/native";
-import React, { useEffect } from "react";
-import { StyleProp, ViewStyle } from "react-native";
-import Animated, {
+import React from "react";
+import { StyleProp, View, ViewStyle } from "react-native";
+import {
     Easing,
     useAnimatedStyle,
     useSharedValue,
-    withDelay,
     withSequence,
     withTiming,
 } from "react-native-reanimated";
@@ -38,7 +36,7 @@ export const STAGGER = {
 };
 
 // ============================================
-// ANIMATED CARD WRAPPER (con repeat on focus)
+// ANIMATED CARD WRAPPER (Disabled for performance)
 // ============================================
 interface AnimatedCardProps {
     children: React.ReactNode;
@@ -49,46 +47,13 @@ interface AnimatedCardProps {
 
 export const AnimatedCard: React.FC<AnimatedCardProps> = ({
     children,
-    index = 0,
-    delay = 0,
     style,
 }) => {
-    const isFocused = useIsFocused();
-    const opacity = useSharedValue(0);
-    const translateY = useSharedValue(20);
-
-    const baseDelay = delay + index * STAGGER.normal;
-
-    useEffect(() => {
-        if (isFocused) {
-            opacity.value = 0;
-            translateY.value = 20;
-
-            opacity.value = withDelay(
-                baseDelay,
-                withTiming(1, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) })
-            );
-            translateY.value = withDelay(
-                baseDelay,
-                withTiming(0, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) })
-            );
-        }
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-        transform: [{ translateY: translateY.value }],
-    }));
-
-    return (
-        <Animated.View style={[animatedStyle, style]}>
-            {children}
-        </Animated.View>
-    );
+    return <View style={style}>{children}</View>;
 };
 
 // ============================================
-// ANIMATED POP-IN (con repeat on focus)
+// ANIMATED POP-IN (Disabled for performance)
 // ============================================
 interface AnimatedPopInProps {
     children: React.ReactNode;
@@ -99,38 +64,13 @@ interface AnimatedPopInProps {
 
 export const AnimatedPopIn: React.FC<AnimatedPopInProps> = ({
     children,
-    index = 0,
-    delay = 0,
     style,
 }) => {
-    const isFocused = useIsFocused();
-    const opacity = useSharedValue(0);
-
-    const baseDelay = delay + index * STAGGER.fast;
-
-    useEffect(() => {
-        if (isFocused) {
-            opacity.value = 0;
-            opacity.value = withDelay(
-                baseDelay,
-                withTiming(1, { duration: DURATIONS.fast, easing: Easing.out(Easing.cubic) })
-            );
-        }
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-    }));
-
-    return (
-        <Animated.View style={[animatedStyle, style]}>
-            {children}
-        </Animated.View>
-    );
+    return <View style={style}>{children}</View>;
 };
 
 // ============================================
-// ANIMATED SLIDE-IN (con repeat on focus)
+// ANIMATED SLIDE-IN (Disabled for performance)
 // ============================================
 interface AnimatedSlideInProps {
     children: React.ReactNode;
@@ -142,56 +82,13 @@ interface AnimatedSlideInProps {
 
 export const AnimatedSlideIn: React.FC<AnimatedSlideInProps> = ({
     children,
-    direction = "up",
-    index = 0,
-    delay = 0,
     style,
 }) => {
-    const isFocused = useIsFocused();
-    const opacity = useSharedValue(0);
-    const translateX = useSharedValue(direction === "right" ? 30 : 0);
-    const translateY = useSharedValue(direction === "down" ? 20 : direction === "up" ? -20 : 0);
-
-    const baseDelay = delay + index * STAGGER.normal;
-
-    useEffect(() => {
-        if (isFocused) {
-            opacity.value = 0;
-            translateX.value = direction === "right" ? 30 : 0;
-            translateY.value = direction === "down" ? 20 : direction === "up" ? -20 : 0;
-
-            opacity.value = withDelay(
-                baseDelay,
-                withTiming(1, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) })
-            );
-            translateX.value = withDelay(
-                baseDelay,
-                withTiming(0, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) })
-            );
-            translateY.value = withDelay(
-                baseDelay,
-                withTiming(0, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) })
-            );
-        }
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-        transform: [
-            { translateX: translateX.value },
-            { translateY: translateY.value },
-        ],
-    }));
-
-    return (
-        <Animated.View style={[animatedStyle, style]}>
-            {children}
-        </Animated.View>
-    );
+    return <View style={style}>{children}</View>;
 };
 
 // ============================================
-// ANIMATED SECTION (con repeat on focus)
+// ANIMATED SECTION (Disabled for performance)
 // ============================================
 interface AnimatedSectionProps {
     children: React.ReactNode;
@@ -201,35 +98,13 @@ interface AnimatedSectionProps {
 
 export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
     children,
-    delay = 0,
     style,
 }) => {
-    const isFocused = useIsFocused();
-    const opacity = useSharedValue(0);
-
-    useEffect(() => {
-        if (isFocused) {
-            opacity.value = 0;
-            opacity.value = withDelay(
-                delay,
-                withTiming(1, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) })
-            );
-        }
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-    }));
-
-    return (
-        <Animated.View style={[animatedStyle, style]}>
-            {children}
-        </Animated.View>
-    );
+    return <View style={style}>{children}</View>;
 };
 
 // ============================================
-// ANIMATED HEADER (con repeat on focus)
+// ANIMATED HEADER (Disabled for performance)
 // ============================================
 interface AnimatedHeaderProps {
     children: React.ReactNode;
@@ -240,34 +115,11 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     children,
     style,
 }) => {
-    const isFocused = useIsFocused();
-    const opacity = useSharedValue(0);
-    const translateY = useSharedValue(15);
-
-    useEffect(() => {
-        if (isFocused) {
-            opacity.value = 0;
-            translateY.value = 15;
-
-            opacity.value = withTiming(1, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) });
-            translateY.value = withTiming(0, { duration: DURATIONS.normal, easing: Easing.out(Easing.cubic) });
-        }
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-        transform: [{ translateY: translateY.value }],
-    }));
-
-    return (
-        <Animated.View style={[animatedStyle, style]}>
-            {children}
-        </Animated.View>
-    );
+    return <View style={style}>{children}</View>;
 };
 
 // ============================================
-// ANIMATED LIST ITEM (con repeat on focus)
+// ANIMATED LIST ITEM (Disabled for performance)
 // ============================================
 interface AnimatedListItemProps {
     children: React.ReactNode;
@@ -277,45 +129,13 @@ interface AnimatedListItemProps {
 
 export const AnimatedListItem: React.FC<AnimatedListItemProps> = ({
     children,
-    index,
     style,
 }) => {
-    const isFocused = useIsFocused();
-    const opacity = useSharedValue(0);
-    const translateY = useSharedValue(20);
-
-    const delay = Math.min(index * STAGGER.fast, 400);
-
-    useEffect(() => {
-        if (isFocused) {
-            opacity.value = 0;
-            translateY.value = 20;
-
-            opacity.value = withDelay(
-                delay,
-                withTiming(1, { duration: DURATIONS.fast, easing: Easing.out(Easing.cubic) })
-            );
-            translateY.value = withDelay(
-                delay,
-                withTiming(0, { duration: DURATIONS.fast, easing: Easing.out(Easing.cubic) })
-            );
-        }
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-        transform: [{ translateY: translateY.value }],
-    }));
-
-    return (
-        <Animated.View style={[animatedStyle, style]}>
-            {children}
-        </Animated.View>
-    );
+    return <View style={style}>{children}</View>;
 };
 
 // ============================================
-// BOUNCE ON PRESS HOOK
+// BOUNCE ON PRESS HOOK (Still active - user interaction)
 // ============================================
 export const useBounceAnimation = () => {
     const scale = useSharedValue(1);
@@ -335,7 +155,7 @@ export const useBounceAnimation = () => {
 };
 
 // ============================================
-// PULSE ANIMATION HOOK
+// PULSE ANIMATION HOOK (Still active - user interaction)
 // ============================================
 export const usePulseAnimation = () => {
     const scale = useSharedValue(1);
