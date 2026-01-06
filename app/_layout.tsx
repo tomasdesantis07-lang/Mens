@@ -12,6 +12,7 @@ import Toast from 'react-native-toast-message';
 import { CustomSplashScreen } from '../src/components/splash/CustomSplashScreen';
 import { initI18n } from '../src/config/i18n';
 import { AuthProvider } from '../src/context/AuthContext';
+import { OnboardingProvider } from '../src/context/OnboardingContext';
 import { SettingsProvider } from '../src/context/SettingsContext';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
 import { auth, db } from '../src/services/firebaseConfig';
@@ -27,10 +28,10 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
     // Load custom fonts with Antigravity aliases
     const [fontsLoaded] = useFonts({
-        'Antigravity-Display': DelaGothicOne_400Regular,
-        'Antigravity-UI-Reg': Inter_400Regular,
-        'Antigravity-UI-Bold': Inter_700Bold,
-        'Antigravity-UI-Black': Inter_900Black,
+        'Mens-Display': DelaGothicOne_400Regular,
+        'Mens-UI-Reg': Inter_400Regular,
+        'Mens-UI-Bold': Inter_700Bold,
+        'Mens-UI-Black': Inter_900Black,
     });
 
     const [appIsReady, setAppIsReady] = useState(false);
@@ -110,29 +111,34 @@ export default function RootLayout() {
                     <AuthProvider key={`auth-${sessionKey}`}>
                         <SettingsProvider key={`settings-${sessionKey}`}>
                             <WorkoutProvider key={`workout-${sessionKey}`}>
-                                <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-                                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
-                                    <Stack.Screen name="index" />
-                                    <Stack.Screen name="language" />
-                                    <Stack.Screen name="auth" />
-                                    <Stack.Screen name="forgot" />
-                                    <Stack.Screen name="onboarding" />
-                                    <Stack.Screen name="warning" />
-                                    <Stack.Screen name="(tabs)" />
-                                    <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
-                                    <Stack.Screen name="routines/create" />
-                                    <Stack.Screen name="routines/manual-editor" />
-                                    <Stack.Screen
-                                        name="routines/[id]/train"
-                                        options={{
-                                            presentation: 'transparentModal',
-                                            animation: 'slide_from_bottom',
-                                            contentStyle: { backgroundColor: 'transparent' },
-                                        }}
-                                    />
-                                    <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-                                </Stack>
-                                <Toast />
+                                <OnboardingProvider>
+                                    <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+                                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
+                                        <Stack.Screen name="index" />
+                                        <Stack.Screen name="language" />
+                                        <Stack.Screen name="terms" />
+                                        <Stack.Screen name="auth" />
+                                        <Stack.Screen name="forgot" />
+                                        <Stack.Screen name="onboarding/identity" />
+                                        <Stack.Screen name="onboarding/biometrics" />
+                                        <Stack.Screen name="onboarding/routine" />
+                                        <Stack.Screen name="warning" />
+                                        <Stack.Screen name="(tabs)" />
+                                        <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+                                        <Stack.Screen name="routines/create" />
+                                        <Stack.Screen name="routines/manual-editor" />
+                                        <Stack.Screen
+                                            name="routines/[id]/train"
+                                            options={{
+                                                presentation: 'transparentModal',
+                                                animation: 'slide_from_bottom',
+                                                contentStyle: { backgroundColor: 'transparent' },
+                                            }}
+                                        />
+                                        <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                                    </Stack>
+                                    <Toast />
+                                </OnboardingProvider>
                             </WorkoutProvider>
                         </SettingsProvider>
                     </AuthProvider>

@@ -37,33 +37,11 @@ const normalizeGoal = (goal: UserGoal): string => {
  * MENS Philosophy: Better to train less with quality than more with mediocrity
  */
 const mapDaysToTemplate = (days: number, level: UserLevel): number => {
-    // If user wants 1-2 days, give them 3-day fullbody
-    if (days <= 2) return 3;
-
-    // If user wants 3 days, perfect for fullbody
-    if (days === 3) return 3;
-
-    // If user wants 4-5 days
-    if (days === 4 || days === 5) {
-        // Beginners should stick to 3-4 days max
-        if (level === "beginner") return 3;
-
-        // Intermediates can handle 4 days
-        if (level === "intermediate") return 4;
-
-        // Advanced can go 5 days if they requested 5
-        return days;
-    }
-
-    // If user wants 6+ days (MENS discourages this unless very advanced)
-    if (days >= 6) {
-        if (level === "beginner") return 3;
-        if (level === "intermediate") return 4;
-        // Even advanced users should be cautious with 6+ days
-        return 5;
-    }
-
-    return 3; // Default fallback
+    // Now we support 2, 3, 4, 5, and 6 day templates directly
+    // We respect the user's choice as the primary factor
+    if (days <= 2) return 2;
+    if (days >= 6) return 6;
+    return days;
 };
 
 /**

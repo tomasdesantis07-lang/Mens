@@ -54,6 +54,7 @@ const TrainScreen: React.FC = () => {
     // We map exerciseId -> list of sets
     const {
         activeWorkout,
+        startWorkout,
         logSet,
         toggleSetComplete,
         addSet,
@@ -63,6 +64,23 @@ const TrainScreen: React.FC = () => {
         startRestTimer,
         replaceExercise
     } = useWorkout();
+
+    // Automatically start workout if not active
+    useEffect(() => {
+        if (!loading && routine) {
+            // Check if we need to start a session
+            // We start a new one if:
+            // 1. No active session exists
+            // 2. The active session is for a different routine/day
+            const isSameSession = activeWorkout
+                && activeWorkout.routine.id === routine.id
+                && activeWorkout.dayIndex === selectedDayIndex;
+
+            if (!isSameSession) {
+                startWorkout(routine, selectedDayIndex);
+            }
+        }
+    }, [loading, routine, selectedDayIndex]);
 
     // Use local timer hook instead of global context value
     const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
@@ -200,6 +218,7 @@ const TrainScreen: React.FC = () => {
                 routineId: routine.id,
                 routineName: routine.name,
                 dayIndex: selectedDayIndex,
+                durationSeconds: elapsedSeconds,
                 exercises: exercisesLog,
             });
 

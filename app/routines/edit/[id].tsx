@@ -15,7 +15,7 @@ import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { CustomInput } from "../../../src/components/common/CustomInput";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { DayEditorSheet } from "../../../src/components/specific/DayEditorSheet";
-import { RoutineDayCard } from "../../../src/components/specific/RoutineDayCard";
+import { DraggableWeeksGrid } from "../../../src/components/specific/DraggableWeeksGrid";
 import { useWorkout } from "../../../src/context/WorkoutContext";
 import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
@@ -240,24 +240,29 @@ const EditRoutineScreen: React.FC = () => {
                     </View>
                 )}
 
-                {/* Days Grid */}
+                {/* Days Grid - Draggable */}
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.days_label')}</Text>
                     <Text style={styles.sectionHint}>
-                        {t('routines.days_hint_edit')}
+                        {t('routines.days_hint_drag', 'Mantén presionado para mover un día')}
                     </Text>
 
-                    <View style={styles.daysGrid}>
-                        {draft.days.map((day) => (
-                            <View key={day.dayIndex} style={styles.dayCardWrapper}>
-                                <RoutineDayCard
-                                    day={day}
-                                    onPress={() => handleDayPress(day.dayIndex)}
-                                    variant={day.exercises.length === 0 ? "empty" : "filled"}
-                                />
-                            </View>
-                        ))}
-                    </View>
+                    <DraggableWeeksGrid
+                        days={draft.days}
+                        onReorder={(from, to) => {
+                            if (draft) {
+                                setDraft(prev => {
+                                    if (!prev) return null;
+                                    const newDays = [...prev.days];
+                                    const temp = newDays[from].exercises;
+                                    newDays[from] = { ...newDays[from], exercises: newDays[to].exercises };
+                                    newDays[to] = { ...newDays[to], exercises: temp };
+                                    return { ...prev, days: newDays };
+                                });
+                            }
+                        }}
+                        onDayPress={handleDayPress}
+                    />
                 </View>
 
                 {/* Info Card */}

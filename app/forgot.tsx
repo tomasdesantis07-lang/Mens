@@ -4,13 +4,13 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
+import { MensLogo } from "../src/components/common/BrandIcons";
 import { auth } from "../src/services/firebaseConfig";
 import { COLORS, COMPONENTS } from "../src/theme/theme";
 
@@ -49,8 +49,8 @@ export default function ForgotPasswordScreen() {
       </TouchableOpacity>
 
       {/* Logo */}
-      <Image
-        source={require("../assets/images/logo.png")}
+      <MensLogo
+        size={80}
         style={styles.logo}
       />
 

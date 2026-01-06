@@ -73,7 +73,8 @@ export default function SettingsScreen() {
         try {
             await AuthService.cleanLocalData();
             await signOut(auth);
-            router.replace('/auth' as any);
+            // Navigate to root which will redirect to auth based on auth state
+            router.replace('/');
         } catch (error) {
             console.error('Error signing out:', error);
             Alert.alert(t('common.error'), t('profile.logout_error') || "Error al cerrar sesión");
@@ -105,9 +106,9 @@ export default function SettingsScreen() {
                 text1: 'Cuenta eliminada',
                 text2: 'Tu cuenta ha sido eliminada permanentemente.',
             });
-            // Navigate to auth screen after a short delay
+            // Navigate to root which will detect no auth and show welcome
             setTimeout(() => {
-                router.replace('/auth' as any);
+                router.replace('/');
             }, 500);
         } catch (error: any) {
             console.error('Error deleting account:', error);

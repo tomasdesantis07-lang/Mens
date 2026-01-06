@@ -6,7 +6,7 @@ import {
     TouchableOpacity,
     TouchableOpacityProps,
 } from "react-native";
-import { COMPONENTS } from "../../theme/theme";
+import { COLORS, COMPONENTS } from "../../theme/theme";
 import { MensHaptics } from "../../utils/haptics";
 
 interface PrimaryButtonProps extends TouchableOpacityProps {
@@ -29,17 +29,28 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         }
     };
 
+    const isDisabled = loading || disabled;
+
     return (
         <TouchableOpacity
-            style={[styles.primaryButton, loading && { opacity: 0.7 }, style]}
-            disabled={loading || disabled}
+            style={[
+                styles.primaryButton,
+                isDisabled && styles.disabledButton,
+                style
+            ]}
+            disabled={isDisabled}
             onPress={handlePress}
             {...props}
         >
             {loading ? (
                 <ActivityIndicator color={COMPONENTS.button.solid.text} />
             ) : (
-                <Text style={styles.primaryButtonText}>{title}</Text>
+                <Text style={[
+                    styles.primaryButtonText,
+                    isDisabled && styles.disabledButtonText
+                ]}>
+                    {title}
+                </Text>
             )}
         </TouchableOpacity>
     );
@@ -54,9 +65,18 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginTop: 8,
     },
+    disabledButton: {
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
     primaryButtonText: {
         color: COMPONENTS.button.solid.text,
         fontSize: 16,
         fontWeight: "600",
     },
+    disabledButtonText: {
+        color: COLORS.textTertiary,
+    },
 });
+

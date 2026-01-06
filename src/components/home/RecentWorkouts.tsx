@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, Dumbbell, Flame } from 'lucide-react-native';
+import { Dumbbell } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -69,13 +69,24 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
         return Math.round(totalVolume);
     };
 
-    const calculateDuration = (workout: WorkoutSession): number => {
-        // Estimate based on sets (avg 2 min per set including rest)
+    const getDurationMinutes = (workout: WorkoutSession): number => {
+        // Use real duration if available
+        if (workout.durationSeconds && workout.durationSeconds > 0) {
+            return Math.round(workout.durationSeconds / 60);
+        }
+        // Fallback estimate for old sessions without durationSeconds
         let totalSets = 0;
         workout.exercises.forEach(exercise => {
             totalSets += exercise.sets.length;
         });
-        return Math.max(15, totalSets * 2); // Minimum 15 min
+        return Math.max(15, totalSets * 2);
+    };
+
+    const formatDuration = (minutes: number): string => {
+        const hrs = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hrs > 0) return `${hrs}h ${mins}m`;
+        return `${mins}m`;
     };
 
     const handleToggleExpand = () => {
@@ -116,47 +127,42 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
             <View style={styles.workoutsList}>
                 {visibleWorkouts.map((workout, index) => (
                     <AnimatedCard key={workout.id} delay={100 + index * 50}>
-                        <View style={styles.workoutCard}>
-                            <View style={styles.cardHeader}>
-                                <View style={styles.cardTitleRow}>
+                        <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={onViewAll || handleToggleExpand}
+                        >
+                            <View style={styles.workoutCard}>
+                                {/* Header: Name + Date */}
+                                <View style={styles.cardHeader}>
                                     <Text style={styles.workoutName} numberOfLines={1}>
                                         {workout.routineName}
                                     </Text>
-                                    <Text style={styles.dayBadge}>
-                                        Día {workout.dayIndex + 1}
+                                    <Text style={styles.dateText}>
+                                        {formatRelativeDate(workout.performedAt)}
                                     </Text>
                                 </View>
-                                <Text style={styles.dateText}>
-                                    {formatRelativeDate(workout.performedAt)}
-                                </Text>
-                            </View>
 
-                            <View style={styles.statsRow}>
-                                <View style={styles.statItem}>
-                                    <Flame size={14} color={COLORS.accent} />
-                                    <Text style={styles.statValue}>
-                                        {calculateTotalVolume(workout).toLocaleString()}
-                                    </Text>
-                                    <Text style={styles.statUnit}>kg</Text>
-                                </View>
-                                <View style={styles.statDivider} />
-                                <View style={styles.statItem}>
-                                    <Clock size={14} color={COLORS.textSecondary} />
-                                    <Text style={styles.statValue}>
-                                        {calculateDuration(workout)}
-                                    </Text>
-                                    <Text style={styles.statUnit}>min</Text>
-                                </View>
-                                <View style={styles.statDivider} />
-                                <View style={styles.statItem}>
-                                    <Dumbbell size={14} color={COLORS.textSecondary} />
-                                    <Text style={styles.statValue}>
-                                        {workout.exercises.length}
-                                    </Text>
-                                    <Text style={styles.statUnit}>ejercicios</Text>
+                                {/* Stats Row: Centered columns */}
+                                <View style={styles.statsRow}>
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statValue}>{workout.exercises.length}</Text>
+                                        <Text style={styles.statLabel}>{t('common.exercises')}</Text>
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statValue}>{formatDuration(getDurationMinutes(workout))}</Text>
+                                        <Text style={styles.statLabel}>{t('common.duration')}</Text>
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statValue}>
+                                            {(calculateTotalVolume(workout) / 1000).toFixed(1)}k
+                                        </Text>
+                                        <Text style={styles.statLabel}>kg</Text>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     </AnimatedCard>
                 ))}
 
@@ -227,7 +233,10 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
     },
     cardHeader: {
-        marginBottom: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
     },
     cardTitleRow: {
         flexDirection: 'row',
@@ -236,10 +245,11 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     workoutName: {
-        ...TYPOGRAPHY.h4,
+        fontSize: 16,
+        fontWeight: '600',
         color: COLORS.textPrimary,
         flex: 1,
-        marginRight: 8,
+        marginRight: 12,
     },
     dayBadge: {
         ...TYPOGRAPHY.caption,
@@ -251,7 +261,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     dateText: {
-        ...TYPOGRAPHY.bodySmall,
+        fontSize: 13,
         color: COLORS.textSecondary,
     },
     statsRow: {
@@ -259,14 +269,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statItem: {
-        flexDirection: 'row',
+        flex: 1,
         alignItems: 'center',
-        gap: 4,
     },
     statValue: {
-        ...TYPOGRAPHY.bodySmall,
-        fontWeight: TYPOGRAPHY.button.fontWeight,
+        fontSize: 18,
+        fontWeight: '700',
         color: COLORS.textPrimary,
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     statUnit: {
         ...TYPOGRAPHY.caption,
@@ -274,9 +290,9 @@ const styles = StyleSheet.create({
     },
     statDivider: {
         width: 1,
-        height: 12,
+        height: 32,
         backgroundColor: COLORS.border,
-        marginHorizontal: 12,
+        marginHorizontal: 8,
     },
     // Empty state
     emptyCard: {

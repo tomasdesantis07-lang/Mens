@@ -12,6 +12,8 @@
         "no": "No",
         "for_you": "For You",
         "days": "days",
+        "duration": "Duration",
+        "exercises": "Exercises",
         "weekdays": [
             "Monday",
             "Tuesday",
@@ -39,6 +41,16 @@
         "login_action": "Log In",
         "create_title": "Create Account",
         "login_title": "Welcome Back"
+    },
+    "terms": {
+        "title": "Terms & Conditions",
+        "subtitle": "Please review and accept our policies to continue.",
+        "legal_text_placeholder": "By using MENS, you agree to our Terms of Service and Privacy Policy. We take your data privacy seriously and will never share your personal information with third parties without your consent. The health data collected is strictly for the purpose of personalizing your training and nutrition plan.",
+        "accept_label": "I accept the",
+        "terms_link": "Terms of Service",
+        "privacy_link": "Privacy Policy",
+        "and": "and",
+        "continue": "Continue"
     },
     "onboarding": {
         "title": "Welcome to MENS",
@@ -157,6 +169,35 @@
             "days_label": "Days",
             "warning_beginner": "For beginners, 5-6 days might be excessive. We recommend 3-4 days for best results."
         },
+        "routine_selection": {
+            "title": "How many days will you train?",
+            "subtitle": "Select your weekly frequency to assign the perfect plan. You can adjust it later.",
+            "info": "All routines are scientifically designed for your level.",
+            "start_button": "Start Plan",
+            "saving": "Saving...",
+            "options": {
+                "2_days": {
+                    "title": "2 days / week",
+                    "desc": "Maintenance and general health"
+                },
+                "3_days": {
+                    "title": "3 days / week",
+                    "desc": "Ideal for beginners"
+                },
+                "4_days": {
+                    "title": "4 days / week",
+                    "desc": "Balance results/time"
+                },
+                "5_days": {
+                    "title": "5 days / week",
+                    "desc": "Serious commitment"
+                },
+                "6_days": {
+                    "title": "6 days / week",
+                    "desc": "Maximum performance"
+                }
+            }
+        },
         "expert_branch": {
             "title": "Level Detected: Architect",
             "message": "We know you have experience. How do you want to start your MENS journey?",
@@ -215,7 +256,7 @@
         "days": "days",
         "weekly_improvement": "Weekly Improvement",
         "vs_last_week": "vs. last week",
-        "volume_30d": "Volume (30d)",
+        "volume_7d": "Volume (7d)",
         "kg_lifted": "kg lifted",
         "rest_day_title": "Rest Day",
         "rest_day_message": "You've done the hard work. Take today to rest and eat plenty of protein to recover.",
@@ -322,9 +363,9 @@
     },
     "tabs": {
         "home": "Home",
-        "stats": "Stats",
+        "stats": "Analytics",
         "communities": "Community",
-        "premium": "Premium",
+        "premium": "Marketplace",
         "profile": "Profile"
     },
     "train": {
@@ -370,9 +411,9 @@
         "english": "English"
     },
     "communities": {
-        "title": "Community",
+        "title": "MENS Community",
         "training_message": "This page is training...",
-        "coming_soon": "Coming Soon: Community and Leaderboards.",
+        "coming_soon": "Coming Soon: MENS Community and Leaderboards.",
         "notify_me": "Notify me",
         "notify_success": "Perfect! We'll let you know when 'The Pack' is ready."
     },
@@ -411,7 +452,7 @@
             "S",
             "S"
         ],
-        "analytics_title": "MENS ANALYTICS",
+        "analytics_title": "MENS Analytics",
         "muscle_balance": "Muscle Balance",
         "no_muscle_data": "No muscle distribution data",
         "lagging_muscle_warning": "Attention: {{muscle}} lagging ({{percentage}}%)",
@@ -424,11 +465,13 @@
         "muscle_activity": "Muscle Activity",
         "front": "Front",
         "back": "Back",
-        "days": "days"
+        "days": "days",
+        "records": "Records",
+        "top_prs": "Top PRs"
     },
     "premium": {
-        "title": "MENS Premium",
-        "placeholder": "Here you will show Premium benefits and plans later."
+        "title": "Marketplace",
+        "placeholder": "Coming soon: Your shop for supplements and equipment."
     },
     "profile": {
         "title": "Profile",
@@ -457,6 +500,8 @@
         }
     },
     "mens_systems": {
+        "routine_tpl_compacto": "MENS System: Compact (Full Body 2 days)",
+        "routine_tpl_elite": "MENS System: Elite (Push/Pull/Legs 6 days)",
         "routine_tpl_fundamentos": "MENS System: Foundations (Full Body)",
         "routine_tpl_arquitectura": "MENS System: Architecture (Upper/Lower)",
         "routine_tpl_dominio": "MENS System: Mastery (Hybrid)",

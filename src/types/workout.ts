@@ -23,6 +23,7 @@ export interface WorkoutSession {
     routineName: string;         // snapshot (so if the routine name changes later, the log still shows old name)
     dayIndex: number;            // which day of the routine this session used
     performedAt: Timestamp;      // Firestore Timestamp
+    durationSeconds: number;     // Real workout duration in seconds (HH:MM:SS = durationSeconds)
     notes?: string;
     exercises: WorkoutExerciseLog[];
 }

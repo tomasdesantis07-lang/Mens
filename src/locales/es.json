@@ -12,6 +12,8 @@
         "no": "No",
         "for_you": "Para Vos",
         "days": "días",
+        "duration": "Duración",
+        "exercises": "Ejercicios",
         "weekdays": [
             "Lunes",
             "Martes",
@@ -39,6 +41,16 @@
         "login_action": "Iniciar sesión",
         "create_title": "Crear Cuenta",
         "login_title": "Bienvenido"
+    },
+    "terms": {
+        "title": "Términos y Condiciones",
+        "subtitle": "Por favor revisá y aceptá nuestras políticas para continuar.",
+        "legal_text_placeholder": "Al usar MENS, aceptás nuestros Términos de Servicio y Política de Privacidad. Nos tomamos muy en serio la privacidad de tus datos y nunca compartiremos tu información personal con terceros sin tu consentimiento. Los datos de salud recolectados son estrictamente para personalizar tu plan de entrenamiento y nutrición.",
+        "accept_label": "Acepto los",
+        "terms_link": "Términos de Servicio",
+        "privacy_link": "Política de Privacidad",
+        "and": "y",
+        "continue": "Continuar"
     },
     "onboarding": {
         "title": "Bienvenido a MENS",
@@ -165,6 +177,35 @@
             "days_label": "Días",
             "warning_beginner": "Para principiantes, 5-6 días puede ser excesivo. Recomendamos 3-4 días para mejores resultados."
         },
+        "routine_selection": {
+            "title": "¿Cuántos días vas a entrenar?",
+            "subtitle": "Selecciona tu frecuencia semanal para asignarte el plan perfecto. Podrás ajustarlo después.",
+            "info": "Todas las rutinas están diseñadas científicamente para tu nivel.",
+            "start_button": "Comenzar Plan",
+            "saving": "Guardando...",
+            "options": {
+                "2_days": {
+                    "title": "2 días / semana",
+                    "desc": "Mantenimiento y salud general"
+                },
+                "3_days": {
+                    "title": "3 días / semana",
+                    "desc": "Ideal para principiantes"
+                },
+                "4_days": {
+                    "title": "4 días / semana",
+                    "desc": "Equilibrio resultados/tiempo"
+                },
+                "5_days": {
+                    "title": "5 días / semana",
+                    "desc": "Compromiso serio"
+                },
+                "6_days": {
+                    "title": "6 días / semana",
+                    "desc": "Máximo rendimiento"
+                }
+            }
+        },
         "expert_branch": {
             "title": "Nivel detectado: Arquitecto",
             "message": "Sabemos que ya tenés experiencia. ¿Cómo querés empezar tu camino en MENS?",
@@ -223,7 +264,7 @@
         "days": "días",
         "weekly_improvement": "Mejora Semanal",
         "vs_last_week": "vs. semana pasada",
-        "volume_30d": "Volumen (30d)",
+        "volume_7d": "Volumen (7d)",
         "kg_lifted": "kg levantados",
         "rest_day_title": "Día de Descanso",
         "rest_day_message": "Ya has hecho el trabajo duro. Aprovecha hoy para descansar y comer mucha proteína para recuperarte.",
@@ -329,10 +370,10 @@
         "start": "Empezar"
     },
     "tabs": {
-        "home": "Inicio",
-        "stats": "Estadísticas",
-        "communities": "Comunidad",
-        "premium": "Premium",
+        "home": "Home",
+        "stats": "Analytics",
+        "communities": "Community",
+        "premium": "Marketplace",
         "profile": "Perfil"
     },
     "train": {
@@ -378,9 +419,9 @@
         "english": "English"
     },
     "communities": {
-        "title": "Comunidad",
+        "title": "MENS Community",
         "training_message": "Esta página está entrenando...",
-        "coming_soon": "Próximamente: Comunidad y Leaderboards.",
+        "coming_soon": "Próximamente: MENS Community y Leaderboards.",
         "notify_me": "Notificarme",
         "notify_success": "¡Perfecto! Te avisaremos cuando 'La Manada' esté lista."
     },
@@ -419,7 +460,7 @@
             "S",
             "D"
         ],
-        "analytics_title": "MENS ANALYTICS",
+        "analytics_title": "MENS Analytics",
         "muscle_balance": "Balance Muscular",
         "no_muscle_data": "Sin datos de distribución muscular",
         "lagging_muscle_warning": "Atención: {{muscle}} rezagado ({{percentage}}%)",
@@ -432,11 +473,13 @@
         "muscle_activity": "Actividad Muscular",
         "front": "Frente",
         "back": "Espalda",
-        "days": "días"
+        "days": "días",
+        "records": "Records",
+        "top_prs": "Mejores PRs"
     },
     "premium": {
-        "title": "MENS Premium",
-        "placeholder": "Aquí más adelante vas a mostrar los beneficios y planes Premium."
+        "title": "Marketplace",
+        "placeholder": "Próximamente: Tu tienda de suplementos y equipamiento."
     },
     "profile": {
         "title": "Perfil",
@@ -465,6 +508,8 @@
         }
     },
     "mens_systems": {
+        "routine_tpl_compacto": "Sistema MENS: Compacto (Full Body 2 días)",
+        "routine_tpl_elite": "Sistema MENS: Elite (Push/Pull/Legs 6 días)",
         "routine_tpl_fundamentos": "Sistema MENS: Fundamentos (Full Body)",
         "routine_tpl_arquitectura": "Sistema MENS: Arquitectura (Torso/Pierna)",
         "routine_tpl_dominio": "Sistema MENS: Dominio (Híbrido)",

@@ -8,6 +8,7 @@ import {
     query,
     serverTimestamp,
     setDoc,
+    updateDoc,
     where,
     writeBatch
 } from "firebase/firestore";
@@ -37,6 +38,26 @@ export const WorkoutService = {
             });
 
             console.log("Workout session created successfully with ID:", docRef.id);
+
+            // Fire-and-forget: Update analytics INCREMENTALLY (non-blocking, O(1))
+            // We create the session object with a client-side timestamp for analytics
+            import("./analyticsService")
+                .then(({ AnalyticsService }) => {
+                    const { Timestamp } = require("firebase/firestore");
+                    const sessionWithTimestamp = {
+                        ...session,
+                        id: docRef.id,
+                        performedAt: Timestamp.now(), // Use client timestamp for immediate analytics
+                    };
+                    console.log("[WorkoutService] Triggering incremental analytics update...");
+                    AnalyticsService.updateFromSession(session.userId, sessionWithTimestamp).catch(err => {
+                        console.warn("[WorkoutService] Analytics update failed:", err);
+                    });
+                })
+                .catch(err => {
+                    console.error("[WorkoutService] Failed to import analyticsService:", err);
+                });
+
             return docRef.id;
         } catch (error) {
             console.error("Error creating workout session:", error);
@@ -44,6 +65,7 @@ export const WorkoutService = {
             throw error;
         }
     },
+
 
     /**
      * Get recent workout sessions for a user with a limit
@@ -175,18 +197,18 @@ export const WorkoutService = {
      */
     async calculateUserMetrics(userId: string): Promise<{
         streak: number;
-        totalVolume30d: number;
+        totalVolume7d: number;
     }> {
         try {
             const sessions = await this.getAllUserWorkoutSessions(userId);
 
             if (sessions.length === 0) {
-                return { streak: 0, totalVolume30d: 0 };
+                return { streak: 0, totalVolume7d: 0 };
             }
 
             const now = new Date();
             const oneDayMs = 24 * 60 * 60 * 1000;
-            const thirtyDaysAgo = new Date(now.getTime() - 30 * oneDayMs);
+            const sevenDaysAgo = new Date(now.getTime() - 7 * oneDayMs);
 
             // Calculate streak (consecutive days with workouts)
             let streak = 0;
@@ -217,14 +239,14 @@ export const WorkoutService = {
                 }
             }
 
-            // Calculate total volume (30 days)
-            let totalVolume30d = 0;
+            // Calculate total volume (7 days)
+            let totalVolume7d = 0;
             sessions.forEach(session => {
                 const sessionDate = new Date(session.performedAt?.toMillis?.() || 0);
-                if (sessionDate >= thirtyDaysAgo) {
+                if (sessionDate >= sevenDaysAgo) {
                     session.exercises.forEach(exercise => {
                         exercise.sets.forEach(set => {
-                            totalVolume30d += set.weight * set.reps;
+                            totalVolume7d += set.weight * set.reps;
                         });
                     });
                 }
@@ -232,11 +254,11 @@ export const WorkoutService = {
 
             return {
                 streak,
-                totalVolume30d: Math.round(totalVolume30d),
+                totalVolume7d: Math.round(totalVolume7d),
             };
         } catch (error) {
             console.error("Error calculating user metrics:", error);
-            return { streak: 0, totalVolume30d: 0 };
+            return { streak: 0, totalVolume7d: 0 };
         }
     },
 
@@ -290,18 +312,9 @@ export const WorkoutService = {
                 // Routine explicitly has this day
                 isRestDay = todayRoutineDay.exercises.length === 0;
             } else {
-                // Day not in routine - only mark as rest if routine uses full 7-day weekday structure
-                // This handles backward compatibility with old routines that only have days 0, 1, 2...
-                const maxDayIndex = Math.max(...currentRoutine.days.map(d => d.dayIndex));
-                const hasWeekendDays = currentRoutine.days.some(d => d.dayIndex >= 5);
-
-                // If routine has weekend days (5=Sat, 6=Sun) or spans full week, use weekday logic
-                if (hasWeekendDays || maxDayIndex >= 6) {
-                    isRestDay = true; // Missing day = rest day
-                } else {
-                    // Old routine without weekday structure - not a rest day for messaging purposes
-                    isRestDay = false;
-                }
+                // If the day is not in the routine, it's a rest day.
+                // MENS assumes a 7-day weekday structure (0=Mon...6=Sun).
+                isRestDay = true;
             }
 
             return {
@@ -560,5 +573,40 @@ export const WorkoutService = {
         await setDoc(routineRef, routine);
 
         return routineRef.id;
+    },
+
+    /**
+     * Delete multiple workout sessions
+     */
+    async deleteWorkoutSessions(userId: string, sessionIds: string[]): Promise<void> {
+        const batch = writeBatch(db);
+        sessionIds.forEach(id => {
+            const ref = doc(db, "workoutSessions", id);
+            batch.delete(ref);
+        });
+        await batch.commit();
+
+        // Trigger analytics recalculation
+        import("./analyticsService").then(({ AnalyticsService }) => {
+            AnalyticsService.recalculateUserAnalytics(userId).catch(console.error);
+        });
+    },
+
+    /**
+     * Update a workout session
+     */
+    async updateWorkoutSession(userId: string, sessionId: string, data: Partial<WorkoutSession>): Promise<void> {
+        const ref = doc(db, "workoutSessions", sessionId);
+        // Ensure durationSeconds is updated if present, otherwise keep existing
+        await updateDoc(ref, {
+            ...data,
+            // If we are updating exercises, we might need to recalculate volume/duration if not provided
+            // For now, trust the incoming data has everything needed
+        });
+
+        // Trigger analytics recalculation
+        import("./analyticsService").then(({ AnalyticsService }) => {
+            AnalyticsService.recalculateUserAnalytics(userId).catch(console.error);
+        });
     }
 };

@@ -44,7 +44,7 @@ export const calculateRepRange = (
                 max = 15;
             } else {
                 min = 15;
-                max = 20; // 20+ treated as 20 for range upper bound in logic, can be formatted differently
+                max = 20;
             }
             break;
         default:
@@ -53,19 +53,10 @@ export const calculateRepRange = (
             max = 12;
     }
 
-    // 2. Analytic (Isolation) Adjustment: +20-30%
-    // If we are in isolation, we already set higher ranges above, but let's apply the specific rule if needed.
-    // The prompt says: "Analytic exercises must always have a range 20-30% higher than compounds".
-    // The rules defined in "Base Logic" already reflect this separation (e.g. Strength: 3-5 vs 8-10 is >30% diff).
-    // We will stick to the hardcoded ranges in the prompt for "Base Logic" as they are explicit.
-
-    // 3. Novato Filter: Safety Floor
+    // Novato Filter: Safety Floor
     if (userLevel === 'Novato') {
         if (min < 5) min = 5;
-        // If max was below 5 (unlikely given rules, but possible in future), adjust it too?
-        // 3-5 becomes 5-5? Or 5-8?
-        // Let's assume if min is raised to 5, max should be at least equal or slightly higher.
-        if (max < 5) max = 5; // Should not happen with defined ranges
+        if (max < 5) max = 5;
     }
 
     return {
@@ -82,10 +73,7 @@ export const calculateRepRange = (
 export const shouldSuggestProgression = (
     repsPerformed: number,
     targetMax: number,
-    rpe: number = 10 // Rate of Perceived Exertion (1-10), assuming "Technique Perfec" implies good RPE
+    rpe: number = 10
 ): boolean => {
-    // "Completó todas las series en el límite superior del rango con técnica perfecta"
-    // We'll simplify to checking the last set or treating individual set performance.
-    // If reps >= max and technique is good (implied by user input usually, or RPE < 10 failure)
     return repsPerformed >= targetMax;
 };

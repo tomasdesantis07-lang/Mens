@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,9 +13,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../src/components/common/CustomInput";
 import { PrimaryButton } from "../../src/components/common/PrimaryButton";
 import { DayEditorSheet } from "../../src/components/specific/DayEditorSheet";
-import { RoutineDayCard } from "../../src/components/specific/RoutineDayCard";
+import { DraggableWeeksGrid } from "../../src/components/specific/DraggableWeeksGrid";
 import { useWorkout } from "../../src/context/WorkoutContext";
-import { auth } from "../../src/services/firebaseConfig";
+import { auth, db } from "../../src/services/firebaseConfig";
 import { RoutineService } from "../../src/services/routineService";
 import { COLORS } from "../../src/theme/theme";
 import { createEmptyDraft, RoutineDay, RoutineDraft } from "../../src/types/routine";
@@ -66,6 +67,17 @@ const ManualEditorScreen: React.FC = () => {
         setIsSaving(true);
         try {
             await RoutineService.createRoutine(user.uid, draft);
+
+            // Calculate training days (days with exercises = non-rest days)
+            const trainingDays = draft.days.filter(day => day.exercises.length > 0).length;
+
+            // Update user profile with daysPerWeek based on routine
+            if (trainingDays > 0) {
+                const userRef = doc(db, 'users', user.uid);
+                await updateDoc(userRef, { daysPerWeek: trainingDays });
+                console.log(`[Manual Editor] Updated user daysPerWeek to ${trainingDays}`);
+            }
+
             showToast.success(t('routines.success_create'), t('common.success'));
             router.replace("/(tabs)/home");
         } catch (error) {
@@ -112,24 +124,26 @@ const ManualEditorScreen: React.FC = () => {
                     />
                 </View>
 
-                {/* Days Grid */}
+                {/* Days Grid - Draggable */}
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.days_label')}</Text>
                     <Text style={styles.sectionHint}>
-                        {t('routines.days_hint_add')}
+                        {t('routines.days_hint_drag', 'Mantén presionado para mover un día')}
                     </Text>
 
-                    <View style={styles.daysGrid}>
-                        {draft.days.map((day) => (
-                            <View key={day.dayIndex} style={styles.dayCardWrapper}>
-                                <RoutineDayCard
-                                    day={day}
-                                    onPress={() => handleDayPress(day.dayIndex)}
-                                    variant={day.exercises.length === 0 ? "empty" : "filled"}
-                                />
-                            </View>
-                        ))}
-                    </View>
+                    <DraggableWeeksGrid
+                        days={draft.days}
+                        onReorder={(from, to) => {
+                            setDraft(prev => {
+                                const newDays = [...prev.days];
+                                const temp = newDays[from].exercises;
+                                newDays[from] = { ...newDays[from], exercises: newDays[to].exercises };
+                                newDays[to] = { ...newDays[to], exercises: temp };
+                                return { ...prev, days: newDays };
+                            });
+                        }}
+                        onDayPress={handleDayPress}
+                    />
                 </View>
 
                 {/* Info Card */}

@@ -1,7 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { Dumbbell, Flame, Moon, Play, Plus } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,6 +22,8 @@ import {
   AnimatedSection,
   AnimatedSlideIn,
 } from "../../src/components/common/Animations";
+import { SectionAppBar } from "../../src/components/common/SectionAppBar";
+import { CalorieResultsModal } from "../../src/components/home/CalorieResultsModal";
 import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
 import { RoutineCard } from "../../src/components/specific/RoutineCard";
@@ -32,6 +34,7 @@ import { RoutineService } from "../../src/services/routineService";
 import { WorkoutService } from "../../src/services/workoutService";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../src/theme/theme";
 import { Routine } from "../../src/types/routine";
+import { calculateAge, calculateBMI, calculateBMR, calculateTDEE, getWeightClass, HealthMetrics } from "../../src/utils/healthUtils";
 
 type UserData = {
   email?: string;
@@ -44,7 +47,7 @@ type UserData = {
 
 type UserMetrics = {
   streak: number;
-  totalVolume30d: number;
+  totalVolume7d: number;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -64,6 +67,10 @@ const HomeScreen: React.FC = () => {
   const [selectedRoutineForTraining, setSelectedRoutineForTraining] = useState<Routine | null>(null);
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
   const [nextWorkout, setNextWorkout] = useState<{ routineId: string; dayIndex: number; isRestDay: boolean } | null>(null);
+
+  // New: Health metrics modal state
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetrics | null>(null);
 
 
   // Floating button animation
@@ -90,8 +97,42 @@ const HomeScreen: React.FC = () => {
   }, [rotateAnimation]);
 
   // Reset button animation when screen is focused
+  const loadData = useCallback(async (isInitial = false) => {
+    const user = auth.currentUser;
+    if (!user) {
+      if (isInitial) setLoading(false);
+      return;
+    }
+
+    try {
+      const ref = doc(db, "users", user.uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setUserData(snap.data() as UserData);
+      }
+
+      const routines = await RoutineService.getUserRoutines(user.uid);
+      setUserRoutines(routines);
+
+      const community = await RoutineService.getCommunityRoutines();
+      setCommunityRoutines(community);
+
+      // Load next workout (lightweight query)
+      const workout = await WorkoutService.getWorkoutForToday(user.uid);
+      setNextWorkout(workout);
+    } catch (e) {
+      console.log("Error loading data", e);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  }, []);
+
+  // Reset button animation and REFRESH DATA when screen is focused
   useFocusEffect(
     useCallback(() => {
+      // Refresh data to catch any changes from routine editor
+      loadData();
+
       setIsButtonExpanded(true);
       setShowFloatingButton(true);
       buttonWidth.setValue(1);
@@ -108,43 +149,81 @@ const HomeScreen: React.FC = () => {
       }, 3000);
 
       return () => clearTimeout(timer);
-    }, [buttonWidth])
+    }, [buttonWidth, loadData])
   );
 
-  // PHASE 1: Load immediate UI data (user, routines)
+  // PHASE 1: Initial load
   useEffect(() => {
-    const loadData = async () => {
+    loadData(true);
+  }, [loadData]);
+
+  // New: Check for new user and show health metrics modal
+  useEffect(() => {
+    if (loading || !userData) return;
+
+    const checkNewUser = async () => {
       const user = auth.currentUser;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+      if (!user) return;
 
       try {
-        const ref = doc(db, "users", user.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          setUserData(snap.data() as UserData);
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) return;
+
+        const data = snap.data();
+
+        // Check if this is a new user who hasn't seen the health modal yet
+        if (data.hasSeenHealthModal) return;
+
+        // Get biometrics from user data
+        const biometrics = data.biometrics;
+        if (!biometrics || !biometrics.weight || !biometrics.height || !biometrics.birthDate || !biometrics.gender) {
+          return; // Missing biometric data, can't calculate
         }
 
-        const routines = await RoutineService.getUserRoutines(user.uid);
-        setUserRoutines(routines);
+        // Determine training days per week
+        let trainingDays = data.daysPerWeek;
 
-        const community = await RoutineService.getCommunityRoutines();
-        setCommunityRoutines(community);
+        // If daysPerWeek not set, calculate from user's active routine
+        if (!trainingDays && userRoutines.length > 0) {
+          // Use the first routine (or most recently used) to calculate training days
+          const activeRoutine = userRoutines[0];
+          // Count non-rest days in the routine
+          trainingDays = activeRoutine.days?.filter((day: any) => !day.isRestDay).length || 3;
 
-        // Load next workout (lightweight query)
-        const workout = await WorkoutService.getWorkoutForToday(user.uid);
-        setNextWorkout(workout);
+          // Update user profile with calculated daysPerWeek
+          await updateDoc(userRef, { daysPerWeek: trainingDays });
+        }
+
+        // If still no training days (no routine created yet), don't show modal
+        if (!trainingDays) {
+          console.log('User has no routine yet, waiting to show health modal');
+          return;
+        }
+
+        // Calculate health metrics
+        const age = calculateAge(biometrics.birthDate?.replace(/ \/ /g, '-') || null);
+        const bmi = calculateBMI(biometrics.weight, biometrics.height);
+        const bmr = calculateBMR(biometrics.weight, biometrics.height, age, biometrics.gender);
+        const tdee = calculateTDEE(bmr, trainingDays);
+        const weightClass = getWeightClass(bmi);
+
+        setHealthMetrics({ bmi, bmr, tdee, weightClass });
+
+        // Show modal after a short delay for better UX
+        setTimeout(() => {
+          setShowHealthModal(true);
+        }, 1500);
+
+        // Mark as seen so we don't show again
+        await updateDoc(userRef, { hasSeenHealthModal: true });
       } catch (e) {
-        console.log("Error loading data", e);
-      } finally {
-        setLoading(false);
+        console.log('Error checking new user health modal', e);
       }
     };
 
-    loadData();
-  }, []);
+    checkNewUser();
+  }, [loading, userData, userRoutines]);
 
   // PHASE 2: Lazy load metrics AFTER initial paint
   // This prevents blocking the initial render with heavy calculations
@@ -219,331 +298,357 @@ const HomeScreen: React.FC = () => {
 
   return (
     <>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 20, paddingBottom: tabBarInset },
-        ]}
-      >
-        {/* Animated Header */}
-        <AnimatedHeader>
-          <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
-        </AnimatedHeader>
+      <View style={styles.container}>
+        {/* App Bar */}
+        <SectionAppBar title="MENS" />
 
-        {/* TEMPORARY DEBUG BUTTON: Go to Warning Screen */}
-        <TouchableOpacity
-          style={styles.debugWarningBtn}
-          onPress={() => router.push('/warning' as any)}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: 80 + insets.top, paddingBottom: tabBarInset },
+          ]}
         >
-          <Text style={styles.debugWarningText}>⚠️ TEST WARNING</Text>
-        </TouchableOpacity>
+          {/* Animated Header */}
+          <AnimatedHeader>
+            <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
+          </AnimatedHeader>
 
-        {/* Rest Day Message */}
-        {isTodayRestDay && (
-          <AnimatedSection delay={50} style={styles.section}>
-            <View style={styles.restDayCard}>
-              <View style={styles.restDayIcon}>
-                <Moon size={28} color={COLORS.success} />
-              </View>
-              <View style={styles.restDayContent}>
-                <Text style={styles.restDayTitle}>{t('home.rest_day_title')}</Text>
-                <Text style={styles.restDayMessage}>{t('home.rest_day_message')}</Text>
-              </View>
-            </View>
-          </AnimatedSection>
-        )}
-
-        {/* Stats Dashboard */}
-        {metrics && (
-          <AnimatedSection delay={50} style={styles.statsSection}>
-            <View style={styles.statsGrid}>
-              {/* Streak Card */}
-              <AnimatedCard
-                index={0}
-                delay={100}
-                style={styles.statCardWrapper}
+          {/* No Routine Reminder Card */}
+          {userRoutines.length === 0 && (
+            <AnimatedSection delay={50} style={styles.section}>
+              <TouchableOpacity
+                style={styles.noRoutineCard}
+                onPress={() => router.push('/routines/create' as any)}
+                activeOpacity={0.8}
               >
-                <View style={styles.statCard}>
-                  <View style={styles.statContent}>
-                    <Text style={styles.statLabel}>{t('home.streak')}</Text>
-                    <View style={styles.statValueRow}>
-                      <Flame size={24} color={COLORS.primary} style={styles.statIcon} />
-                      <Text style={styles.statValue}>{metrics.streak}</Text>
-                    </View>
-                    <Text style={styles.statUnit}>{t('home.days')}</Text>
-                  </View>
+                <View style={styles.noRoutineIcon}>
+                  <Dumbbell size={28} color={COLORS.primary} />
                 </View>
-              </AnimatedCard>
-
-              {/* Volume Card */}
-              <AnimatedCard
-                index={1}
-                delay={150}
-                style={styles.statCardWrapper}
-              >
-                <View style={styles.statCard}>
-                  <View style={styles.statContent}>
-                    <Text style={styles.statLabel}>{t('home.volume_30d')}</Text>
-                    <View style={styles.statValueRow}>
-                      <Dumbbell size={24} color={COLORS.primary} style={styles.statIcon} />
-                      <Text style={styles.statValue}>
-                        {(metrics.totalVolume30d / 1000).toFixed(1)}k
-                      </Text>
-                    </View>
-                    <Text style={styles.statUnit}>{t('home.kg_lifted')}</Text>
-                  </View>
+                <View style={styles.noRoutineContent}>
+                  <Text style={styles.noRoutineTitle}>Creá tu primera rutina</Text>
+                  <Text style={styles.noRoutineMessage}>
+                    Para empezar a entrenar, necesitás una rutina. ¡Creá la tuya ahora!
+                  </Text>
                 </View>
-              </AnimatedCard>
-            </View>
-          </AnimatedSection>
-        )}
-
-        {/* Recent Workouts Section */}
-        <RecentWorkouts />
-
-        {/* Community Routines Section */}
-        <AnimatedSection delay={300} style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('home.community_routines')}</Text>
-
-          {communityRoutines.length === 0 ? (
-            <AnimatedCard index={0} delay={350}>
-              <Text style={styles.emptyText}>
-                {t('home.no_community_routines')}
-              </Text>
-            </AnimatedCard>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-            >
-              {communityRoutines.map((routine, index) => {
-                // Calculate total exercise count
-                const exerciseCount = routine.days.reduce(
-                  (total, day) => total + day.exercises.length,
-                  0
-                );
-
-                return (
-                  <AnimatedSlideIn key={routine.id} direction="right" index={index} delay={350}>
-                    <View style={styles.communityCard}>
-                      <RoutineCard
-                        name={routine.name}
-                        days={routine.daysPerWeek}
-                        exerciseCount={exerciseCount}
-                        variant="community"
-                        onPress={() => console.log("Start:", routine.name)}
-                      />
-                    </View>
-                  </AnimatedSlideIn>
-                );
-              })}
-            </ScrollView>
+              </TouchableOpacity>
+            </AnimatedSection>
           )}
 
-          <AnimatedCard index={0} delay={500}>
-            <TouchableOpacity
-              style={styles.viewMore}
-              onPress={() => console.log("View more community routines")}
-            >
-              <Text style={styles.viewMoreText}>{t('home.view_more')}</Text>
-            </TouchableOpacity>
-          </AnimatedCard>
-        </AnimatedSection>
-      </ScrollView>
 
-      {/* Floating Quick Start Button */}
-      {nextWorkout && showFloatingButton && !activeWorkout && (
-        <Animated.View
-          style={[
-            styles.floatingButtonContainer,
-            {
-              bottom: tabBarInset + 6,
-              width: buttonWidth.interpolate({
-                inputRange: [0, 1],
-                outputRange: [48, isTodayRestDay ? 140 : 230],
-              }),
-              opacity: isTodayRestDay ? 0.7 : 1,
-            },
-            isTodayRestDay && {
-              shadowColor: COLORS.success,
-              backgroundColor: COLORS.success + '30',
-            },
-          ]}
-        >
-          {/* Rotating Gradient Layer (Behind) */}
-          <Animated.View
-            style={{
-              position: 'absolute',
-              width: 250,
-              height: 250,
-              top: -101,
-              left: buttonWidth.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-101, -10],
-              }),
-              transform: [
-                {
-                  rotate: rotateAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg'],
-                  }),
-                },
-              ],
-            }}
-          >
-            <LinearGradient
-              colors={isTodayRestDay
-                ? [COLORS.success, 'transparent', COLORS.success, 'transparent']
-                : [COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ flex: 1 }}
-            />
-          </Animated.View>
+          {/* Rest Day Message */}
+          {isTodayRestDay && (
+            <AnimatedSection delay={50} style={styles.section}>
+              <View style={styles.restDayCard}>
+                <View style={styles.restDayIcon}>
+                  <Moon size={28} color={COLORS.success} />
+                </View>
+                <View style={styles.restDayContent}>
+                  <Text style={styles.restDayTitle}>{t('home.rest_day_title')}</Text>
+                  <Text style={styles.restDayMessage}>{t('home.rest_day_message')}</Text>
+                </View>
+              </View>
+            </AnimatedSection>
+          )}
 
-          {/* Button Content (Static Center) */}
-          <View
-            style={[
-              styles.floatingButtonInner,
-              { backgroundColor: isTodayRestDay ? COLORS.success + '20' : COLORS.surface },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.floatingButton}
-              onPress={isTodayRestDay ? undefined : handleQuickStart}
-              activeOpacity={isTodayRestDay ? 1 : 0.8}
-              disabled={isTodayRestDay}
-            >
-              <Animated.View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                {isTodayRestDay ? (
-                  <Moon size={18} color={COLORS.success} />
-                ) : (
-                  <Play size={18} color={COLORS.textPrimary} fill={COLORS.textPrimary} />
-                )}
-                <Animated.View
-                  style={{
-                    opacity: buttonWidth,
-                    overflow: "hidden",
-                    width: buttonWidth.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, isTodayRestDay ? 80 : 185],
-                    }),
-                  }}
+          {/* Stats Dashboard */}
+          {metrics && (
+            <AnimatedSection delay={50} style={styles.statsSection}>
+              <View style={styles.statsGrid}>
+                {/* Streak Card */}
+                <AnimatedCard
+                  index={0}
+                  delay={100}
+                  style={styles.statCardWrapper}
                 >
-                  <Text
-                    style={[
-                      styles.floatingButtonText,
-                      isTodayRestDay && { color: COLORS.success }
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {isTodayRestDay ? t('home.rest_button') : t('home.start_today')}
-                  </Text>
-                </Animated.View>
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      )}
+                  <View style={styles.statCard}>
+                    <View style={styles.statContent}>
+                      <Text style={styles.statLabel}>{t('home.streak')}</Text>
+                      <View style={styles.statValueRow}>
+                        <Flame size={24} color={COLORS.primary} style={styles.statIcon} />
+                        <Text style={styles.statValue}>{metrics.streak}</Text>
+                      </View>
+                      <Text style={styles.statUnit}>{t('home.days')}</Text>
+                    </View>
+                  </View>
+                </AnimatedCard>
 
-      {/* Upper Floating Button - Empty Workout */}
-      {showFloatingButton && (
-        <Animated.View
-          style={[
-            styles.floatingButtonContainerRight,
-            {
-              bottom: tabBarInset + 6 + 48 + 12, // Above the main button (48px height + 12px gap)
-              width: buttonWidth.interpolate({
-                inputRange: [0, 1],
-                outputRange: [48, 120],
-              }),
-            },
-          ]}
-        >
-          {/* Rotating Border Glow */}
-          <Animated.View
-            style={{
-              position: 'absolute',
-              width: 200,
-              height: 200,
-              top: -76,
-              left: buttonWidth.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-76, -10],
-              }),
-              transform: [
-                {
-                  rotate: rotateAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg'],
-                  }),
-                },
-              ],
-            }}
-          >
-            <LinearGradient
-              colors={['rgba(255,255,255,0.3)', 'transparent', 'rgba(255,255,255,0.3)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ flex: 1 }}
-            />
-          </Animated.View>
+                {/* Volume Card */}
+                <AnimatedCard
+                  index={1}
+                  delay={150}
+                  style={styles.statCardWrapper}
+                >
+                  <View style={styles.statCard}>
+                    <View style={styles.statContent}>
+                      <Text style={styles.statLabel}>{t('home.volume_7d')}</Text>
+                      <View style={styles.statValueRow}>
+                        <Dumbbell size={24} color={COLORS.primary} style={styles.statIcon} />
+                        <Text style={styles.statValue}>
+                          {(metrics.totalVolume7d / 1000).toFixed(1)}k
+                        </Text>
+                      </View>
+                      <Text style={styles.statUnit}>{t('home.kg_lifted')}</Text>
+                    </View>
+                  </View>
+                </AnimatedCard>
+              </View>
+            </AnimatedSection>
+          )}
 
-          {/* Button Content */}
+          {/* Recent Workouts Section */}
+          <RecentWorkouts onViewAll={() => router.push("/workout-history" as any)} />
+
+          {/* Community Routines Section */}
+          <AnimatedSection delay={300} style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('home.community_routines')}</Text>
+
+            {communityRoutines.length === 0 ? (
+              <AnimatedCard index={0} delay={350}>
+                <Text style={styles.emptyText}>
+                  {t('home.no_community_routines')}
+                </Text>
+              </AnimatedCard>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              >
+                {communityRoutines.map((routine, index) => {
+                  // Calculate total exercise count
+                  const exerciseCount = routine.days.reduce(
+                    (total, day) => total + day.exercises.length,
+                    0
+                  );
+
+                  return (
+                    <AnimatedSlideIn key={routine.id} direction="right" index={index} delay={350}>
+                      <View style={styles.communityCard}>
+                        <RoutineCard
+                          name={routine.name}
+                          days={routine.daysPerWeek}
+                          exerciseCount={exerciseCount}
+                          variant="community"
+                          onPress={() => console.log("Start:", routine.name)}
+                        />
+                      </View>
+                    </AnimatedSlideIn>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <AnimatedCard index={0} delay={500}>
+              <TouchableOpacity
+                style={styles.viewMore}
+                onPress={() => console.log("View more community routines")}
+              >
+                <Text style={styles.viewMoreText}>{t('home.view_more')}</Text>
+              </TouchableOpacity>
+            </AnimatedCard>
+          </AnimatedSection>
+        </ScrollView>
+
+        {/* Floating Quick Start Button */}
+        {nextWorkout && showFloatingButton && !activeWorkout && !isTodayRestDay && (
           <Animated.View
             style={[
-              styles.floatingButtonInnerOutline,
+              styles.floatingButtonContainer,
               {
-                backgroundColor: COLORS.surface, // Solid background to hide glow
+                bottom: tabBarInset + 6,
+                width: buttonWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [48, isTodayRestDay ? 140 : 230],
+                }),
+                opacity: isTodayRestDay ? 0.7 : 1,
+              },
+              isTodayRestDay && {
+                shadowColor: COLORS.success,
+                backgroundColor: COLORS.success + '30',
               },
             ]}
           >
-            <TouchableOpacity
-              style={styles.floatingButton}
-              onPress={() => console.log('Empty workout')}
-              activeOpacity={0.8}
+            {/* Rotating Gradient Layer (Behind) */}
+            <Animated.View
+              style={{
+                position: 'absolute',
+                width: 250,
+                height: 250,
+                top: -101,
+                left: buttonWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-101, -10],
+                }),
+                transform: [
+                  {
+                    rotate: rotateAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
             >
-              <Animated.View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
+              <LinearGradient
+                colors={isTodayRestDay
+                  ? [COLORS.success, 'transparent', COLORS.success, 'transparent']
+                  : [COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ flex: 1 }}
+              />
+            </Animated.View>
+
+            {/* Button Content (Static Center) */}
+            <View
+              style={[
+                styles.floatingButtonInner,
+                { backgroundColor: isTodayRestDay ? COLORS.success + '20' : COLORS.surface },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.floatingButton}
+                onPress={isTodayRestDay ? undefined : handleQuickStart}
+                activeOpacity={isTodayRestDay ? 1 : 0.8}
+                disabled={isTodayRestDay}
               >
-                <Plus size={18} color={COLORS.textPrimary} strokeWidth={2.5} />
                 <Animated.View
                   style={{
-                    opacity: buttonWidth,
-                    overflow: "hidden",
-                    width: buttonWidth.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 55],
-                    }),
+                    flexDirection: "row",
+                    alignItems: "center",
                   }}
                 >
-                  <Text style={styles.floatingButtonText} numberOfLines={1}>
-                    {t('home.empty_workout')}
-                  </Text>
+                  {isTodayRestDay ? (
+                    <Moon size={18} color={COLORS.success} />
+                  ) : (
+                    <Play size={18} color={COLORS.textPrimary} fill={COLORS.textPrimary} />
+                  )}
+                  <Animated.View
+                    style={{
+                      opacity: buttonWidth,
+                      overflow: "hidden",
+                      width: buttonWidth.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, isTodayRestDay ? 80 : 185],
+                      }),
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.floatingButtonText,
+                        isTodayRestDay && { color: COLORS.success }
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {isTodayRestDay ? t('home.rest_button') : t('home.start_today')}
+                    </Text>
+                  </Animated.View>
                 </Animated.View>
-              </Animated.View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
-        </Animated.View>
-      )}
+        )}
 
-      <DaySelectorSheet
-        visible={!!selectedRoutineForTraining}
-        routine={selectedRoutineForTraining}
-        onClose={() => setSelectedRoutineForTraining(null)}
-        onSelectDay={handleSelectDay}
-      />
+        {/* Upper Floating Button - Empty Workout */}
+        {showFloatingButton && !activeWorkout && (
+          <Animated.View
+            style={[
+              styles.floatingButtonContainerRight,
+              {
+                bottom: isTodayRestDay ? tabBarInset + 6 : tabBarInset + 6 + 48 + 12, // Move down on rest days
+                width: buttonWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [48, 120],
+                }),
+              },
+            ]}
+          >
+            {/* Rotating Border Glow */}
+            <Animated.View
+              style={{
+                position: 'absolute',
+                width: 200,
+                height: 200,
+                top: -76,
+                left: buttonWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-76, -10],
+                }),
+                transform: [
+                  {
+                    rotate: rotateAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <LinearGradient
+                colors={['rgba(255,255,255,0.3)', 'transparent', 'rgba(255,255,255,0.3)', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ flex: 1 }}
+              />
+            </Animated.View>
+
+            {/* Button Content */}
+            <Animated.View
+              style={[
+                styles.floatingButtonInnerOutline,
+                {
+                  backgroundColor: COLORS.surface, // Solid background to hide glow
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.floatingButton}
+                onPress={() => console.log('Empty workout')}
+                activeOpacity={0.8}
+              >
+                <Animated.View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <Plus size={18} color={COLORS.textPrimary} strokeWidth={2.5} />
+                  <Animated.View
+                    style={{
+                      opacity: buttonWidth,
+                      overflow: "hidden",
+                      width: buttonWidth.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 55],
+                      }),
+                    }}
+                  >
+                    <Text style={styles.floatingButtonText} numberOfLines={1}>
+                      {t('home.empty_workout')}
+                    </Text>
+                  </Animated.View>
+                </Animated.View>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+        )}
+
+        <DaySelectorSheet
+          visible={!!selectedRoutineForTraining}
+          routine={selectedRoutineForTraining}
+          onClose={() => setSelectedRoutineForTraining(null)}
+          onSelectDay={handleSelectDay}
+        />
+
+        {/* Health Metrics Modal for New Users */}
+        <CalorieResultsModal
+          visible={showHealthModal}
+          onClose={() => setShowHealthModal(false)}
+          metrics={healthMetrics}
+        />
+      </View>
     </>
   );
 };
@@ -554,6 +659,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     paddingHorizontal: 24,
@@ -758,18 +866,36 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 20,
   },
-  debugWarningBtn: {
-    backgroundColor: COLORS.error + '20',
+  noRoutineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '15',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.error,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 24,
-    alignSelf: 'flex-start',
+    borderColor: COLORS.primary + '30',
+    gap: 16,
   },
-  debugWarningText: {
-    ...TYPOGRAPHY.label,
-    color: COLORS.error,
-    fontWeight: 'bold',
+  noRoutineIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  noRoutineContent: {
+    flex: 1,
+    gap: 4,
+  },
+  noRoutineTitle: {
+    ...TYPOGRAPHY.h4,
+    color: COLORS.primary,
+  },
+  noRoutineMessage: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+
 });

@@ -12,10 +12,12 @@ import {
 import { LineChart } from "react-native-gifted-charts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedCard, AnimatedHeader, AnimatedSection } from "../../src/components/common/Animations";
+import { SectionAppBar } from "../../src/components/common/SectionAppBar";
 import { ConsistencyHeatmap } from "../../src/components/stats/ConsistencyHeatmap";
 import { MuscleBreakdown } from "../../src/components/stats/MuscleBreakdown";
 import { RankingCard } from "../../src/components/stats/RankingCard";
 import { useTabBarInset } from "../../src/hooks/useTabBarInset";
+import { useUserAnalytics } from "../../src/hooks/useUserAnalytics";
 import { auth } from "../../src/services/firebaseConfig";
 import { MuscleDistribution, StatsService, UserRank, VolumeDataPoint } from "../../src/services/statsService";
 import { WorkoutService } from "../../src/services/workoutService";
@@ -25,13 +27,17 @@ const StatsScreen: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
-  const [loading, setLoading] = useState(true);
+
+  // Real-time analytics from Firestore (instant load)
+  const { analytics, loading: analyticsLoading } = useUserAnalytics();
+
+  // Additional stats that still need to be calculated (for consistency heatmap, etc.)
   const [consistency, setConsistency] = useState<Map<string, number>>(new Map());
   const [muscleDistribution, setMuscleDistribution] = useState<MuscleDistribution[]>([]);
   const [volumeProgression, setVolumeProgression] = useState<VolumeDataPoint[]>([]);
   const [userRank, setUserRank] = useState<UserRank | null>(null);
-  const [maxStreak, setMaxStreak] = useState(0);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
+  const [additionalLoading, setAdditionalLoading] = useState(true);
 
   // Memoized calculation: only recalculates when workoutHistory changes
   const heatmapData = useMemo(() => {
@@ -39,25 +45,25 @@ const StatsScreen: React.FC = () => {
   }, [workoutHistory]);
 
   useEffect(() => {
-    loadAllStats();
+    loadAdditionalStats();
   }, []);
 
-  const loadAllStats = async () => {
+  const loadAdditionalStats = async () => {
     const userId = auth.currentUser?.uid;
     if (!userId) {
-      setLoading(false);
+      setAdditionalLoading(false);
       return;
     }
 
     try {
-      // Load all stats in parallel
+      // Load stats that aren't covered by the analytics document
       const [workoutStats, muscles, volume, rank, history] = await Promise.all([
         WorkoutService.getUserStats(userId),
         StatsService.getMuscleDistribution(userId),
         StatsService.getVolumeProgression(userId, 8),
         StatsService.getUserRank(userId),
         WorkoutService.getAllUserWorkoutSessions(userId),
-      ])
+      ]);
 
       // Store history for memoized heatmap calculation
       setWorkoutHistory(history);
@@ -73,18 +79,21 @@ const StatsScreen: React.FC = () => {
       setMuscleDistribution(muscles);
       setVolumeProgression(volume);
       setUserRank(rank);
-      setMaxStreak(workoutStats.maxStreak);
     } catch (error) {
-      console.error("Error loading stats:", error);
+      console.error("Error loading additional stats:", error);
     } finally {
-      setLoading(false);
+      setAdditionalLoading(false);
     }
   };
 
-  if (loading) {
+  // Show loading only for initial load
+  const isLoading = analyticsLoading && additionalLoading;
+
+  if (isLoading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.loadingContainer}>
+      <View style={styles.container}>
+        <SectionAppBar title={t("stats.analytics_title")} />
+        <View style={[styles.loadingContainer, { paddingTop: 80 + insets.top }]}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>{t("stats.loading")}</Text>
         </View>
@@ -92,19 +101,17 @@ const StatsScreen: React.FC = () => {
     );
   }
 
-  const hasData = consistency.size > 0 || muscleDistribution.length > 0;
+  // Check if user has any data (from analytics or calculated stats)
+  const hasData = analytics !== null || consistency.size > 0 || muscleDistribution.length > 0;
 
   if (!hasData) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.container}>
+        <SectionAppBar title={t("stats.analytics_title")} />
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: 80 + insets.top, paddingBottom: tabBarInset }]}
           showsVerticalScrollIndicator={false}
         >
-          <AnimatedHeader style={styles.header}>
-            <Text style={styles.headerTitle}>{t("stats.analytics_title")}</Text>
-          </AnimatedHeader>
-
           <AnimatedSection delay={100} style={styles.emptySection}>
             <View style={styles.emptyStateContainer}>
               <Text style={styles.emptyTitle}>{t("stats.no_analytics_yet")}</Text>
@@ -122,17 +129,63 @@ const StatsScreen: React.FC = () => {
     );
   }
 
+  // Format total volume for display
+  const formatVolume = (volume: number): string => {
+    if (volume >= 1000000) {
+      return `${(volume / 1000000).toFixed(1)}M`;
+    } else if (volume >= 1000) {
+      return `${(volume / 1000).toFixed(0)}K`;
+    }
+    return volume.toFixed(0);
+  };
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      {/* App Bar */}
+      <SectionAppBar title={t("stats.analytics_title")} />
+
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 80 + insets.top, paddingBottom: tabBarInset }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header subtitle */}
         <AnimatedHeader style={styles.header}>
-          <Text style={styles.headerTitle}>{t("stats.analytics_title")}</Text>
           <Text style={styles.headerSubtitle}>{t("stats.performance_subtitle")}</Text>
         </AnimatedHeader>
+
+        {/* Quick Stats from Analytics (Instant Load) */}
+        {analytics && (
+          <AnimatedSection delay={50} style={styles.section}>
+            <View style={styles.quickStatsRow}>
+              {/* Total Volume Card */}
+              <AnimatedCard style={styles.quickStatCard}>
+                <Text style={styles.quickStatLabel}>{t("stats.total_volume")}</Text>
+                <Text style={styles.quickStatValue}>
+                  {formatVolume(analytics.totalVolume)}
+                </Text>
+                <Text style={styles.quickStatUnit}>kg</Text>
+              </AnimatedCard>
+
+              {/* Consistency Score Card */}
+              <AnimatedCard style={styles.quickStatCard}>
+                <Text style={styles.quickStatLabel}>{t("stats.consistency")}</Text>
+                <Text style={[styles.quickStatValue, { color: COLORS.success }]}>
+                  {analytics.consistencyScore}
+                </Text>
+                <Text style={styles.quickStatUnit}>%</Text>
+              </AnimatedCard>
+
+              {/* Personal Records Count */}
+              <AnimatedCard style={styles.quickStatCard}>
+                <Text style={styles.quickStatLabel}>{t("stats.records")}</Text>
+                <Text style={[styles.quickStatValue, { color: COLORS.warning }]}>
+                  {analytics.personalRecords?.length || 0}
+                </Text>
+                <Text style={styles.quickStatUnit}>PRs</Text>
+              </AnimatedCard>
+            </View>
+          </AnimatedSection>
+        )}
 
         {/* Section 1: Consistency & Body Heatmap (unified card) */}
         <AnimatedSection delay={100} style={styles.section}>
@@ -189,12 +242,21 @@ const StatsScreen: React.FC = () => {
               </View>
             )}
 
-            {maxStreak > 0 && (
+            {/* Top 3 Personal Records */}
+            {analytics?.personalRecords && analytics.personalRecords.length > 0 && (
               <View style={styles.statusItem}>
-                <AnimatedCard style={styles.streakCard}>
-                  <Text style={styles.streakLabel}>{t("stats.best_streak")}</Text>
-                  <Text style={styles.streakValue}>{maxStreak}</Text>
-                  <Text style={styles.streakUnit}>{t("stats.days")}</Text>
+                <AnimatedCard style={styles.prCard}>
+                  <Text style={styles.prCardTitle}>{t("stats.top_prs")}</Text>
+                  {analytics.personalRecords.slice(0, 3).map((pr, index) => (
+                    <View key={index} style={styles.prRow}>
+                      <Text style={styles.prName} numberOfLines={1}>
+                        {pr.exerciseName}
+                      </Text>
+                      <Text style={styles.prValue}>
+                        {pr.weight}kg × {pr.reps}
+                      </Text>
+                    </View>
+                  ))}
                 </AnimatedCard>
               </View>
             )}
@@ -277,6 +339,38 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY.bold,
     color: COLORS.textInverse,
   },
+  // Quick Stats (from analytics)
+  quickStatsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  quickStatCard: {
+    flex: 1,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    alignItems: "center",
+  },
+  quickStatLabel: {
+    fontSize: 10,
+    fontFamily: FONT_FAMILY.bold,
+    color: COLORS.textTertiary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  quickStatValue: {
+    fontSize: 24,
+    fontFamily: FONT_FAMILY.heavy,
+    color: COLORS.primary,
+  },
+  quickStatUnit: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
   chartCard: {
     backgroundColor: COLORS.card,
     borderRadius: 16,
@@ -300,6 +394,42 @@ const styles = StyleSheet.create({
   },
   statusItem: {
     flex: 1,
+  },
+  // PR Card
+  prCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+  },
+  prCardTitle: {
+    fontSize: 12,
+    fontFamily: FONT_FAMILY.bold,
+    color: COLORS.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  prRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  prName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.regular,
+    color: COLORS.textPrimary,
+    marginRight: 8,
+  },
+  prValue: {
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.bold,
+    color: COLORS.warning,
   },
   streakCard: {
     backgroundColor: COLORS.card,

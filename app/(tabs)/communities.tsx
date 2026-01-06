@@ -9,6 +9,7 @@ import {
   AnimatedSection,
 } from "../../src/components/common/Animations";
 import { PrimaryButton } from "../../src/components/common/PrimaryButton";
+import { SectionAppBar } from "../../src/components/common/SectionAppBar";
 import { COLORS } from "../../src/theme/theme";
 import { showToast } from "../../src/utils/toast";
 
@@ -21,8 +22,11 @@ const CommunitiesScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.content}>
+    <View style={styles.container}>
+      {/* App Bar */}
+      <SectionAppBar title={t('communities.title')} />
+
+      <View style={[styles.content, { paddingTop: 80 + insets.top }]}>
         {/* Icon */}
         <AnimatedPopIn delay={0}>
           <View style={styles.iconContainer}>

@@ -33,6 +33,21 @@ export interface StarterTemplate {
  */
 export const STARTER_TEMPLATES: StarterTemplate[] = [
     // ==========================================
+    // Sistema MENS: Compacto (Full Body 2 días)
+    // ==========================================
+    {
+        id: "tpl_2d_fullbody",
+        nameKey: "routine_tpl_compacto",
+        daysPerWeek: 2,
+        recommendedLevels: ["beginner", "intermediate"],
+        recommendedGoals: ["health", "general", "maintenance"],
+        dayStructure: [
+            { dayIndex: 0, labelKey: "day_fullbody_a" },
+            { dayIndex: 3, labelKey: "day_fullbody_b" },
+        ],
+    },
+
+    // ==========================================
     // Sistema MENS: Fundamentos (Full Body)
     // ==========================================
     {
@@ -80,6 +95,25 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
             { dayIndex: 2, labelKey: "day_empuje_hipertrofia" },
             { dayIndex: 3, labelKey: "day_traccion_hipertrofia" },
             { dayIndex: 4, labelKey: "day_pierna_hombro" },
+        ],
+    },
+
+    // ==========================================
+    // Sistema MENS: Elite (Push/Pull/Legs 6 días)
+    // ==========================================
+    {
+        id: "tpl_6d_ppl",
+        nameKey: "routine_tpl_elite",
+        daysPerWeek: 6,
+        recommendedLevels: ["advanced"],
+        recommendedGoals: ["muscle", "strength"],
+        dayStructure: [
+            { dayIndex: 0, labelKey: "day_push_a" },
+            { dayIndex: 1, labelKey: "day_pull_a" },
+            { dayIndex: 2, labelKey: "day_legs_a" },
+            { dayIndex: 3, labelKey: "day_push_b" },
+            { dayIndex: 4, labelKey: "day_pull_b" },
+            { dayIndex: 5, labelKey: "day_legs_b" },
         ],
     },
 ];

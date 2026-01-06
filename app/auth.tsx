@@ -3,13 +3,13 @@ import { Eye, EyeOff } from "lucide-react-native";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { AuthTabs } from "../src/components/auth/AuthTabs";
+import { MensLogo } from "../src/components/common/BrandIcons";
 import { CustomInput } from "../src/components/common/CustomInput";
 import { PrimaryButton } from "../src/components/common/PrimaryButton";
 import { AuthService } from "../src/services/authService";
@@ -32,7 +32,8 @@ const AuthScreen: React.FC = () => {
     try {
       if (mode === "register") {
         await AuthService.register(email.trim(), password);
-        router.replace("/pre_onboarding");
+        // Navigate to Data Tunnel (Step 1)
+        router.replace("/onboarding/identity");
       } else {
         await AuthService.login(email.trim(), password);
         router.replace("/(tabs)/home");
@@ -49,8 +50,8 @@ const AuthScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      <Image
-        source={require("../assets/images/logo.png")}
+      <MensLogo
+        size={96}
         style={styles.logo}
       />
 

@@ -279,8 +279,8 @@ const OnboardingScreen: React.FC = () => {
     if (currentStep < STEPS) {
       if (validateStep(currentStep)) {
         // Special Logic: Expert Branch
-        // Trigger after Frequency (Step 6) and before Injuries (Step 7)
-        if (currentStep === 6) {
+        // Trigger after Experience (Step 3) - right after selecting advanced/expert
+        if (currentStep === 3) {
           const isExpert = data.experienceLevel === 'advanced' || data.experienceLevel === 'expert';
           if (isExpert) {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -304,9 +304,9 @@ const OnboardingScreen: React.FC = () => {
   const handleExpertDecision = (choice: 'complete' | 'direct') => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (choice === 'complete') {
-      // Continue to Step 7 (Injuries)
+      // Continue to Step 4 (Goals) - normal flow
       setShowExpertDecision(false);
-      setCurrentStep(7);
+      setCurrentStep(4);
       setData({ ...data, healthCompleted: true });
     } else {
       // Skip to Step 8 (Acquisition), set flag false

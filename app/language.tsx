@@ -13,8 +13,8 @@ const LanguageScreen: React.FC = () => {
 
     const handleLanguageSelect = async (lang: "es" | "en") => {
         await changeLanguage(lang);
-        // Navigate to auth flow
-        router.replace("/auth");
+        // Navigate to terms screen
+        router.replace("/terms");
     };
 
     return (

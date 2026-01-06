@@ -7,28 +7,14 @@ import {
     signInWithEmailAndPassword,
     UserCredential,
 } from "firebase/auth";
-import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "./firebaseConfig";
 
 export const AuthService = {
     async register(email: string, password: string): Promise<UserCredential> {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        const uid = cred.user.uid;
-
-        const userRef = doc(db, "users", uid);
-        await setDoc(
-            userRef,
-            {
-                email: cred.user.email,
-                createdAt: serverTimestamp(),
-                isPremium: false,
-                displayName: "",
-                objective: null,
-                daysPerWeek: null,
-                level: null,
-            },
-            { merge: true }
-        );
+        // We do NOT create the user document here anymore. 
+        // It will be created at the end of the Onboarding Data Tunnel.
         return cred;
     },
 

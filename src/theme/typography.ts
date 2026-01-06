@@ -1,19 +1,19 @@
 import { TextStyle } from 'react-native';
 
 // ============================================================================
-// FONT FAMILY - Antigravity Typography System
+// FONT FAMILY - MENS Typography System
 // ============================================================================
 // Dela Gothic One: Industrial/sci-fi display font for titles and hero text
 // Inter: Modern UI font for body text, buttons, and data display
 export const FONT_FAMILY = {
     // Display font - Dela Gothic One (brutalist, industrial)
-    display: 'Antigravity-Display',
+    display: 'Mens-Display',
 
     // UI fonts - Inter family (clean, technical)
-    regular: 'Antigravity-UI-Reg',
-    medium: 'Antigravity-UI-Reg', // Inter doesn't have medium, fallback to regular
-    bold: 'Antigravity-UI-Bold',
-    heavy: 'Antigravity-UI-Black',
+    regular: 'Mens-UI-Reg',
+    medium: 'Mens-UI-Reg', // Inter doesn't have medium, fallback to regular
+    bold: 'Mens-UI-Bold',
+    heavy: 'Mens-UI-Black',
 };
 
 // ============================================================================

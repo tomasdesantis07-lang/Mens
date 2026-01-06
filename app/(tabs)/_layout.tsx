@@ -1,10 +1,11 @@
+
 import { Tabs } from "expo-router";
 import {
   BarChart3,
-  Crown,
   Home,
+  ShoppingBag,
   User,
-  Users,
+  Users
 } from "lucide-react-native";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -73,7 +74,7 @@ export default function TabsLayout() {
             title: t('tabs.premium'),
             tabBarIcon: ({ color, focused }) => (
               <AnimatedTabIcon
-                icon={<Crown color={color} size={26} />}
+                icon={<ShoppingBag color={color} size={26} />}
                 focused={focused}
                 color={color}
               />

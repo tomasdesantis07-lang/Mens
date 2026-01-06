@@ -1,8 +1,10 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MensLogo } from '../src/components/common/BrandIcons';
 import { useAuth } from '../src/context/AuthContext';
 import { db } from '../src/services/firebaseConfig';
 import { COLORS, LETTER_SPACING, TYPOGRAPHY } from '../src/theme/theme';
@@ -13,40 +15,50 @@ const WelcomeScreen: React.FC = () => {
   const { user, loading } = useAuth();
   const [checkingOnboarding, setCheckingOnboarding] = useState(false);
 
+  /* 
+    Refactored Logic for "MENS Zero Friction"
+    - If User is totally new (no Auth) -> Terms Screen (via handleStart)
+    - If User has Auth but no Profile (or incomplete) -> Identity Screen (Data Tunnel)
+    - If User has Profile -> Home
+  */
+
   useEffect(() => {
     const checkUserStatus = async () => {
-      if (!loading && user) {
-        setCheckingOnboarding(true);
-        try {
-          // Check if user has completed onboarding
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+      // Wait for auth loading to complete
+      if (!loading) {
+        if (user) {
+          setCheckingOnboarding(true);
+          try {
+            // Check if user has completed onboarding
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
 
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            // Verify that critical onboarding fields are present
-            const hasCompletedOnboarding =
-              userData?.username &&
-              userData?.displayName &&
-              (userData?.experienceLevel || userData?.level); // Support both new and legacy field
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              // Verify that critical onboarding fields are present
+              const hasCompletedOnboarding =
+                userData?.username &&
+                userData?.displayName &&
+                userData?.healthCompleted; // New flag from OnboardingContext
 
-            if (hasCompletedOnboarding) {
-              // User has completed onboarding, go to home
-              router.replace('/(tabs)/home');
+              if (hasCompletedOnboarding) {
+                router.replace('/(tabs)/home');
+              } else {
+                // User exists but tunnel incomplete -> Go to Identity
+                // Ideally we could restore state, but for now restart tunnel
+                router.replace('/onboarding/identity');
+              }
             } else {
-              // User document exists but is incomplete, complete onboarding
-              router.replace('/pre_onboarding');
+              // User has Auth but no Firestore doc -> Tunnel Start
+              router.replace('/onboarding/identity');
             }
-          } else {
-            // User needs to complete onboarding
-            router.replace('/pre_onboarding');
+          } catch (error) {
+            console.error('Error checking user status:', error);
+            router.replace('/onboarding/identity');
+          } finally {
+            setCheckingOnboarding(false);
           }
-        } catch (error) {
-          console.error('Error checking user status:', error);
-          // On error, assume onboarding needed
-          router.replace('/pre_onboarding');
-        } finally {
-          setCheckingOnboarding(false);
         }
+        // If no user, we just stay here and show the Welcome Screen
       }
     };
 
@@ -54,8 +66,23 @@ const WelcomeScreen: React.FC = () => {
   }, [user, loading]);
 
   const handleStart = () => {
+    // Flow: Start -> Language -> Terms -> Auth
     router.push('/language');
   };
+
+  // Block hardware back button on Welcome screen (prevents going back after logout)
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        // Return true to prevent default back behavior
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [])
+  );
 
   // Don't show anything while checking auth state or onboarding status
   if (loading || checkingOnboarding) {
@@ -69,8 +96,8 @@ const WelcomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../assets/images/logo.png')}
+      <MensLogo
+        size={130}
         style={styles.logo}
       />
 
@@ -82,25 +109,6 @@ const WelcomeScreen: React.FC = () => {
         onPress={handleStart}
       >
         <Text style={styles.buttonText}>{t('welcome.start')}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={async () => {
-          try {
-            const { RoutineMigrationService } = await import('../src/services/migrationService');
-            const res = await RoutineMigrationService.uploadRoutineTemplates();
-            if (res.success) {
-              alert(`DB Populated! ${res.count} templates uploaded.`);
-            } else {
-              alert(`Error: ${(res.error as { message?: string })?.message || JSON.stringify(res.error)}`);
-            }
-          } catch (err: any) {
-            alert(`Exception: ${err?.message || JSON.stringify(err)}`);
-          }
-        }}
-        style={{ marginTop: 20, opacity: 0.3 }}
-      >
-        <Text style={{ color: COLORS.textSecondary, fontSize: 10 }}>[SEED DB]</Text>
       </TouchableOpacity>
     </View>
   );
