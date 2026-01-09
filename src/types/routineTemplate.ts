@@ -2,8 +2,6 @@ import { Timestamp } from "firebase/firestore";
 import { BodyPartSlug } from "./bodyParts";
 import { Mechanic } from "./exercise";
 
-export type TemplateLevel = 'Novato' | 'Experimentado';
-export type TemplateGoal = 'Fuerza' | 'Recomposición' | 'Resistencia';
 export type TemplateEquipment = 'Gym Completo' | 'En casa-Sin equipo';
 
 export interface TemplateExercise {
@@ -15,13 +13,17 @@ export interface TemplateExercise {
     targetZone?: BodyPartSlug;
 }
 
+export interface TemplateDay {
+    id: string; // e.g., "day_1", "upper_a"
+    name: string; // e.g., "Día 1", "Torso A"
+    exercises: TemplateExercise[];
+}
+
 export interface RoutineTemplate {
     id?: string; // Firestore ID
     name: string; // e.g., "Full Body Novato A"
-    level: TemplateLevel;
-    goal: TemplateGoal;
     equipment: TemplateEquipment;
     daysPerWeek: number;
-    exercises: TemplateExercise[];
+    days: TemplateDay[]; // Structured days
     createdAt?: Timestamp;
 }

@@ -2,9 +2,11 @@ import { BlurView } from "expo-blur";
 import { usePathname, useRouter } from "expo-router";
 import { Clock, Dumbbell } from "lucide-react-native";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRestTimer, useWorkout, useWorkoutTimer } from "../../context/WorkoutContext";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
+import { translateIfKey } from "../../utils/translationHelpers";
 
 const TAB_BAR_HEIGHT = 60;
 const TAB_BAR_BOTTOM = 20;
@@ -13,6 +15,7 @@ export const ActiveWorkoutOverlay: React.FC = () => {
     const router = useRouter();
     const pathname = usePathname();
     const { activeWorkout, restEndTime, isResting } = useWorkout();
+    const { t } = useTranslation();
     const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
     const restSeconds = useRestTimer(restEndTime || null);
 
@@ -59,7 +62,7 @@ export const ActiveWorkoutOverlay: React.FC = () => {
 
                 <View style={styles.info}>
                     <Text style={styles.routineName} numberOfLines={1}>
-                        {activeWorkout.routine.name}
+                        {translateIfKey(activeWorkout.routine.name)}
                     </Text>
                     <View style={styles.metaRow}>
                         {isResting ? (

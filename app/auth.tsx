@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Eye, EyeOff } from "lucide-react-native";
+import { CheckSquare, Eye, EyeOff, Square } from "lucide-react-native";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,7 +13,7 @@ import { MensLogo } from "../src/components/common/BrandIcons";
 import { CustomInput } from "../src/components/common/CustomInput";
 import { PrimaryButton } from "../src/components/common/PrimaryButton";
 import { AuthService } from "../src/services/authService";
-import { COLORS } from "../src/theme/theme";
+import { COLORS, TYPOGRAPHY } from "../src/theme/theme";
 
 const AuthScreen: React.FC = () => {
   const router = useRouter();
@@ -24,6 +24,7 @@ const AuthScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -47,6 +48,15 @@ const AuthScreen: React.FC = () => {
   };
 
   const isRegister = mode === "register";
+
+  // Placeholder handlers for terms and privacy links
+  const handleTermsPress = () => {
+    console.log('Terms of Service pressed - TODO: implement');
+  };
+
+  const handlePrivacyPress = () => {
+    console.log('Privacy Policy pressed - TODO: implement');
+  };
 
   return (
     <View style={styles.screen}>
@@ -103,11 +113,36 @@ const AuthScreen: React.FC = () => {
 
         {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
 
+        {/* Terms & Conditions Checkbox - Only shown in register mode */}
+        {isRegister && (
+          <TouchableOpacity
+            style={styles.termsRow}
+            onPress={() => setTermsAccepted(!termsAccepted)}
+            activeOpacity={0.8}
+          >
+            {termsAccepted ? (
+              <CheckSquare size={22} color={COLORS.primary} />
+            ) : (
+              <Square size={22} color={COLORS.textTertiary} />
+            )}
+            <Text style={styles.termsText}>
+              {t('auth.terms_accept_label')}{' '}
+              <Text style={styles.termsLink} onPress={handleTermsPress}>
+                {t('auth.terms_link')}
+              </Text>
+              {' '}{t('auth.terms_and')}{' '}
+              <Text style={styles.termsLink} onPress={handlePrivacyPress}>
+                {t('auth.privacy_link')}
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <PrimaryButton
           title={isRegister ? t('auth.create_action') : t('auth.login_action')}
           onPress={handleSubmit}
           loading={loading}
-          disabled={!email || password.length < 6}
+          disabled={!email || password.length < 6 || (isRegister && !termsAccepted)}
         />
 
         <TouchableOpacity
@@ -193,5 +228,22 @@ const styles = StyleSheet.create({
   switchModeText: {
     color: COLORS.textSecondary,
     fontSize: 13,
+  },
+  termsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  termsText: {
+    flex: 1,
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: COLORS.primary,
+    textDecorationLine: "underline",
   },
 });

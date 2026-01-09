@@ -1,38 +1,65 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Calendar, Check, Info } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PrimaryButton } from '../../src/components/common/PrimaryButton';
 import { useOnboarding } from '../../src/context/OnboardingContext';
+import { RoutineService } from '../../src/services/routineService';
 import { COLORS, TYPOGRAPHY } from '../../src/theme/theme';
+import { RoutineTemplate, TemplateEquipment } from '../../src/types/routineTemplate';
+import { Equipment } from '../../src/types/user';
 
 const RoutineSelectionScreen = () => {
     const router = useRouter();
     const { t } = useTranslation();
     const { data, updateData, saveAndFinish, isSaving } = useOnboarding();
 
-    const [selectedfrequency, setSelectedFrequency] = useState<number | null>(null);
+    const [templates, setTemplates] = React.useState<RoutineTemplate[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [selectedCategory, setSelectedCategory] = React.useState<TemplateEquipment>('Gym Completo');
+    const [selectedRoutineId, setSelectedRoutineId] = React.useState<string | null>(null);
 
-    const frequencies = [
-        { days: 2, title: t('routine_selection.options.2_days.title'), desc: t('routine_selection.options.2_days.desc') },
-        { days: 3, title: t('routine_selection.options.3_days.title'), desc: t('routine_selection.options.3_days.desc') },
-        { days: 4, title: t('routine_selection.options.4_days.title'), desc: t('routine_selection.options.4_days.desc') },
-        { days: 5, title: t('routine_selection.options.5_days.title'), desc: t('routine_selection.options.5_days.desc') },
-        { days: 6, title: t('routine_selection.options.6_days.title'), desc: t('routine_selection.options.6_days.desc') },
-    ];
+    React.useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                const fetched = await RoutineService.getRoutineTemplates();
+                setTemplates(fetched);
+            } catch (error) {
+                console.error("Failed to fetch templates", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchTemplates();
+    }, []);
 
-    const handleSelectFrequency = (days: number) => {
-        setSelectedFrequency(days);
-        updateData({ daysPerWeek: days });
+    const filteredTemplates = templates.filter(t => t.equipment === selectedCategory);
+
+
+
+    const handleSelectRoutine = (template: RoutineTemplate) => {
+        setSelectedRoutineId(template.id || null);
+
+        let mappedEquipment: Equipment = 'full_gym';
+        if (template.equipment === 'En casa-Sin equipo') {
+            mappedEquipment = 'bodyweight';
+        }
+
+        // Update context with the routine details
+        updateData({
+            daysPerWeek: template.daysPerWeek,
+            equipment: mappedEquipment,
+            selectedRoutineTemplateId: template.id
+        });
     };
 
-    const handleFinish = async () => {
-        if (!selectedfrequency) return;
+    const handleFinish = async (isTemplateOnly: boolean) => {
+        if (!selectedRoutineId) return;
+
+        updateData({ isTemplateOnly });
 
         try {
-            // saveAndFinish will now use the daysPerWeek in context 
-            // to assign a routine via OnboardingContext logic
             await saveAndFinish();
             router.replace('/(tabs)/home');
         } catch (error) {
@@ -54,19 +81,42 @@ const RoutineSelectionScreen = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>{t('routine_selection.title')}</Text>
+                <Text style={styles.title}>{t('onboarding.routine_selection.title')}</Text>
                 <Text style={styles.subtitle}>
-                    {t('routine_selection.subtitle')}
+                    {t('onboarding.routine_selection.subtitle')}
                 </Text>
 
+                {/* Category Chips */}
+                <View style={styles.chipsContainer}>
+                    <TouchableOpacity
+                        style={[styles.chip, selectedCategory === 'Gym Completo' && styles.chipSelected]}
+                        onPress={() => setSelectedCategory('Gym Completo')}
+                    >
+                        <Text style={[styles.chipText, selectedCategory === 'Gym Completo' && styles.chipTextSelected]}>
+                            {t('onboarding.routine_selection.gym_label')}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.chip, selectedCategory === 'En casa-Sin equipo' && styles.chipSelected]}
+                        onPress={() => setSelectedCategory('En casa-Sin equipo')}
+                    >
+                        <Text style={[styles.chipText, selectedCategory === 'En casa-Sin equipo' && styles.chipTextSelected]}>
+                            {t('onboarding.routine_selection.calisthenics_label')}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Templates List */}
                 <View style={styles.grid}>
-                    {frequencies.map((item) => {
-                        const isSelected = selectedfrequency === item.days;
+                    {loading ? (
+                        <Text style={{ color: COLORS.textSecondary }}>{t('onboarding.routine_selection.loading')}</Text>
+                    ) : filteredTemplates.map((item) => {
+                        const isSelected = selectedRoutineId === item.id;
                         return (
                             <TouchableOpacity
-                                key={item.days}
+                                key={item.id}
                                 style={[styles.card, isSelected && styles.cardSelected]}
-                                onPress={() => handleSelectFrequency(item.days)}
+                                onPress={() => handleSelectRoutine(item)}
                                 activeOpacity={0.7}
                             >
                                 <View style={styles.cardHeader}>
@@ -77,21 +127,24 @@ const RoutineSelectionScreen = () => {
                                 </View>
 
                                 <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                                    {item.title}
+                                    {t(item.name)}
                                 </Text>
                                 <Text style={[styles.cardDesc, isSelected && styles.cardDescSelected]}>
-                                    {item.desc}
+                                    {item.daysPerWeek} {t('common.days_per_week')}
                                 </Text>
                             </TouchableOpacity>
                         );
                     })}
+                    {!loading && filteredTemplates.length === 0 && (
+                        <Text style={{ color: COLORS.textSecondary }}>{t('onboarding.routine_selection.empty_category')}</Text>
+                    )}
                 </View>
 
                 {/* Info Note */}
                 <View style={styles.infoBox}>
                     <Info size={16} color={COLORS.textTertiary} style={{ marginTop: 2 }} />
                     <Text style={styles.infoText}>
-                        {t('routine_selection.info')}
+                        {t('onboarding.routine_selection.info')}
                     </Text>
                 </View>
 
@@ -99,11 +152,21 @@ const RoutineSelectionScreen = () => {
 
             <View style={styles.footer}>
                 <PrimaryButton
-                    title={isSaving ? t('routine_selection.saving') : t('routine_selection.start_button')}
-                    onPress={handleFinish}
-                    disabled={!selectedfrequency || isSaving}
+                    title={isSaving ? t('onboarding.routine_selection.saving') : t('onboarding.routine_selection.start_button')}
+                    onPress={() => handleFinish(false)}
+                    disabled={!selectedRoutineId || isSaving}
                     loading={isSaving}
+                    style={{ marginBottom: 12 }}
                 />
+                {selectedRoutineId && (
+                    <TouchableOpacity
+                        style={styles.secondaryButton}
+                        onPress={() => handleFinish(true)}
+                        disabled={isSaving}
+                    >
+                        <Text style={styles.secondaryButtonText}>{t('onboarding.routine_selection.template_only')}</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -130,7 +193,7 @@ const styles = StyleSheet.create({
     },
     content: {
         paddingHorizontal: 24,
-        paddingBottom: 120,
+        paddingBottom: 150, // Extra padding for double buttons footer
     },
     title: {
         ...TYPOGRAPHY.h1,
@@ -141,6 +204,30 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.bodyLarge,
         color: COLORS.textSecondary,
         marginBottom: 32,
+    },
+    chipsContainer: {
+        flexDirection: 'row',
+        marginBottom: 24,
+        gap: 12,
+    },
+    chip: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    chipSelected: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    chipText: {
+        ...TYPOGRAPHY.label,
+        color: COLORS.textSecondary,
+    },
+    chipTextSelected: {
+        color: COLORS.textInverse,
     },
     grid: {
         gap: 12,
@@ -211,7 +298,16 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.background,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
+        paddingBottom: 34, // Safe area
     },
+    secondaryButton: {
+        paddingVertical: 14,
+        alignItems: 'center',
+    },
+    secondaryButtonText: {
+        ...TYPOGRAPHY.button,
+        color: COLORS.primary,
+    }
 });
 
 export default RoutineSelectionScreen;

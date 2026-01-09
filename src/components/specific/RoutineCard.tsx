@@ -8,6 +8,7 @@ import {
     View,
 } from "react-native";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
+import { translateIfKey } from "../../utils/translationHelpers";
 
 interface RoutineCardProps {
     name: string;
@@ -39,7 +40,7 @@ const RoutineCardComponent: React.FC<RoutineCardProps> = ({
         <View style={styles.card}>
             <View style={styles.cardHeader}>
                 <View style={styles.nameContainer}>
-                    <Text style={styles.name}>{name}</Text>
+                    <Text style={styles.name}>{translateIfKey(name)}</Text>
                     {isCurrentPlan && (
                         <Zap
                             size={18}

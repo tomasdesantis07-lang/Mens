@@ -23,9 +23,9 @@ import { AchievementCard } from '../../src/components/profile/AchievementCard';
 import { ProfileMenuSheet } from '../../src/components/profile/ProfileMenuSheet';
 import { RoutinePreviewCard } from '../../src/components/profile/RoutinePreviewCard';
 import { RoutinePreviewSheet } from '../../src/components/profile/RoutinePreviewSheet';
+import { useRoutines } from '../../src/hooks/useRoutines';
 import { useTabBarInset } from '../../src/hooks/useTabBarInset';
 import { auth, db } from '../../src/services/firebaseConfig';
-import { RoutineService } from '../../src/services/routineService';
 import { COLORS, FONT_FAMILY } from '../../src/theme/theme';
 import { Routine } from '../../src/types/routine';
 
@@ -36,6 +36,8 @@ type UserData = {
   photoURL?: string;
 };
 
+// ...
+
 const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
   const router = useRouter();
@@ -43,7 +45,7 @@ const ProfileScreen: React.FC = () => {
   const tabBarInset = useTabBarInset();
   const [menuVisible, setMenuVisible] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [userRoutines, setUserRoutines] = useState<Routine[]>([]);
+  const { routines: userRoutines } = useRoutines(); // Hook usage
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
 
   // Reload routines when screen is focused (after editing)
@@ -62,9 +64,7 @@ const ProfileScreen: React.FC = () => {
       if (userDoc.exists()) {
         setUserData(userDoc.data() as UserData);
       }
-
-      const routines = await RoutineService.getUserRoutines(user.uid);
-      setUserRoutines(routines);
+      // Routines fetched via hook
     } catch (error) {
       console.error('Error loading user data:', error);
     }

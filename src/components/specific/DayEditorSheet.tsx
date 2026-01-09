@@ -1,8 +1,9 @@
 import { Plus } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     KeyboardAvoidingView,
+    LayoutAnimation,
     Modal,
     Platform,
     ScrollView,
@@ -10,9 +11,11 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CustomExerciseService } from "../../services/customExerciseService";
+import { auth } from "../../services/firebaseConfig";
 import { COLORS } from "../../theme/theme";
 import { CatalogExercise } from "../../types/exercise";
 import {
@@ -20,9 +23,12 @@ import {
     RoutineDay,
     RoutineExercise,
 } from "../../types/routine";
+import { showToast } from "../../utils/toast";
 import { PrimaryButton } from "../common/PrimaryButton";
+import { CreateExerciseModal } from "./CreateExerciseModal";
 import { ExercisePickerModal } from "./ExercisePickerModal";
 import { ExerciseRow } from "./ExerciseRow";
+
 
 interface DayEditorSheetProps {
     day: RoutineDay;
@@ -42,14 +48,31 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
     const [editedDay, setEditedDay] = useState<RoutineDay>(day);
     const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
     const [showExercisePicker, setShowExercisePicker] = useState(false);
+    const [showCreateExercise, setShowCreateExercise] = useState(false);
+    const [customExercises, setCustomExercises] = useState<CatalogExercise[]>([]);
+    const [isLoadingCustom, setIsLoadingCustom] = useState(false);
+    const [exerciseBeingEdited, setExerciseBeingEdited] = useState<CatalogExercise | undefined>(undefined);
+
+    const loadCustomExercises = useCallback(async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        try {
+            const exercises = await CustomExerciseService.getUserCustomExercises(user.uid);
+            setCustomExercises(exercises);
+        } catch (error) {
+            console.error("Failed to load custom exercises", error);
+        }
+    }, []);
 
     React.useEffect(() => {
         if (visible) {
             setEditedDay(day);
             // Auto-expand first exercise when opening
             setExpandedExerciseId(day.exercises[0]?.id || null);
+            loadCustomExercises();
         }
-    }, [visible, day]);
+    }, [visible, day, loadCustomExercises]);
 
     const handleLabelChange = (label: string) => {
         setEditedDay((prev) => ({ ...prev, label }));
@@ -59,45 +82,100 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
         setShowExercisePicker(true);
     };
 
-    const handleExerciseSelect = (exercise: CatalogExercise, translatedName: string) => {
-        const newExercise = createEmptyExercise(editedDay.exercises.length);
-        newExercise.exerciseId = exercise.id;
-        newExercise.targetZone = exercise.primaryMuscles[0];
-        newExercise.name = translatedName;
+    const handleExerciseSelect = (exercises: Array<{ exercise: CatalogExercise, translatedName: string }>) => {
+        const newExercises = exercises.map(({ exercise, translatedName }, index) => {
+            const newEx = createEmptyExercise(editedDay.exercises.length + index);
+            newEx.exerciseId = exercise.id;
+            newEx.targetZone = exercise.primaryMuscles[0];
+            newEx.name = translatedName;
+            return newEx;
+        });
 
         setEditedDay((prev) => ({
             ...prev,
-            exercises: [...prev.exercises, newExercise],
+            exercises: [...prev.exercises, ...newExercises],
         }));
         setShowExercisePicker(false);
-        setExpandedExerciseId(newExercise.id);
+        // Expand the last added one
+        if (newExercises.length > 0) {
+            setExpandedExerciseId(newExercises[newExercises.length - 1].id);
+        }
     };
 
     const handleCustomExercise = () => {
-        const newExercise = createEmptyExercise(editedDay.exercises.length);
-        // No exerciseId means it's a custom exercise
-
-        setEditedDay((prev) => ({
-            ...prev,
-            exercises: [...prev.exercises, newExercise],
-        }));
         setShowExercisePicker(false);
-        setExpandedExerciseId(newExercise.id);
+        setExerciseBeingEdited(undefined);
+        setShowCreateExercise(true);
     };
 
-    const handleUpdateExercise = (index: number, exercise: RoutineExercise) => {
+    const handleEditCustomExercise = (exercise: CatalogExercise) => {
+        setShowExercisePicker(false);
+        setExerciseBeingEdited(exercise);
+        setShowCreateExercise(true);
+    };
+
+    const handleSaveCustomExercise = async (exerciseData: Omit<CatalogExercise, "id">) => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        setIsLoadingCustom(true);
+        try {
+            if (exerciseBeingEdited) {
+                // Update existing
+                await CustomExerciseService.updateCustomExercise(user.uid, exerciseBeingEdited.id, exerciseData);
+                showToast.success('Ejercicio actualizado');
+            } else {
+                // Create new
+                const newExercise = await CustomExerciseService.createCustomExercise(user.uid, exerciseData);
+                // Auto-select the newly created exercise
+                handleExerciseSelect([{ exercise: newExercise, translatedName: newExercise.nameKey }]);
+                showToast.success(t('create_exercise.success_created'));
+            }
+
+            // Refresh list
+            await loadCustomExercises();
+            setShowCreateExercise(false);
+        } catch (error) {
+            console.error(error);
+            showToast.error(exerciseBeingEdited ? 'Error al actualizar' : t('create_exercise.error_create'));
+        } finally {
+            setIsLoadingCustom(false);
+        }
+    };
+
+    const handleUpdateExercise = useCallback((index: number, exercise: RoutineExercise) => {
         setEditedDay((prev) => ({
             ...prev,
             exercises: prev.exercises.map((ex, i) => (i === index ? exercise : ex)),
         }));
-    };
+    }, []);
 
-    const handleDeleteExercise = (index: number) => {
+    const handleDeleteExercise = useCallback((index: number) => {
         setEditedDay((prev) => ({
             ...prev,
             exercises: prev.exercises.filter((_, i) => i !== index),
         }));
-    };
+    }, []);
+
+    const handleToggleExpand = useCallback((id: string) => {
+        LayoutAnimation.configureNext({
+            duration: 250,
+            update: {
+                type: LayoutAnimation.Types.easeInEaseOut,
+            },
+            create: {
+                duration: 250,
+                type: LayoutAnimation.Types.easeInEaseOut,
+                property: LayoutAnimation.Properties.opacity,
+            },
+            delete: {
+                duration: 250,
+                type: LayoutAnimation.Types.easeInEaseOut,
+                property: LayoutAnimation.Properties.opacity,
+            },
+        });
+        setExpandedExerciseId((prev) => (prev === id ? null : id));
+    }, []);
 
     const handleSave = () => {
         onSave(editedDay);
@@ -151,15 +229,12 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                         editedDay.exercises.map((exercise, index) => (
                             <ExerciseRow
                                 key={exercise.id}
+                                index={index}
                                 exercise={exercise}
-                                onUpdate={(updated) => handleUpdateExercise(index, updated)}
-                                onDelete={() => handleDeleteExercise(index)}
+                                onUpdate={handleUpdateExercise}
+                                onDelete={handleDeleteExercise}
                                 isExpanded={expandedExerciseId === exercise.id}
-                                onToggleExpand={() => {
-                                    setExpandedExerciseId(
-                                        expandedExerciseId === exercise.id ? null : exercise.id
-                                    );
-                                }}
+                                onToggleExpand={handleToggleExpand}
                             />
                         ))
                     )}
@@ -187,7 +262,18 @@ export const DayEditorSheet: React.FC<DayEditorSheetProps> = ({
                 visible={showExercisePicker}
                 onSelect={handleExerciseSelect}
                 onCustomExercise={handleCustomExercise}
+                onEditCustomExercise={handleEditCustomExercise}
                 onClose={() => setShowExercisePicker(false)}
+                customExercises={customExercises}
+            />
+
+            {/* Create/Edit Custom Exercise Modal */}
+            <CreateExerciseModal
+                visible={showCreateExercise}
+                onClose={() => setShowCreateExercise(false)}
+                onSave={handleSaveCustomExercise}
+                loading={isLoadingCustom}
+                initialData={exerciseBeingEdited}
             />
         </Modal>
     );

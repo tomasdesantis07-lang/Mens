@@ -1,18 +1,28 @@
-import * as Haptics from "expo-haptics";
-import { ArrowLeftRight, Check, ChevronDown, ChevronUp, Info, Plus } from "lucide-react-native";
-import React, { memo, useCallback } from "react";
+import { ArrowLeftRight, Check, Dumbbell, Info, Plus } from "lucide-react-native";
+import React, { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
+    LayoutAnimation,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    UIManager,
+    View
 } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { COLORS } from "../../theme/theme";
 import { RoutineExercise } from "../../types/routine";
 import { WorkoutSetLog } from "../../types/workout";
+import { MensHaptics } from '../../utils/haptics';
 import { showToast } from "../../utils/toast";
+import { translateIfKey } from "../../utils/translationHelpers";
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface WorkoutExerciseCardProps {
     exercise: RoutineExercise;
@@ -96,14 +106,22 @@ const SetRow = memo(({
         </View>
     );
 }, (prev, next) => {
+    // Deep comparison for lastSet because the parent creates a new object every time
+    const lastSetEqual =
+        (prev.lastSet === null && next.lastSet === null) ||
+        (prev.lastSet !== null && next.lastSet !== null &&
+            prev.lastSet.weight === next.lastSet.weight &&
+            prev.lastSet.reps === next.lastSet.reps);
+
     return (
         prev.isCompleted === next.isCompleted &&
         prev.set.weight === next.set.weight &&
         prev.set.reps === next.set.reps &&
         prev.set.setIndex === next.set.setIndex &&
-        prev.lastSet === next.lastSet && // Reference comparison should be stable
+        lastSetEqual &&
         prev.onToggleSet === next.onToggleSet && // Should be stable via useCallback
-        prev.onLogSet === next.onLogSet // Should be stable via Context
+        prev.onLogSet === next.onLogSet && // Should be stable via Context
+        prev.restSeconds === next.restSeconds
     );
 });
 
@@ -121,10 +139,23 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
 }) => {
     const { t } = useTranslation();
 
-    const completedCount = logs.filter((set) =>
-        completedSets.has(`${exercise.id}-${set.setIndex}`)
-    ).length;
+    // PERFORMANCE: Pre-calculate completion count
+    const completedCount = useMemo(() =>
+        logs.filter((set) => completedSets.has(`${exercise.id}-${set.setIndex}`)).length,
+        [logs, completedSets, exercise.id]
+    );
     const totalSets = logs.length;
+
+    // PERFORMANCE: Pre-calculate set data to avoid recalculation during map
+    const setData = useMemo(() =>
+        logs.map((set, index) => ({
+            set,
+            index,
+            isCompleted: completedSets.has(`${exercise.id}-${set.setIndex}`),
+            lastSet: getLastSessionSet(exercise.id, set.setIndex),
+        })),
+        [logs, completedSets, exercise.id, getLastSessionSet]
+    );
 
     const handleToggleSet = useCallback((setIndex: number) => {
         const key = `${exercise.id}-${setIndex}`;
@@ -133,32 +164,47 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
         onToggleSetComplete(exercise.id, setIndex, exercise.restSeconds);
 
         if (!wasCompleted) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            MensHaptics.medium();
         }
     }, [exercise.id, exercise.restSeconds, completedSets, onToggleSetComplete]);
 
+    const handleToggleExpand = useCallback(() => {
+        // Fast height animation with subtle ease (Lyfta-style)
+        LayoutAnimation.configureNext({
+            duration: 200,
+            update: {
+                type: LayoutAnimation.Types.easeOut,
+            },
+        });
+        MensHaptics.light();
+        onToggleExpand();
+    }, [onToggleExpand]);
+
     return (
-        <View style={styles.exerciseCard}>
+        <View style={[
+            styles.exerciseRow,
+            isExpanded && styles.exerciseRowExpanded
+        ]}>
             {/* Collapsible Header */}
             <TouchableOpacity
-                style={styles.exerciseCollapsibleHeader}
-                onPress={onToggleExpand}
+                style={[
+                    styles.exerciseCollapsibleHeader,
+                    isExpanded && styles.headerExpanded
+                ]}
+                onPress={handleToggleExpand}
                 activeOpacity={0.7}
             >
                 <View style={styles.headerLeftTrain}>
-                    <View style={styles.expandIconTrain}>
-                        {isExpanded ? (
-                            <ChevronUp size={20} color={COLORS.primary} />
-                        ) : (
-                            <ChevronDown size={20} color={COLORS.textSecondary} />
-                        )}
+                    {/* Thumbnail placeholder - will hold exercise preview image */}
+                    <View style={styles.thumbnailBox}>
+                        <Dumbbell size={20} color={COLORS.textSecondary} />
                     </View>
                     <View style={styles.headerInfoTrain}>
                         <Text style={styles.exerciseNameHeader} numberOfLines={1}>
-                            {exercise.name}
+                            {translateIfKey(exercise.name, t)}
                         </Text>
                         <Text style={styles.exerciseMetaTrain}>
-                            {completedCount}/{totalSets} {t('train.set')} • {exercise.sets.length} × {exercise.reps}
+                            {completedCount}/{totalSets} {t('train.set')}
                         </Text>
                     </View>
                 </View>
@@ -190,9 +236,13 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                 </View>
             </TouchableOpacity>
 
-            {/* Expandable Content */}
+            {/* Expandable Content with Lyfta-style fast fade */}
             {isExpanded && (
-                <View style={styles.exerciseExpandedContent}>
+                <Animated.View
+                    entering={FadeIn.duration(150)}
+                    exiting={FadeOut.duration(100)}
+                    style={styles.exerciseExpandedContent}
+                >
                     <View style={styles.setsHeader}>
                         <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
                         <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
@@ -201,33 +251,31 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                         <View style={{ width: 40 }} />
                     </View>
 
-                    {logs.map((set, index) => {
-                        const isCompleted = completedSets.has(`${exercise.id}-${set.setIndex}`);
-                        const lastSet = getLastSessionSet(exercise.id, set.setIndex);
-
-                        return (
-                            <SetRow
-                                key={set.setIndex}
-                                set={set}
-                                index={index}
-                                isCompleted={isCompleted}
-                                lastSet={lastSet}
-                                exerciseId={exercise.id}
-                                onLogSet={onLogSet}
-                                onToggleSet={handleToggleSet}
-                                restSeconds={exercise.restSeconds}
-                            />
-                        );
-                    })}
+                    {setData.map(({ set, index, isCompleted, lastSet }) => (
+                        <SetRow
+                            key={set.setIndex}
+                            set={set}
+                            index={index}
+                            isCompleted={isCompleted}
+                            lastSet={lastSet}
+                            exerciseId={exercise.id}
+                            onLogSet={onLogSet}
+                            onToggleSet={handleToggleSet}
+                            restSeconds={exercise.restSeconds}
+                        />
+                    ))}
 
                     <TouchableOpacity
                         style={styles.addSetButton}
-                        onPress={() => onAddSet(exercise.id)}
+                        onPress={() => {
+                            MensHaptics.light();
+                            onAddSet(exercise.id);
+                        }}
                     >
                         <Plus size={16} color={COLORS.primary} />
                         <Text style={styles.addSetText}>{t('train.add_set')}</Text>
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
             )}
         </View>
     );
@@ -245,18 +293,32 @@ export const WorkoutExerciseCard = memo(WorkoutExerciseCardComponent, (prevProps
 });
 
 const styles = StyleSheet.create({
-    exerciseCard: {
+    // Collapsed: minimal row with bottom border only
+    exerciseRow: {
+        backgroundColor: COLORS.background,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+        paddingVertical: 12,
+        paddingHorizontal: 0,
+    },
+    // Expanded: full card appearance
+    exerciseRowExpanded: {
         backgroundColor: COLORS.card,
         borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
         borderWidth: 1,
         borderColor: COLORS.border,
+        borderBottomWidth: 1,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        marginVertical: 8,
     },
     exerciseCollapsibleHeader: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
+        paddingBottom: 0,
+    },
+    headerExpanded: {
         paddingBottom: 16,
     },
     headerLeftTrain: {
@@ -264,7 +326,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         flex: 1,
     },
-    expandIconTrain: {
+    thumbnailBox: {
+        width: 44,
+        height: 44,
+        borderRadius: 8,
+        backgroundColor: COLORS.surface,
+        justifyContent: "center",
+        alignItems: "center",
         marginRight: 12,
     },
     headerInfoTrain: {
@@ -292,6 +360,12 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
         paddingTop: 16,
+    },
+    hiddenContent: {
+        height: 0,
+        overflow: 'hidden',
+        paddingTop: 0,
+        borderTopWidth: 0,
     },
     setsHeader: {
         flexDirection: "row",

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  InteractionManager,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,12 +29,14 @@ import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
 import { RoutineCard } from "../../src/components/specific/RoutineCard";
 import { useWorkout } from "../../src/context/WorkoutContext";
+import { useRoutines } from "../../src/hooks/useRoutines";
 import { useTabBarInset } from "../../src/hooks/useTabBarInset";
 import { auth, db } from "../../src/services/firebaseConfig";
 import { RoutineService } from "../../src/services/routineService";
 import { WorkoutService } from "../../src/services/workoutService";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../src/theme/theme";
 import { Routine } from "../../src/types/routine";
+import { MensHaptics } from "../../src/utils/haptics";
 import { calculateAge, calculateBMI, calculateBMR, calculateTDEE, getWeightClass, HealthMetrics } from "../../src/utils/healthUtils";
 
 type UserData = {
@@ -62,7 +65,7 @@ const HomeScreen: React.FC = () => {
   const { t } = useTranslation();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userRoutines, setUserRoutines] = useState<Routine[]>([]);
+  const { routines: userRoutines, loading: routinesLoading } = useRoutines();
   const [communityRoutines, setCommunityRoutines] = useState<Routine[]>([]);
   const [selectedRoutineForTraining, setSelectedRoutineForTraining] = useState<Routine | null>(null);
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
@@ -74,7 +77,7 @@ const HomeScreen: React.FC = () => {
 
 
   // Floating button animation
-  const buttonWidth = useRef(new Animated.Value(1)).current; // 1 = expanded, 0 = collapsed
+  const expandAnimation = useRef(new Animated.Value(1)).current; // 1 = expanded, 0 = collapsed
   const [isButtonExpanded, setIsButtonExpanded] = useState(true);
   const [showFloatingButton, setShowFloatingButton] = useState(true);
   const rotateAnimation = useRef(new Animated.Value(0)).current;
@@ -82,14 +85,13 @@ const HomeScreen: React.FC = () => {
   const { startWorkout, activeWorkout } = useWorkout();
 
   // Rotating border glow animation - OPTIMIZED: Use transform rotation
-  // Note: useNativeDriver: true only works with transform/opacity on RN
-  // The interpolated width/left values cannot use native driver
+  // Note: useNativeDriver: true works perfectly for rotation transform
   useEffect(() => {
     const rotate = Animated.loop(
       Animated.timing(rotateAnimation, {
         toValue: 1,
         duration: 3000,
-        useNativeDriver: false,
+        useNativeDriver: true, // Switched to true for transform
       })
     );
     rotate.start();
@@ -111,8 +113,7 @@ const HomeScreen: React.FC = () => {
         setUserData(snap.data() as UserData);
       }
 
-      const routines = await RoutineService.getUserRoutines(user.uid);
-      setUserRoutines(routines);
+      // User routines are now handled by useRoutines hook
 
       const community = await RoutineService.getCommunityRoutines();
       setCommunityRoutines(community);
@@ -130,26 +131,32 @@ const HomeScreen: React.FC = () => {
   // Reset button animation and REFRESH DATA when screen is focused
   useFocusEffect(
     useCallback(() => {
-      // Refresh data to catch any changes from routine editor
-      loadData();
-
+      // Immediate UI reset (don't wait for interactions for the button UI state)
       setIsButtonExpanded(true);
       setShowFloatingButton(true);
-      buttonWidth.setValue(1);
+      expandAnimation.setValue(1);
 
-      // Collapse after 3 seconds
+      // Defer data loading to keep navigation smooth
+      const interaction = InteractionManager.runAfterInteractions(() => {
+        loadData();
+      });
+
+      // Collapse button after 3 seconds
       const timer = setTimeout(() => {
-        Animated.timing(buttonWidth, {
+        Animated.timing(expandAnimation, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: false,
+          useNativeDriver: false, // width requires JS thread
         }).start(() => {
           setIsButtonExpanded(false);
         });
       }, 3000);
 
-      return () => clearTimeout(timer);
-    }, [buttonWidth, loadData])
+      return () => {
+        interaction.cancel();
+        clearTimeout(timer);
+      };
+    }, [expandAnimation, loadData])
   );
 
   // PHASE 1: Initial load
@@ -273,6 +280,7 @@ const HomeScreen: React.FC = () => {
     if (nextWorkout) {
       const routine = userRoutines.find(r => r.id === nextWorkout.routineId);
       if (routine) {
+        MensHaptics.heavy();
         setShowFloatingButton(false);
         startWorkout(routine, nextWorkout.dayIndex);
         router.push(`../routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
@@ -316,14 +324,14 @@ const HomeScreen: React.FC = () => {
 
           {/* No Routine Reminder Card */}
           {userRoutines.length === 0 && (
-            <AnimatedSection delay={50} style={styles.section}>
+            <AnimatedSection delay={50} style={styles.heroSection}>
               <TouchableOpacity
                 style={styles.noRoutineCard}
                 onPress={() => router.push('/routines/create' as any)}
                 activeOpacity={0.8}
               >
                 <View style={styles.noRoutineIcon}>
-                  <Dumbbell size={28} color={COLORS.primary} />
+                  <Plus size={28} color={COLORS.primary} />
                 </View>
                 <View style={styles.noRoutineContent}>
                   <Text style={styles.noRoutineTitle}>Creá tu primera rutina</Text>
@@ -338,7 +346,7 @@ const HomeScreen: React.FC = () => {
 
           {/* Rest Day Message */}
           {isTodayRestDay && (
-            <AnimatedSection delay={50} style={styles.section}>
+            <AnimatedSection delay={50} style={styles.heroSection}>
               <View style={styles.restDayCard}>
                 <View style={styles.restDayIcon}>
                   <Moon size={28} color={COLORS.success} />
@@ -457,7 +465,7 @@ const HomeScreen: React.FC = () => {
               styles.floatingButtonContainer,
               {
                 bottom: tabBarInset + 6,
-                width: buttonWidth.interpolate({
+                width: expandAnimation.interpolate({
                   inputRange: [0, 1],
                   outputRange: [48, isTodayRestDay ? 140 : 230],
                 }),
@@ -476,29 +484,35 @@ const HomeScreen: React.FC = () => {
                 width: 250,
                 height: 250,
                 top: -101,
-                left: buttonWidth.interpolate({
+                left: expandAnimation.interpolate({
                   inputRange: [0, 1],
                   outputRange: [-101, -10],
                 }),
-                transform: [
-                  {
-                    rotate: rotateAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg'],
-                    }),
-                  },
-                ],
               }}
             >
-              <LinearGradient
-                colors={isTodayRestDay
-                  ? [COLORS.success, 'transparent', COLORS.success, 'transparent']
-                  : [COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ flex: 1 }}
-              />
+              <Animated.View
+                style={{
+                  flex: 1,
+                  transform: [
+                    {
+                      rotate: rotateAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <LinearGradient
+                  colors={isTodayRestDay
+                    ? [COLORS.success, 'transparent', COLORS.success, 'transparent']
+                    : [COLORS.primary, '#2962FF33', COLORS.primary, 'transparent']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ flex: 1 }}
+                />
+              </Animated.View>
             </Animated.View>
 
             {/* Button Content (Static Center) */}
@@ -527,9 +541,9 @@ const HomeScreen: React.FC = () => {
                   )}
                   <Animated.View
                     style={{
-                      opacity: buttonWidth,
+                      opacity: expandAnimation,
                       overflow: "hidden",
-                      width: buttonWidth.interpolate({
+                      width: expandAnimation.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0, isTodayRestDay ? 80 : 185],
                       }),
@@ -557,8 +571,8 @@ const HomeScreen: React.FC = () => {
             style={[
               styles.floatingButtonContainerRight,
               {
-                bottom: isTodayRestDay ? tabBarInset + 6 : tabBarInset + 6 + 48 + 12, // Move down on rest days
-                width: buttonWidth.interpolate({
+                bottom: (isTodayRestDay || !nextWorkout) ? tabBarInset + 6 : tabBarInset + 6 + 48 + 12, // Move down on rest days or if no routine
+                width: expandAnimation.interpolate({
                   inputRange: [0, 1],
                   outputRange: [48, 120],
                 }),
@@ -572,26 +586,32 @@ const HomeScreen: React.FC = () => {
                 width: 200,
                 height: 200,
                 top: -76,
-                left: buttonWidth.interpolate({
+                left: expandAnimation.interpolate({
                   inputRange: [0, 1],
                   outputRange: [-76, -10],
                 }),
-                transform: [
-                  {
-                    rotate: rotateAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg'],
-                    }),
-                  },
-                ],
               }}
             >
-              <LinearGradient
-                colors={['rgba(255,255,255,0.3)', 'transparent', 'rgba(255,255,255,0.3)', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ flex: 1 }}
-              />
+              <Animated.View
+                style={{
+                  flex: 1,
+                  transform: [
+                    {
+                      rotate: rotateAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.3)', 'transparent', 'rgba(255,255,255,0.3)', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ flex: 1 }}
+                />
+              </Animated.View>
             </Animated.View>
 
             {/* Button Content */}
@@ -617,9 +637,9 @@ const HomeScreen: React.FC = () => {
                   <Plus size={18} color={COLORS.textPrimary} strokeWidth={2.5} />
                   <Animated.View
                     style={{
-                      opacity: buttonWidth,
+                      opacity: expandAnimation,
                       overflow: "hidden",
-                      width: buttonWidth.interpolate({
+                      width: expandAnimation.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0, 55],
                       }),
@@ -674,6 +694,9 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 48,
+  },
+  heroSection: {
+    marginBottom: 12,
   },
   sectionTitle: {
     ...TYPOGRAPHY.h3,

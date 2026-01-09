@@ -4,15 +4,18 @@ import {
     doc,
     getDoc,
     getDocs,
+    onSnapshot,
     query,
     serverTimestamp,
     setDoc,
+    Unsubscribe,
     updateDoc,
     where,
     writeBatch,
 } from "firebase/firestore";
 import { templateToRoutineDays } from "../data/starterRoutineTemplates";
 import { Routine, RoutineDraft } from "../types/routine";
+import { RoutineTemplate } from "../types/routineTemplate"; // Added import
 import { getRecommendedTemplate, UserGoal, UserLevel } from "../utils/routineRecommendation";
 import { db } from "./firebaseConfig";
 
@@ -95,6 +98,42 @@ export const RoutineService = {
             daysPerWeek: sanitizedDraft.days.filter((d) => d.exercises.length > 0).length,
             updatedAt: serverTimestamp(),
         });
+    },
+
+    /**
+     * Subscribe to user routines for real-time updates
+     * Returns an unsubscribe function
+     */
+    subscribeToUserRoutines(userId: string, callback: (routines: Routine[]) => void): Unsubscribe {
+        try {
+            const q = query(
+                collection(db, "routines"),
+                where("userId", "==", userId)
+            );
+
+            return onSnapshot(q, (snapshot) => {
+                const routines = snapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })) as Routine[];
+
+                // Sort by createdAt on client side
+                const sortedRoutines = routines.sort((a, b) => {
+                    const aTime = a.createdAt?.toMillis() || 0;
+                    const bTime = b.createdAt?.toMillis() || 0;
+                    return bTime - aTime;
+                });
+
+                callback(sortedRoutines);
+            }, (error) => {
+                console.error("Error subscribing to routines:", error);
+                // Don't call callback with empty list on error to avoid flashing empty state
+                // asking UI to handle error if needed, or just log it.
+            });
+        } catch (error) {
+            console.error("Error setting up routine subscription:", error);
+            return () => { }; // Return no-op unsubscribe
+        }
     },
 
     /**
@@ -262,6 +301,37 @@ export const RoutineService = {
         } catch (error) {
             console.error("Error fetching community routines:", error);
             return [];
+        }
+    },
+
+    /**
+     * Get all routine templates
+     */
+    async getRoutineTemplates(): Promise<RoutineTemplate[]> {
+        try {
+            const templatesRef = collection(db, "routines_templates");
+            const snapshot = await getDocs(templatesRef);
+            return snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as RoutineTemplate[];
+        } catch (error) {
+            console.error("Error fetching routine templates:", error);
+            return [];
+        }
+    },
+
+    async getRoutineTemplateById(id: string): Promise<RoutineTemplate | null> {
+        try {
+            const docRef = doc(db, "routines_templates", id);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return { id: docSnap.id, ...docSnap.data() } as RoutineTemplate;
+            }
+            return null;
+        } catch (error) {
+            console.error("Error fetching routine template by id:", error);
+            return null;
         }
     },
 

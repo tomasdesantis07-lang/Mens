@@ -4,17 +4,19 @@ import {
     doc,
     getDocs,
     limit,
+    onSnapshot,
     orderBy,
     query,
     serverTimestamp,
     setDoc,
+    Unsubscribe,
     updateDoc,
     where,
-    writeBatch
+    writeBatch,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
-import { createEmptyDay, RoutineDay, RoutineExercise } from "../types/routine";
-import { RoutineTemplate, TemplateEquipment, TemplateGoal, TemplateLevel } from "../types/routineTemplate";
+import { RoutineDay, RoutineExercise } from "../types/routine";
+import { RoutineTemplate, TemplateEquipment } from "../types/routineTemplate";
 import { UserProfile } from "../types/user";
 import { WorkoutSession } from "../types/workout";
 import { db } from "./firebaseConfig";
@@ -66,6 +68,38 @@ export const WorkoutService = {
         }
     },
 
+
+    /**
+     * Subscribe to recent workout sessions for real-time updates
+     */
+    subscribeToRecentSessions(
+        userId: string,
+        limitCount: number = 10,
+        callback: (sessions: WorkoutSession[]) => void
+    ): Unsubscribe {
+        try {
+            const q = query(
+                collection(db, "workoutSessions"),
+                where("userId", "==", userId),
+                orderBy("performedAt", "desc"),
+                limit(limitCount)
+            );
+
+            return onSnapshot(q, (snapshot) => {
+                const sessions = snapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })) as WorkoutSession[];
+                callback(sessions);
+            }, (error) => {
+                console.error("Error subscribing to recent sessions:", error);
+                // Don't modify state on error to avoid flickering
+            });
+        } catch (error) {
+            console.error("Error setting up session subscription:", error);
+            return () => { };
+        }
+    },
 
     /**
      * Get recent workout sessions for a user with a limit
@@ -445,42 +479,27 @@ export const WorkoutService = {
      */
     async assignRoutineFromTemplates(
         userId: string,
-        userProfile: UserProfile
+        userProfile: UserProfile,
+        options: { translateKey?: (key: string) => string } = {}
     ): Promise<string | null> {
         try {
             // Helpers to map UserProfile to Template criteria
-            const mapLevel = (l: string | null | undefined): TemplateLevel => {
-                if (['advanced', 'expert', 'intermediate'].includes(l || '')) return 'Experimentado';
-                return 'Novato';
-            };
 
-            const mapGoal = (g: string[]): TemplateGoal => {
-                if (g.includes('strength')) return 'Fuerza';
-                if (g.includes('endurance')) return 'Resistencia';
-                return 'Recomposición'; // Default
-            };
 
             const mapEquipment = (e: string | null | undefined): TemplateEquipment => {
                 if (e === 'full_gym') return 'Gym Completo';
                 return 'En casa-Sin equipo';
             };
 
-            const targetLevel = mapLevel(userProfile.experienceLevel || userProfile.level);
-            const targetGoal = mapGoal(userProfile.goals.map(g => g as string) || []); // Cast if needed
             const targetEquipment = mapEquipment(userProfile.equipment);
             const targetDays = userProfile.daysPerWeek || 3;
 
-            console.log(`Matching routine for: Level=${targetLevel}, Goal=${targetGoal}, Eq=${targetEquipment}, Days=${targetDays}`);
+            console.log(`Matching routine for: Eq=${targetEquipment}, Days=${targetDays}`);
 
             // Query Firestore
-            // Note: This requires a composite index if we query by all fields.
-            // For now, let's query by Level and Goal, then filter client side for Equipment/Days to reduce index needs, 
-            // OR assume the index exists.
             const templatesRef = collection(db, "routines_templates");
             const q = query(
                 templatesRef,
-                where("level", "==", targetLevel),
-                where("goal", "==", targetGoal),
                 where("equipment", "==", targetEquipment),
                 where("daysPerWeek", "==", targetDays)
             );
@@ -496,7 +515,7 @@ export const WorkoutService = {
             const template = snapshot.docs[0].data() as RoutineTemplate;
             console.log("Found template:", template.name);
 
-            const newRoutineId = await this.saveTemplateAsRoutine(userId, template, targetLevel, targetGoal);
+            const newRoutineId = await this.saveTemplateAsRoutine(userId, template, { translateKey: options.translateKey });
             return newRoutineId;
         } catch (error) {
             console.error("Error assigning routine:", error);
@@ -507,55 +526,59 @@ export const WorkoutService = {
     async saveTemplateAsRoutine(
         userId: string,
         template: RoutineTemplate,
-        userLevel: TemplateLevel,
-        userGoal: TemplateGoal
+        options: { onlyStructure?: boolean; translateKey?: (key: string) => string } = {}
     ): Promise<string> {
         const routineRef = doc(collection(db, "routines"));
         const days: RoutineDay[] = [];
 
-        // Create days
-        for (let i = 0; i < template.daysPerWeek; i++) {
-            days.push(createEmptyDay(i));
-        }
+        // Helper to translate or passthrough
+        const t = options.translateKey || ((key: string) => key);
 
-        // Distribute exercises - Simplification logic for now: All in Day 0
-        const mappedExercises = template.exercises.map((templateEx, index) => {
-            const range = calculateRepRange(userLevel, userGoal, templateEx.type);
-
-            const routineEx: RoutineExercise = {
-                id: uuidv4(),
-                exerciseId: templateEx.id,
-                name: templateEx.name,
-                targetZone: templateEx.targetZone,
-                sets: [],
-                reps: range.label, // "8-12"
-                restSeconds: templateEx.restSeconds,
-                order: index
+        // Create days from template structure
+        template.days.forEach((tplDay, index) => {
+            const routineDay: RoutineDay = {
+                dayIndex: index,
+                label: t(tplDay.name), // Translate day name
+                exercises: []
             };
 
-            // Create Sets
-            const setList = [];
-            for (let s = 0; s < templateEx.sets; s++) {
-                setList.push({
-                    setIndex: s,
-                    targetReps: range.max, // Target the top of range? Or undefined?
-                    // targetWeight can be populated from "History" (Point 3 of prompt)
+            // If not just structure, populate exercises
+            if (!options.onlyStructure) {
+                routineDay.exercises = tplDay.exercises.map((templateEx, exIndex) => {
+                    const range = calculateRepRange(templateEx.type);
+
+                    const routineEx: RoutineExercise = {
+                        id: uuidv4(),
+                        exerciseId: templateEx.id,
+                        name: templateEx.name, // Keep as translation key for dynamic translation
+                        targetZone: templateEx.targetZone,
+                        sets: [],
+                        reps: range.label, // "8-12"
+                        restSeconds: templateEx.restSeconds,
+                        order: exIndex
+                    };
+
+                    // Create Sets
+                    const setList = [];
+                    for (let s = 0; s < templateEx.sets; s++) {
+                        setList.push({
+                            setIndex: s,
+                            targetReps: range.max, // Target the top of range
+                        });
+                    }
+                    routineEx.sets = setList;
+
+                    return routineEx;
                 });
             }
-            routineEx.sets = setList;
 
-            return routineEx;
+            days.push(routineDay);
         });
-
-        // Add to Day 0
-        if (days.length > 0) {
-            days[0].exercises = mappedExercises;
-        }
 
         // Save
         const routine = {
             userId,
-            name: template.name,
+            name: t(template.name), // Translate routine name
             source: "ai" as const,
             isActive: true, // Make active immediately
             isCurrentPlan: true,
@@ -568,8 +591,21 @@ export const WorkoutService = {
 
         // Deactivate others
         const batch = writeBatch(db);
-        // ... (deactivation logic omitted for brevity in single function, ideally rely on routineService helper)
-        // I'll just save it directly here.
+        const existingRoutinesRef = collection(db, "routines");
+        const q = query(existingRoutinesRef, where("userId", "==", userId));
+        const snapshot = await getDocs(q);
+
+        snapshot.forEach((doc) => {
+            batch.update(doc.ref, { isActive: false, isCurrentPlan: false });
+        });
+
+        // Add the new routine to the batch? No, setDoc is safer separately or add to batch.
+        // Let's just commit the deactivation batch first or do it all in one.
+        // For simplicity and matching previous style:
+        if (!snapshot.empty) {
+            await batch.commit();
+        }
+
         await setDoc(routineRef, routine);
 
         return routineRef.id;

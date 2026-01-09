@@ -108,12 +108,17 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={{ flex: 1, backgroundColor: '#000000' }}>
                 {appIsReady && (
-                    <AuthProvider key={`auth-${sessionKey}`}>
-                        <SettingsProvider key={`settings-${sessionKey}`}>
-                            <WorkoutProvider key={`workout-${sessionKey}`}>
+                    <AuthProvider>
+                        <SettingsProvider>
+                            <WorkoutProvider>
                                 <OnboardingProvider>
                                     <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-                                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background }, animation: 'fade' }}>
+                                    <Stack screenOptions={{
+                                        headerShown: false,
+                                        contentStyle: { backgroundColor: COLORS.background },
+                                        animation: 'fade_from_bottom', // Smother than just fade
+                                        animationDuration: 200
+                                    }}>
                                         <Stack.Screen name="index" />
                                         <Stack.Screen name="language" />
                                         <Stack.Screen name="terms" />

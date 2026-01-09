@@ -17,6 +17,7 @@ import { WorkoutService } from '../../services/workoutService';
 import { COLORS, TYPOGRAPHY } from '../../theme/theme';
 import { Routine } from '../../types/routine';
 import { WorkoutSession } from '../../types/workout';
+import { translateIfKey } from '../../utils/translationHelpers';
 
 interface RoutinePreviewSheetProps {
     visible: boolean;
@@ -130,7 +131,7 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerContent}>
-                            <Text style={styles.title}>{routine.name}</Text>
+                            <Text style={styles.title}>{translateIfKey(routine.name)}</Text>
                             <Text style={styles.subtitle}>
                                 {routine.daysPerWeek} {t('routine_card.days_per_week') || 'días/semana'}
                                 {lastSession && (
@@ -210,7 +211,7 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                                                 {day.isRestDay ? (
                                                     <Text style={styles.restDayLabel}>{t('home.rest_day_title')}</Text>
                                                 ) : day.label ? (
-                                                    <Text style={styles.dayLabel}>{day.label}</Text>
+                                                    <Text style={styles.dayLabel}>{translateIfKey(day.label)}</Text>
                                                 ) : null}
                                                 <Text style={styles.exerciseCount}>
                                                     {day.isRestDay
@@ -240,12 +241,12 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                                             <View style={styles.exercisePreview}>
                                                 {day.exercises.slice(0, 3).map((ex, i) => (
                                                     <Text key={i} style={styles.exercisePreviewText} numberOfLines={1}>
-                                                        • {ex.name || 'Sin nombre'}
+                                                        • {translateIfKey(ex.name, t) || t('routine_card.no_name')}
                                                     </Text>
                                                 ))}
                                                 {day.exercises.length > 3 && (
                                                     <Text style={styles.moreExercises}>
-                                                        +{day.exercises.length - 3} más
+                                                        {t('routine_card.more_exercises', { count: day.exercises.length - 3 })}
                                                     </Text>
                                                 )}
                                             </View>

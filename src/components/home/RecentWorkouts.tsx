@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Dumbbell } from 'lucide-react-native';
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     LayoutAnimation,
@@ -9,10 +9,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { auth } from '../../services/firebaseConfig';
-import { WorkoutService } from '../../services/workoutService';
+import { useRecentWorkouts } from '../../hooks/useRecentWorkouts';
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from '../../theme/theme';
-import { WorkoutSession } from '../../types/workout';
+import { WorkoutSession } from '../../types/workout'; // ensure this is imported if used in props or types
+import { translateIfKey } from '../../utils/translationHelpers';
 import { AnimatedCard } from '../common/Animations';
 
 interface RecentWorkoutsProps {
@@ -23,28 +23,8 @@ const VISIBLE_COUNT = 2;
 
 const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => {
     const { t } = useTranslation();
-    const [workouts, setWorkouts] = useState<WorkoutSession[]>([]);
+    const { recentSessions: workouts, loading } = useRecentWorkouts(5);
     const [expanded, setExpanded] = useState(false);
-    const [loading, setLoading] = useState(true);
-
-    const loadWorkouts = useCallback(async () => {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        try {
-            // Use optimized query with limit instead of fetching all sessions
-            const sessions = await WorkoutService.getRecentSessions(user.uid, 5);
-            setWorkouts(sessions);
-        } catch (error) {
-            console.error('Error loading recent workouts:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        loadWorkouts();
-    }, [loadWorkouts]);
 
     const formatRelativeDate = (timestamp: any): string => {
         const date = timestamp.toDate();
@@ -135,7 +115,7 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
                                 {/* Header: Name + Date */}
                                 <View style={styles.cardHeader}>
                                     <Text style={styles.workoutName} numberOfLines={1}>
-                                        {workout.routineName}
+                                        {translateIfKey(workout.routineName)}
                                     </Text>
                                     <Text style={styles.dateText}>
                                         {formatRelativeDate(workout.performedAt)}
@@ -172,7 +152,7 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
                         <View style={[styles.workoutCard, styles.peekCard]}>
                             <View style={styles.cardHeader}>
                                 <Text style={styles.workoutName} numberOfLines={1}>
-                                    {workouts[VISIBLE_COUNT]?.routineName}
+                                    {translateIfKey(workouts[VISIBLE_COUNT]?.routineName)}
                                 </Text>
                             </View>
                         </View>

@@ -1,8 +1,10 @@
 import { useRouter } from "expo-router";
 import { doc, updateDoc } from "firebase/firestore";
+import { X as CloseIcon, Lightbulb } from "lucide-react-native";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+    LayoutAnimation,
     ScrollView,
     StyleSheet,
     Text,
@@ -30,6 +32,18 @@ const ManualEditorScreen: React.FC = () => {
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
     const [isEditorVisible, setIsEditorVisible] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showTip, setShowTip] = useState(true);
+    const [showInfo, setShowInfo] = useState(true);
+
+    const dismissTip = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowTip(false);
+    };
+
+    const dismissInfo = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowInfo(false);
+    };
 
     const handleRoutineNameChange = (name: string) => {
         setDraft((prev) => ({ ...prev, name }));
@@ -68,14 +82,12 @@ const ManualEditorScreen: React.FC = () => {
         try {
             await RoutineService.createRoutine(user.uid, draft);
 
-            // Calculate training days (days with exercises = non-rest days)
+            // Calculate training days
             const trainingDays = draft.days.filter(day => day.exercises.length > 0).length;
 
-            // Update user profile with daysPerWeek based on routine
             if (trainingDays > 0) {
                 const userRef = doc(db, 'users', user.uid);
                 await updateDoc(userRef, { daysPerWeek: trainingDays });
-                console.log(`[Manual Editor] Updated user daysPerWeek to ${trainingDays}`);
             }
 
             showToast.success(t('routines.success_create'), t('common.success'));
@@ -93,7 +105,6 @@ const ManualEditorScreen: React.FC = () => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Text style={styles.backButton}>← {t('common.back')}</Text>
@@ -106,14 +117,30 @@ const ManualEditorScreen: React.FC = () => {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Tip about rest days */}
-                <View style={styles.tipCard}>
-                    <Text style={styles.tipText}>
-                        💡 {t('routines.rest_days_tip')}
-                    </Text>
-                </View>
+                {(!hasExercises && showInfo) && (
+                    <View style={styles.infoCard}>
+                        <Lightbulb size={18} color={COLORS.primary} style={{ marginRight: 10 }} />
+                        <Text style={styles.infoText}>
+                            Agregá ejercicios a <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>al menos un día</Text> para crear la rutina
+                        </Text>
+                        <TouchableOpacity onPress={dismissInfo} style={styles.closeCardButton}>
+                            <CloseIcon size={16} color={COLORS.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
 
-                {/* Routine Name Input */}
+                {showTip && (
+                    <View style={styles.tipCard}>
+                        <Lightbulb size={18} color={COLORS.primary} style={{ marginRight: 10 }} />
+                        <Text style={styles.tipText}>
+                            Los <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>días vacíos</Text> se consideran automáticamente días de <Text style={{ color: COLORS.success, fontWeight: '700' }}>descanso</Text>.
+                        </Text>
+                        <TouchableOpacity onPress={dismissTip} style={styles.closeCardButton}>
+                            <CloseIcon size={16} color={COLORS.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.name_label')}</Text>
                     <CustomInput
@@ -124,9 +151,9 @@ const ManualEditorScreen: React.FC = () => {
                     />
                 </View>
 
-                {/* Days Grid - Draggable */}
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.days_label')}</Text>
+
                     <Text style={styles.sectionHint}>
                         {t('routines.days_hint_drag', 'Mantén presionado para mover un día')}
                     </Text>
@@ -145,18 +172,8 @@ const ManualEditorScreen: React.FC = () => {
                         onDayPress={handleDayPress}
                     />
                 </View>
-
-                {/* Info Card */}
-                {!hasExercises && (
-                    <View style={styles.infoCard}>
-                        <Text style={styles.infoText}>
-                            {t('routines.info_add_exercises')}
-                        </Text>
-                    </View>
-                )}
             </ScrollView>
 
-            {/* Bottom Action */}
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 + (activeWorkout ? 60 : 0) }]}>
                 <PrimaryButton
                     title={t('routines.create_action')}
@@ -167,7 +184,6 @@ const ManualEditorScreen: React.FC = () => {
                 />
             </View>
 
-            {/* Day Editor Modal */}
             {editingDayIndex !== null && (
                 <DayEditorSheet
                     day={draft.days[editingDayIndex]}
@@ -226,24 +242,23 @@ const styles = StyleSheet.create({
     nameInput: {
         marginBottom: 0,
     },
-    daysGrid: {
-        gap: 12,
-    },
-    dayCardWrapper: {
-        marginBottom: 0,
-    },
     infoCard: {
         backgroundColor: COLORS.surface,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.border,
         padding: 16,
+        paddingRight: 40,
         marginBottom: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        position: 'relative',
     },
     infoText: {
         fontSize: 14,
         color: COLORS.textSecondary,
         lineHeight: 20,
+        flex: 1,
     },
     bottomBar: {
         paddingHorizontal: 24,
@@ -261,11 +276,22 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
         padding: 16,
+        paddingRight: 40,
         marginBottom: 24,
+        flexDirection: "row",
+        alignItems: "center",
+        position: 'relative',
     },
     tipText: {
         fontSize: 14,
         color: COLORS.textSecondary,
         lineHeight: 20,
+        flex: 1,
+    },
+    closeCardButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        padding: 4,
     },
 });

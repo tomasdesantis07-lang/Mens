@@ -50,7 +50,10 @@ export const AuthService = {
             throw new Error("No authenticated user found");
         }
 
-        // Step 0: Re-authenticate first if password is provided (recommended for sensitive ops)
+        const userId = user.uid;
+        console.log(`[AuthService] Starting account deletion for user: ${userId}`);
+
+        // Step 0: Re-authenticate first if password is provided
         if (password && user.email) {
             try {
                 const credential = EmailAuthProvider.credential(user.email, password);
@@ -65,49 +68,66 @@ export const AuthService = {
             }
         }
 
-        const userId = user.uid;
-
         try {
-            // Step 1: Delete all user routines
-            const routinesQuery = query(collection(db, "routines"), where("userId", "==", userId));
-            const routinesSnapshot = await getDocs(routinesQuery);
-            if (routinesSnapshot.docs.length > 0) {
-                const batch = writeBatch(db);
-                routinesSnapshot.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-                await batch.commit();
-                console.log(`[AuthService] Deleted ${routinesSnapshot.docs.length} routines`);
+            // Step 1: Clean up routines
+            await this.deleteUserCollectionData("routines", userId);
+
+            // Step 2: Clean up modern workout sessions
+            await this.deleteUserCollectionData("workoutSessions", userId);
+
+            // Step 3: Clean up legacy workouts (just in case)
+            await this.deleteUserCollectionData("workouts", userId);
+
+            // Step 4: Clean up user analytics
+            try {
+                await deleteDoc(doc(db, "user_analytics", userId));
+                console.log("[AuthService] Deleted user analytics");
+            } catch (e) {
+                console.warn("[AuthService] Could not delete analytics (maybe doesn't exist):", e);
             }
 
-            // Step 2: Delete all user workouts
-            const workoutsQuery = query(collection(db, "workouts"), where("userId", "==", userId));
-            const workoutsSnapshot = await getDocs(workoutsQuery);
-            if (workoutsSnapshot.docs.length > 0) {
-                const batch = writeBatch(db);
-                workoutsSnapshot.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-                await batch.commit();
-                console.log(`[AuthService] Deleted ${workoutsSnapshot.docs.length} workouts`);
-            }
+            // Step 5: Clean up custom exercises (subcollection of users)
+            await this.deleteUserCollectionData(`users/${userId}/custom_exercises`, userId);
 
-            // Step 3: Delete user document
+            // Step 6: Delete user document
             await deleteDoc(doc(db, "users", userId));
-            console.log("[AuthService] Deleted user document");
+            console.log("[AuthService] Deleted user profile document");
 
-            // Step 4: Finally delete the Firebase Auth account
+            // Step 7: Finally delete the Firebase Auth account
             await deleteUser(user);
             console.log("[AuthService] Deleted Firebase Auth account");
 
-            // Step 5: Clean local data (AsyncStorage, etc)
+            // Step 8: Clean local data
             await this.cleanLocalData();
 
         } catch (error: any) {
-            console.error("[AuthService] Error deleting account:", error);
+            console.error("[AuthService] Failed at some step of account deletion:", error);
 
-            // Handle requires-recent-login (should be rare now since we re-auth first)
             if (error.code === "auth/requires-recent-login") {
                 throw new Error("Por seguridad, necesitamos validar tu contraseña nuevamente.");
             }
-
             throw error;
+        }
+    },
+
+    /**
+     * Helper to delete all documents in a collection belonging to a user
+     */
+    async deleteUserCollectionData(collectionPath: string, userId: string): Promise<void> {
+        try {
+            const q = query(collection(db, collectionPath), where("userId", "==", userId));
+            const snapshot = await getDocs(q);
+
+            if (!snapshot.empty) {
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+                await batch.commit();
+                console.log(`[AuthService] Deleted ${snapshot.docs.length} documents from ${collectionPath}`);
+            }
+        } catch (error) {
+            console.warn(`[AuthService] Non-critical error deleting ${collectionPath}:`, error);
+            // We don't throw here to allow other deletions to proceed, 
+            // but the "Missing or insufficient permissions" might still bubble up if it's the main error.
         }
     },
 

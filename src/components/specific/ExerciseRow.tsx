@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, Clock, Plus, Trash2, X } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     StyleSheet,
@@ -10,17 +10,20 @@ import {
 } from "react-native";
 import { COLORS } from "../../theme/theme";
 import { createEmptySet, PredefinedSet, RoutineExercise } from "../../types/routine";
+import { translateIfKey } from "../../utils/translationHelpers";
 import { RestTimePicker } from "./RestTimePicker";
 
 interface ExerciseRowProps {
+    index: number;
     exercise: RoutineExercise;
-    onUpdate: (exercise: RoutineExercise) => void;
-    onDelete: () => void;
+    onUpdate: (index: number, exercise: RoutineExercise) => void;
+    onDelete: (index: number) => void;
     isExpanded: boolean;
-    onToggleExpand: () => void;
+    onToggleExpand: (id: string) => void;
 }
 
-export const ExerciseRow: React.FC<ExerciseRowProps> = ({
+const ExerciseRowComponent: React.FC<ExerciseRowProps> = ({
+    index,
     exercise,
     onUpdate,
     onDelete,
@@ -32,19 +35,19 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
     const [showRestPicker, setShowRestPicker] = useState(false);
 
     const handleFieldChange = (field: keyof RoutineExercise, value: any) => {
-        onUpdate({ ...exercise, [field]: value });
+        onUpdate(index, { ...exercise, [field]: value });
     };
 
     const handleSetChange = (setIndex: number, field: keyof PredefinedSet, value: any) => {
         const updatedSets = exercise.sets.map((set) =>
             set.setIndex === setIndex ? { ...set, [field]: value } : set
         );
-        onUpdate({ ...exercise, sets: updatedSets });
+        onUpdate(index, { ...exercise, sets: updatedSets });
     };
 
     const handleAddSet = () => {
         const newSet = createEmptySet(exercise.sets.length);
-        onUpdate({ ...exercise, sets: [...exercise.sets, newSet] });
+        onUpdate(index, { ...exercise, sets: [...exercise.sets, newSet] });
     };
 
     const handleRemoveSet = (setIndex: number) => {
@@ -52,7 +55,7 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
         const updatedSets = exercise.sets
             .filter((set) => set.setIndex !== setIndex)
             .map((set, index) => ({ ...set, setIndex: index })); // Reindex
-        onUpdate({ ...exercise, sets: updatedSets });
+        onUpdate(index, { ...exercise, sets: updatedSets });
     };
 
     const formatRestTime = (seconds: number) => {
@@ -66,7 +69,7 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
             {/* Collapsible Header */}
             <TouchableOpacity
                 style={styles.header}
-                onPress={onToggleExpand}
+                onPress={() => onToggleExpand(exercise.id)}
                 activeOpacity={0.7}
             >
                 <View style={styles.headerLeft}>
@@ -79,17 +82,19 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
                     </View>
                     <View style={styles.headerInfo}>
                         <Text style={styles.exerciseNameHeader} numberOfLines={1}>
-                            {exercise.name || t('exercise_row.name_placeholder')}
+                            {translateIfKey(exercise.name, t) || t('exercise_row.name_placeholder')}
                         </Text>
-                        <Text style={styles.exerciseMeta}>
-                            {exercise.sets.length} × {exercise.reps} • {formatRestTime(exercise.restSeconds)}
-                        </Text>
+                        {!isExpanded && (
+                            <Text style={styles.exerciseMeta}>
+                                {exercise.sets.length} {t('train.set')}
+                            </Text>
+                        )}
                     </View>
                 </View>
                 <TouchableOpacity
                     onPress={(e) => {
                         e.stopPropagation();
-                        onDelete();
+                        onDelete(index);
                     }}
                     style={styles.deleteButtonHeader}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -101,21 +106,19 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
             {/* Expandable Content */}
             {isExpanded && (
                 <View style={styles.content}>
-                    {/* Exercise Name Input */}
-                    <TextInput
-                        style={[
-                            styles.nameInput,
-                            exercise.exerciseId && styles.nameInputReadOnly
-                        ]}
-                        placeholder={t('exercise_row.name_placeholder')}
-                        placeholderTextColor={COLORS.textTertiary}
-                        value={exercise.name}
-                        onChangeText={(text) => handleFieldChange("name", text)}
-                        editable={!exercise.exerciseId}
-                    />
+                    {/* Exercise Name Input - Solo si es ejercicio personalizado */}
+                    {!exercise.exerciseId && (
+                        <TextInput
+                            style={styles.nameInput}
+                            placeholder={t('exercise_row.name_placeholder')}
+                            placeholderTextColor={COLORS.textTertiary}
+                            value={exercise.name}
+                            onChangeText={(text) => handleFieldChange("name", text)}
+                        />
+                    )}
 
                     {/* Rest Time */}
-                    <TouchableOpacity style={styles.restRow} onPress={() => setShowRestPicker(true)}>
+                    <TouchableOpacity style={[styles.restRow, exercise.exerciseId && { marginTop: 12 }]} onPress={() => setShowRestPicker(true)}>
                         <View style={styles.restInfo}>
                             <Clock size={16} color={COLORS.textSecondary} />
                             <Text style={styles.restLabel}>{t('exercise_row.rest_time', { time: formatRestTime(exercise.restSeconds) })}</Text>
@@ -132,10 +135,10 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
                     </View>
 
                     {/* Sets Rows */}
-                    {exercise.sets.map((set, index) => (
+                    {exercise.sets.map((set, setIndex) => (
                         <View key={set.setIndex} style={styles.setRow}>
                             <View style={styles.setNumberContainer}>
-                                <Text style={styles.setNumber}>{index + 1}</Text>
+                                <Text style={styles.setNumber}>{setIndex + 1}</Text>
                             </View>
 
                             <TextInput
@@ -220,6 +223,10 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
     );
 };
 
+// Memoized to prevent unnecessary re-renders - Default shallow comparison is correct now
+// because handlers are stable refs from parent and exercise object is immutable updated.
+export const ExerciseRow = memo(ExerciseRowComponent);
+
 const styles = StyleSheet.create({
     container: {
         backgroundColor: COLORS.card,
@@ -275,11 +282,8 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
         padding: 12,
+        marginTop: 12,
         marginBottom: 12,
-    },
-    nameInputReadOnly: {
-        backgroundColor: COLORS.background,
-        opacity: 0.7,
     },
     restRow: {
         flexDirection: "row",

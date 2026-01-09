@@ -1,16 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Edit } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import { Plus, Trash2 } from "lucide-react-native"; // Removed Edit import
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Dimensions,
-    ScrollView,
+    InteractionManager,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import DraggableFlatList, {
+    RenderItemParams,
+    ScaleDecorator,
+} from "react-native-draggable-flatlist";
+import { Gesture, GestureDetector, Swipeable } from "react-native-gesture-handler";
 import Animated, {
     runOnJS,
     useAnimatedStyle,
@@ -30,11 +34,13 @@ import { RoutineService } from "../../../src/services/routineService";
 import { WorkoutService } from "../../../src/services/workoutService";
 import { COLORS } from "../../../src/theme/theme";
 import { CatalogExercise } from "../../../src/types/exercise";
-import { Routine } from "../../../src/types/routine";
+import { Routine, RoutineExercise } from "../../../src/types/routine";
 import { WorkoutExerciseLog, WorkoutSession } from "../../../src/types/workout";
 import { showToast } from "../../../src/utils/toast";
+import { translateIfKey } from "../../../src/utils/translationHelpers";
 
 import { useTranslation } from "react-i18next";
+import { v4 as uuidv4 } from "uuid";
 
 const TrainScreen: React.FC = () => {
     const { t } = useTranslation();
@@ -42,16 +48,6 @@ const TrainScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
     const { id, dayIndex } = useLocalSearchParams<{ id: string; dayIndex?: string }>();
 
-    const [loading, setLoading] = useState(true);
-    const [routine, setRoutine] = useState<Routine | null>(null);
-    const [selectedDayIndex, setSelectedDayIndex] = useState<number>(
-        dayIndex ? parseInt(dayIndex) : 0
-    );
-
-    // State for the current workout log
-    // We map exerciseId -> list of sets
-    // State for the current workout log
-    // We map exerciseId -> list of sets
     const {
         activeWorkout,
         startWorkout,
@@ -62,16 +58,24 @@ const TrainScreen: React.FC = () => {
         finishWorkout,
         cancelWorkout,
         startRestTimer,
-        replaceExercise
+        replaceExercise,
+        reorderExercises,
+        addExerciseToSession,
+        removeExerciseFromSession
     } = useWorkout();
+
+    // Optimistic initialization: Check if we already have the data in context
+    const hasActiveSession = activeWorkout && activeWorkout.routine.id === id;
+
+    const [loading, setLoading] = useState(!hasActiveSession);
+    const [routine, setRoutine] = useState<Routine | null>(hasActiveSession ? activeWorkout.routine : null);
+    const [selectedDayIndex, setSelectedDayIndex] = useState<number>(
+        activeWorkout?.dayIndex ?? (dayIndex ? parseInt(dayIndex) : 0)
+    );
 
     // Automatically start workout if not active
     useEffect(() => {
         if (!loading && routine) {
-            // Check if we need to start a session
-            // We start a new one if:
-            // 1. No active session exists
-            // 2. The active session is for a different routine/day
             const isSameSession = activeWorkout
                 && activeWorkout.routine.id === routine.id
                 && activeWorkout.dayIndex === selectedDayIndex;
@@ -79,26 +83,61 @@ const TrainScreen: React.FC = () => {
             if (!isSameSession) {
                 startWorkout(routine, selectedDayIndex);
             }
+            setLoading(false);
         }
     }, [loading, routine, selectedDayIndex]);
 
-    // Use local timer hook instead of global context value
     const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
 
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+    const flatListRef = useRef<any>(null);
+
+    // Auto-scroll when expanding an exercise
+    useEffect(() => {
+        if (expandedExerciseId && currentDay?.exercises) {
+            const index = currentDay.exercises.findIndex(e => e.id === expandedExerciseId);
+            if (index !== -1) {
+                // Small timeout to allow the card to begin expanding and layout to update
+                setTimeout(() => {
+                    flatListRef.current?.scrollToIndex({
+                        index,
+                        animated: true,
+                        viewPosition: 0.3, // Centers it slightly above the middle for better visibility of the first sets
+                    });
+                }, 100);
+            }
+        }
+    }, [expandedExerciseId]);
+
+    const openedRow = useRef<Swipeable | null>(null);
+
+    const closeOpenedRow = useCallback(() => {
+        if (openedRow.current) {
+            openedRow.current.close();
+        }
+    }, []);
+
+    const emptySet = useMemo(() => new Set<string>(), []);
+
+    const handleToggleExpand = useCallback((exerciseId: string) => {
+        setExpandedExerciseId(prev => prev === exerciseId ? null : exerciseId);
+    }, []);
 
     // Replacement state
     const [replacementModalVisible, setReplacementModalVisible] = useState(false);
     const [exerciseToReplace, setExerciseToReplace] = useState<string | null>(null);
     const [recommendations, setRecommendations] = useState<CatalogExercise[]>([]);
 
+    // Add Exercise state
+    const [addExerciseModalVisible, setAddExerciseModalVisible] = useState(false);
+
     // Drag to dismiss gesture
     const { height: SCREEN_HEIGHT } = Dimensions.get('window');
     const translateY = useSharedValue(0);
-    const DISMISS_THRESHOLD = SCREEN_HEIGHT * 0.4; // 40% of screen to dismiss
+    const DISMISS_THRESHOLD = SCREEN_HEIGHT * 0.4;
 
     const dismissScreen = () => {
         router.back();
@@ -106,19 +145,16 @@ const TrainScreen: React.FC = () => {
 
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
-            // Only allow dragging down (positive translateY)
             if (event.translationY > 0) {
                 translateY.value = event.translationY;
             }
         })
         .onEnd((event) => {
             if (event.translationY > DISMISS_THRESHOLD) {
-                // Dismiss - animate out and navigate back
                 translateY.value = withTiming(SCREEN_HEIGHT, { duration: 200 }, () => {
                     runOnJS(dismissScreen)();
                 });
             } else {
-                // Snap back to original position
                 translateY.value = withSpring(0, {
                     damping: 20,
                     stiffness: 300,
@@ -129,38 +165,56 @@ const TrainScreen: React.FC = () => {
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: translateY.value }],
     }));
-    useEffect(() => {
-        const loadRoutineAndHistory = async () => {
-            if (!id) return;
-            try {
-                const data = await RoutineService.getRoutineById(id);
-                setRoutine(data);
 
-                // If the routine exists and has days, ensure selectedDayIndex is valid
-                if (data && data.days.length > 0) {
-                    // If the passed dayIndex is invalid or not present, default to the first available day
-                    const dayExists = data.days.some(d => d.dayIndex === selectedDayIndex);
-                    if (!dayExists) {
-                        setSelectedDayIndex(data.days[0].dayIndex);
+    useEffect(() => {
+        if (!id) return;
+
+        // Use InteractionManager to defer data loading until after screen transition
+        const interaction = InteractionManager.runAfterInteractions(() => {
+            const loadData = async () => {
+                // 1. Load Routine (only if not already loaded from context)
+                if (!routine) {
+                    try {
+                        const data = await RoutineService.getRoutineById(id);
+                        setRoutine(data);
+
+                        if (data && data.days.length > 0) {
+                            const dayExists = data.days.some(d => d.dayIndex === selectedDayIndex);
+                            if (!dayExists) {
+                                setSelectedDayIndex(data.days[0].dayIndex);
+                            }
+                        }
+                        setLoading(false);
+                    } catch (error) {
+                        console.error("Error loading routine:", error);
+                        showToast.error(t('train.error_load'));
+                        setLoading(false);
                     }
                 }
+            };
 
+            const loadHistory = async () => {
+                // 2. Load History (Non-blocking)
                 if (auth.currentUser) {
-                    const last = await WorkoutService.getLastWorkoutSessionForRoutine(
-                        auth.currentUser.uid,
-                        id,
-                        selectedDayIndex
-                    );
-                    setLastSession(last);
+                    try {
+                        const last = await WorkoutService.getLastWorkoutSessionForRoutine(
+                            auth.currentUser.uid,
+                            id,
+                            selectedDayIndex
+                        );
+                        setLastSession(last);
+                    } catch (error) {
+                        console.error("Error loading history:", error);
+                        // Fail silently for history, not critical
+                    }
                 }
-            } catch (error) {
-                console.error("Error loading routine:", error);
-                showToast.error(t('train.error_load'));
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadRoutineAndHistory();
+            };
+
+            loadData();
+            loadHistory();
+        });
+
+        return () => interaction.cancel();
     }, [id, selectedDayIndex]);
 
     const handleToggleSet = useCallback((exerciseId: string, setIndex: number, restSeconds: number) => {
@@ -170,7 +224,6 @@ const TrainScreen: React.FC = () => {
 
     const getLastSessionSet = useCallback((exerciseId: string, setIndex: number): { weight: number; reps: number } | null => {
         if (!lastSession) return null;
-        // Try to find matching exercise by routineExerciseId
         const exLog = lastSession.exercises.find(e => e.routineExerciseId === exerciseId);
         if (!exLog) return null;
         const foundSet = exLog.sets.find(s => s.setIndex === setIndex);
@@ -179,27 +232,17 @@ const TrainScreen: React.FC = () => {
     }, [lastSession]);
 
     const handleFinishWorkout = async () => {
-        if (!routine || !auth.currentUser || !activeWorkout) {
-            console.log("Cannot finish workout - missing data:", {
-                hasRoutine: !!routine,
-                hasUser: !!auth.currentUser,
-                hasActiveWorkout: !!activeWorkout
-            });
-            return;
-        }
+        if (!routine || !auth.currentUser || !activeWorkout) return;
 
-        const currentDay = routine.days.find((d) => d.dayIndex === selectedDayIndex);
-        if (!currentDay) {
-            console.log("Cannot find current day for index:", selectedDayIndex);
-            return;
-        }
+        const currentDay = activeWorkout.routine.days.find((d) => d.dayIndex === selectedDayIndex);
+        if (!currentDay) return;
 
         setIsSaving(true);
         try {
-            // Build the workout session object from Context data
             const exercisesLog: WorkoutExerciseLog[] = currentDay.exercises.map((ex) => {
                 const sets = activeWorkout.logs[ex.id] || [];
                 return {
+                    exerciseId: ex.exerciseId,
                     routineExerciseId: ex.id,
                     name: ex.name,
                     targetSets: ex.sets.length,
@@ -207,11 +250,6 @@ const TrainScreen: React.FC = () => {
                     sets: sets,
                 };
             });
-
-            console.log("Attempting to save workout session...");
-            console.log("User ID:", auth.currentUser.uid);
-            console.log("Routine ID:", routine.id);
-            console.log("Exercises count:", exercisesLog.length);
 
             const sessionId = await WorkoutService.createWorkoutSession({
                 userId: auth.currentUser.uid,
@@ -222,9 +260,6 @@ const TrainScreen: React.FC = () => {
                 exercises: exercisesLog,
             });
 
-            console.log("Workout session saved successfully with ID:", sessionId);
-
-            // Calculate metrics for summary screen
             let totalVolume = 0;
             let completedExerciseCount = 0;
 
@@ -245,9 +280,8 @@ const TrainScreen: React.FC = () => {
                 });
             });
 
-            finishWorkout(); // Clear context
+            finishWorkout();
 
-            // Navigate to victory screen with metrics
             router.replace({
                 pathname: "/workout/summary",
                 params: {
@@ -259,8 +293,6 @@ const TrainScreen: React.FC = () => {
             } as any);
         } catch (error) {
             console.error("Error saving workout:", error);
-            console.error("Error type:", typeof error);
-            console.error("Error message:", error instanceof Error ? error.message : String(error));
             showToast.error(t('train.error_save'));
         } finally {
             setIsSaving(false);
@@ -285,14 +317,7 @@ const TrainScreen: React.FC = () => {
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    const navigateToEdit = () => {
-        if (routine) {
-            router.push(`/routines/edit/${routine.id}` as any);
-        }
-    };
-
     const handleInitiateReplace = (exerciseId: string) => {
-        // Find current exercise to get recommendations
         const currentDay = activeWorkout?.routine.days.find(d => d.dayIndex === activeWorkout.dayIndex);
         const exercise = currentDay?.exercises.find(e => e.id === exerciseId);
 
@@ -306,8 +331,9 @@ const TrainScreen: React.FC = () => {
         setReplacementModalVisible(true);
     };
 
-    const handleConfirmReplace = (newExercise: CatalogExercise, translatedName: string) => {
-        if (exerciseToReplace) {
+    const handleConfirmReplace = (exercises: Array<{ exercise: CatalogExercise, translatedName: string }>) => {
+        if (exerciseToReplace && exercises.length > 0) {
+            const { exercise: newExercise, translatedName } = exercises[0];
             replaceExercise(exerciseToReplace, {
                 id: newExercise.id,
                 name: translatedName,
@@ -319,6 +345,30 @@ const TrainScreen: React.FC = () => {
         setExerciseToReplace(null);
     };
 
+    const handleAddExercises = (selectedExercises: Array<{ exercise: CatalogExercise, translatedName: string }>) => {
+        let nextOrder = currentDay?.exercises.length ?? 0;
+
+        selectedExercises.forEach(({ exercise, translatedName }) => {
+            const newRoutineExercise: RoutineExercise = {
+                id: uuidv4(),
+                exerciseId: exercise.id,
+                name: translatedName,
+                sets: [
+                    { setIndex: 1, targetReps: 10, targetWeight: 0 },
+                    { setIndex: 2, targetReps: 10, targetWeight: 0 },
+                    { setIndex: 3, targetReps: 10, targetWeight: 0 }
+                ],
+                reps: "10",
+                restSeconds: 60,
+                targetZone: exercise.primaryMuscles[0],
+                notes: "",
+                order: nextOrder++
+            };
+            addExerciseToSession(newRoutineExercise);
+        });
+        setAddExerciseModalVisible(false);
+        showToast.success(t('train.exercises_added') || "Ejercicios añadidos");
+    };
 
     if (loading) {
         return (
@@ -339,95 +389,172 @@ const TrainScreen: React.FC = () => {
         );
     }
 
-    const currentDay = routine.days.find((d) => d.dayIndex === selectedDayIndex);
+    const isViewingActiveSession = activeWorkout
+        && routine
+        && activeWorkout.routine.id === routine.id
+        && activeWorkout.dayIndex === selectedDayIndex;
 
-    return (
-        <GestureDetector gesture={panGesture}>
-            <Animated.View style={[styles.container, { paddingTop: insets.top + 20 }, animatedStyle]}>
-                {/* Drag handle indicator */}
-                <View style={styles.dragHandle}>
-                    <View style={styles.dragIndicator} />
-                </View>
+    const displayRoutine = isViewingActiveSession ? activeWorkout.routine : routine;
+    const currentDay = displayRoutine.days.find((d) => d.dayIndex === selectedDayIndex);
 
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.headerTop}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
-                        </TouchableOpacity>
-                        <View style={styles.timerContainer}>
-                            <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>
-                        </View>
-                        <TouchableOpacity onPress={navigateToEdit} style={styles.editButton}>
-                            <Edit size={16} color={COLORS.primary} />
-                            <Text style={styles.editButtonText}>{t('train.edit')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.headerTitle}>
-                        <Text style={styles.routineName}>{routine.name}</Text>
-                        <Text style={styles.dayLabel}>
-                            {currentDay ? currentDay.label : t('train.day_label', { number: selectedDayIndex + 1 })}
-                        </Text>
-                    </View>
-                </View>
+    // Render item for DraggableFlatList
+    const renderItem = ({ item, drag, isActive }: RenderItemParams<RoutineExercise>) => {
+        const renderRightActions = () => {
+            return (
+                <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => {
+                        closeOpenedRow();
+                        removeExerciseFromSession(item.id);
+                    }}
+                >
+                    <Trash2 size={24} color={COLORS.error} />
+                </TouchableOpacity>
+            );
+        };
 
+        let currentRef: Swipeable | null = null;
 
-
-                <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-                    {currentDay?.exercises.map((exercise) => (
+        return (
+            <ScaleDecorator>
+                <Swipeable
+                    ref={ref => { currentRef = ref; }}
+                    renderRightActions={renderRightActions}
+                    onSwipeableWillOpen={() => {
+                        if (openedRow.current && openedRow.current !== currentRef) {
+                            openedRow.current.close();
+                        }
+                        openedRow.current = currentRef;
+                    }}
+                    onSwipeableClose={() => {
+                        if (openedRow.current === currentRef) {
+                            openedRow.current = null;
+                        }
+                    }}
+                >
+                    <TouchableOpacity
+                        onLongPress={drag}
+                        disabled={isActive}
+                        activeOpacity={1}
+                        style={{ opacity: isActive ? 0.8 : 1 }}
+                    >
                         <WorkoutExerciseCard
-                            key={exercise.id}
-                            exercise={exercise}
-                            logs={activeWorkout?.logs[exercise.id] || []}
-                            completedSets={activeWorkout?.completedSets || new Set()}
-                            isExpanded={expandedExerciseId === exercise.id}
-                            onToggleExpand={() => setExpandedExerciseId(
-                                expandedExerciseId === exercise.id ? null : exercise.id
-                            )}
+                            exercise={item}
+                            logs={activeWorkout?.logs[item.id] || []}
+                            completedSets={activeWorkout?.completedSets || emptySet}
+                            isExpanded={expandedExerciseId === item.id}
+                            onToggleExpand={() => handleToggleExpand(item.id)}
                             onLogSet={logSet}
                             onToggleSetComplete={handleToggleSet}
                             onAddSet={addSet}
                             getLastSessionSet={getLastSessionSet}
                             onReplace={handleInitiateReplace}
                         />
-                    ))}
-                </ScrollView>
-
-                <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                    <PrimaryButton
-                        title={t('train.finish_session')}
-                        onPress={handleFinishWorkout}
-                        loading={isSaving}
-                    />
-                    <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
-                        <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
                     </TouchableOpacity>
+                </Swipeable>
+            </ScaleDecorator>
+        );
+    };
+
+    return (
+        <Animated.View style={[styles.container, { paddingTop: insets.top + 20 }, animatedStyle]}>
+            {/* Drag handle zone */}
+            <GestureDetector gesture={panGesture}>
+                <View>
+                    <View style={styles.dragHandle}>
+                        <View style={styles.dragIndicator} />
+                    </View>
+
+                    <View style={styles.header}>
+                        <View style={styles.headerTop}>
+                            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                                <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
+                            </TouchableOpacity>
+                            <View style={styles.timerContainer}>
+                                <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>
+                            </View>
+                            {/* Empty view to balance layout since we removed Edit button */}
+                            <View style={{ width: 80 }} />
+                        </View>
+                        <View style={styles.headerTitle}>
+                            <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
+                            <Text style={styles.dayLabel}>
+                                {currentDay ? translateIfKey(currentDay.label) : t('train.day_label', { number: selectedDayIndex + 1 })}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
+            </GestureDetector>
 
-                {/* Cancel Workout Confirmation Dialog */}
-                <ConfirmDialog
-                    visible={showCancelDialog}
-                    title={t('train.cancel_dialog.title')}
-                    message={t('train.cancel_dialog.message')}
-                    confirmText={t('train.cancel_dialog.confirm')}
-                    cancelText={t('train.cancel_dialog.cancel')}
-                    onConfirm={confirmCancelWorkout}
-                    onCancel={() => setShowCancelDialog(false)}
-                    variant="danger"
-                />
+            <DraggableFlatList
+                ref={flatListRef}
+                data={currentDay?.exercises || []}
+                onDragEnd={({ from, to }) => reorderExercises(from, to)}
+                keyExtractor={(item) => item.id}
+                renderItem={renderItem}
+                containerStyle={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 24 }}
+                onScrollToIndexFailed={(info) => {
+                    // Fallback if scroll fails (common with dynamic heights)
+                    setTimeout(() => {
+                        flatListRef.current?.scrollToOffset({
+                            offset: info.averageItemLength * info.index,
+                            animated: true
+                        });
+                    }, 100);
+                }}
+                ListFooterComponent={
+                    <TouchableOpacity
+                        style={styles.addExerciseButton}
+                        onPress={() => setAddExerciseModalVisible(true)}
+                    >
+                        <Plus size={20} color={COLORS.primary} />
+                        <Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
+                    </TouchableOpacity>
+                }
+            />
 
-                <ExercisePickerModal
-                    visible={replacementModalVisible}
-                    onClose={() => setReplacementModalVisible(false)}
-                    onSelect={handleConfirmReplace}
-                    onCustomExercise={() => {
-                        // TODO: Handle custom exercise creation flow if needed or show toast
-                        showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente");
-                    }}
-                    recommendedExercises={recommendations}
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) + 8 }]}>
+                <PrimaryButton
+                    title={t('train.finish_session')}
+                    onPress={handleFinishWorkout}
+                    loading={isSaving}
                 />
-            </Animated.View>
-        </GestureDetector>
+                <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
+                    <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
+                </TouchableOpacity>
+            </View>
+
+            <ConfirmDialog
+                visible={showCancelDialog}
+                title={t('train.cancel_dialog.title')}
+                message={t('train.cancel_dialog.message')}
+                confirmText={t('train.cancel_dialog.confirm')}
+                cancelText={t('train.cancel_dialog.cancel')}
+                onConfirm={confirmCancelWorkout}
+                onCancel={() => setShowCancelDialog(false)}
+                variant="danger"
+            />
+
+            {/* Replacement Modal */}
+            <ExercisePickerModal
+                visible={replacementModalVisible}
+                onClose={() => setReplacementModalVisible(false)}
+                onSelect={handleConfirmReplace}
+                onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")}
+                recommendedExercises={recommendations}
+                multiSelect={false}
+            />
+
+            {/* Add Exercise Modal */}
+            <ExercisePickerModal
+                visible={addExerciseModalVisible}
+                onClose={() => setAddExerciseModalVisible(false)}
+                onSelect={handleAddExercises}
+                onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")}
+                multiSelect={true}
+            />
+        </Animated.View>
     );
 };
 
@@ -439,7 +566,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.background,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        marginTop: 40, // Space at top to see previous screen
+        marginTop: 40,
         overflow: 'hidden',
     },
     dragHandle: {
@@ -484,162 +611,11 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginTop: 4,
     },
-    editButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: COLORS.surface,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        gap: 6,
-    },
-    editButtonText: {
-        color: COLORS.primary,
-        fontWeight: "600",
-        fontSize: 14,
-    },
-
-    content: {
-        flex: 1,
-        paddingHorizontal: 24,
-    },
     errorText: {
         color: COLORS.textPrimary,
         fontSize: 18,
         textAlign: "center",
         marginTop: 40,
-    },
-
-    exerciseCard: {
-        backgroundColor: COLORS.card,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    exerciseHeader: {
-        marginBottom: 16,
-    },
-    exerciseName: {
-        fontSize: 18,
-        fontWeight: "700",
-        color: COLORS.textPrimary,
-        marginBottom: 4,
-    },
-    exerciseTarget: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
-    },
-    setsHeader: {
-        flexDirection: "row",
-        marginBottom: 8,
-        paddingHorizontal: 4,
-    },
-    colHeader: {
-        color: COLORS.textSecondary,
-        fontSize: 12,
-        fontWeight: "600",
-        textAlign: "center",
-    },
-    setRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 8,
-        gap: 8,
-    },
-    setRowCompleted: {
-        opacity: 0.8,
-    },
-    exerciseTitleRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-    },
-    noteButton: {
-        padding: 4,
-    },
-    exerciseNotes: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
-        fontStyle: "italic",
-        marginTop: 4,
-    },
-    historyContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    historyText: {
-        fontSize: 11,
-        color: COLORS.textTertiary,
-        fontVariant: ["tabular-nums"],
-    },
-    inputCompleted: {
-        backgroundColor: COLORS.surface,
-        color: COLORS.textSecondary,
-    },
-    checkButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: COLORS.surface,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    checkButtonActive: {
-        backgroundColor: COLORS.success,
-        borderColor: COLORS.success,
-        shadowColor: COLORS.success,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    setNumberContainer: {
-        width: 40,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    setNumber: {
-        color: COLORS.textSecondary,
-        fontWeight: "600",
-    },
-    input: {
-        flex: 1,
-        backgroundColor: "transparent",
-        borderRadius: 0,
-        paddingVertical: 8,
-        paddingHorizontal: 8,
-        color: COLORS.textPrimary,
-        textAlign: "center",
-        borderWidth: 0,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-        fontSize: 16,
-        fontWeight: "600",
-        fontVariant: ["tabular-nums"],
-    },
-    removeSetButton: {
-        width: 40,
-        alignItems: "center",
-    },
-    addSetButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 12,
-        gap: 8,
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-    },
-    addSetText: {
-        color: COLORS.primary,
-        fontWeight: "600",
-        fontSize: 14,
     },
     footer: {
         paddingHorizontal: 24,
@@ -670,41 +646,32 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontVariant: ["tabular-nums"],
     },
-    // Collapsible styles
-    exerciseCollapsibleHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingBottom: 16,
+    deleteButton: {
+        backgroundColor: COLORS.error + '20',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 80,
+        height: '100%',
+        borderRadius: 16,
+        marginBottom: 16,
+        marginLeft: 10,
     },
-    headerLeftTrain: {
-        flexDirection: "row",
-        alignItems: "center",
-        flex: 1,
+    addExerciseButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+        borderStyle: 'dashed',
+        borderRadius: 16,
+        marginVertical: 16,
+        gap: 8,
+        backgroundColor: COLORS.surface,
     },
-    expandIconTrain: {
-        marginRight: 12,
-    },
-    headerInfoTrain: {
-        flex: 1,
-    },
-    exerciseNameHeader: {
+    addExerciseButtonText: {
+        color: COLORS.primary,
         fontSize: 16,
-        fontWeight: "600",
-        color: COLORS.textPrimary,
-        marginBottom: 4,
-    },
-    exerciseMetaTrain: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
-    },
-    noteButtonHeader: {
-        padding: 8,
-        marginLeft: 8,
-    },
-    exerciseExpandedContent: {
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        paddingTop: 16,
-    },
+        fontWeight: '600',
+    }
 });

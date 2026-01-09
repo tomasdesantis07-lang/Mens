@@ -1,4 +1,4 @@
-import { Activity, Dumbbell, PlusCircle, Search, X } from "lucide-react-native";
+import { Activity, Check, Dumbbell, Pencil, Search, X } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -20,51 +20,18 @@ import { CatalogExercise } from "../../types/exercise";
 
 interface ExercisePickerModalProps {
     visible: boolean;
-    onSelect: (exercise: CatalogExercise, translatedName: string) => void;
+    onSelect: (exercises: Array<{ exercise: CatalogExercise, translatedName: string }>) => void;
     onCustomExercise: () => void;
+    onEditCustomExercise?: (exercise: CatalogExercise) => void;
     onClose: () => void;
     recommendedExercises?: CatalogExercise[];
+    customExercises?: CatalogExercise[];
+    multiSelect?: boolean;
 }
 
+import { MUSCLE_CATEGORIES } from "../../constants/muscles";
+
 // Muscle filter categories organized by body zone
-const MUSCLE_CATEGORIES: { label: string; muscles: { slug: BodyPartSlug; label: string }[] }[] = [
-    {
-        label: "Tren Superior",
-        muscles: [
-            { slug: "chest", label: "Pecho" },
-            { slug: "deltoids", label: "Hombros" },
-            { slug: "triceps", label: "Tríceps" },
-            { slug: "biceps", label: "Bíceps" },
-            { slug: "forearm", label: "Antebrazos" },
-        ],
-    },
-    {
-        label: "Espalda",
-        muscles: [
-            { slug: "lats", label: "Dorsales" },
-            { slug: "upper-back", label: "Espalda Alta" },
-            { slug: "trapezius", label: "Trapecios" },
-            { slug: "lower-back", label: "Lumbar" },
-        ],
-    },
-    {
-        label: "Core",
-        muscles: [
-            { slug: "abs", label: "Abdominales" },
-            { slug: "obliques", label: "Oblicuos" },
-        ],
-    },
-    {
-        label: "Tren Inferior",
-        muscles: [
-            { slug: "quadriceps", label: "Cuádriceps" },
-            { slug: "hamstring", label: "Isquios" },
-            { slug: "gluteal", label: "Glúteos" },
-            { slug: "calves", label: "Pantorrillas" },
-            { slug: "adductors", label: "Aductores" },
-        ],
-    },
-];
 
 const getEquipmentIcon = (equipment: string) => {
     switch (equipment) {
@@ -79,17 +46,22 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
     visible,
     onSelect,
     onCustomExercise,
+    onEditCustomExercise,
     onClose,
     recommendedExercises,
+    customExercises = [],
+    multiSelect = true,
 }) => {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedMuscle, setSelectedMuscle] = useState<BodyPartSlug | null>(null);
+    const [selectedExercises, setSelectedExercises] = useState<Set<string>>(new Set());
 
     // Reset state when modal opens/closes
     React.useEffect(() => {
         if (visible) {
+            setSelectedExercises(new Set());
             if (!recommendedExercises || recommendedExercises.length === 0) {
                 setSelectedMuscle(null);
             }
@@ -102,6 +74,8 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
 
     // Filter exercises based on selected muscle
     const filteredByCategory = useMemo(() => {
+        const fullCatalog = [...customExercises, ...EXERCISE_CATALOG];
+
         // If we have recommendations and no manual filters, show recommendations
         if (recommendedExercises && recommendedExercises.length > 0 && !selectedMuscle) {
             return recommendedExercises;
@@ -109,20 +83,20 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
 
         // If no muscle selected, show all
         if (!selectedMuscle) {
-            return EXERCISE_CATALOG;
+            return fullCatalog;
         }
 
         // Filter by selected muscle
-        return EXERCISE_CATALOG.filter(ex =>
+        return fullCatalog.filter(ex =>
             ex.primaryMuscles.includes(selectedMuscle)
         );
-    }, [selectedMuscle, recommendedExercises]);
+    }, [selectedMuscle, recommendedExercises, customExercises]);
 
     // Further filter by search query
     const filteredExercises = useMemo(() => {
         const withTranslations = filteredByCategory.map(ex => ({
             ...ex,
-            displayName: t(`exercises.${ex.id}`)
+            displayName: ex.id.startsWith('custom_') ? ex.nameKey : t(`exercises.${ex.id}`)
         }));
 
         if (!searchQuery) return withTranslations;
@@ -133,23 +107,75 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
         );
     }, [searchQuery, filteredByCategory, t]);
 
+    const toggleSelection = (exercise: CatalogExercise, name: string) => {
+        if (!multiSelect) {
+            // Immediate selection for single mode
+            onSelect([{ exercise, translatedName: name }]);
+            return;
+        }
+
+        const newSet = new Set(selectedExercises);
+        if (newSet.has(exercise.id)) {
+            newSet.delete(exercise.id);
+        } else {
+            newSet.add(exercise.id);
+        }
+        setSelectedExercises(newSet);
+    };
+
+    const handleConfirmSelection = () => {
+        const selectedList = [...customExercises, ...EXERCISE_CATALOG]
+            .filter(ex => selectedExercises.has(ex.id))
+            .map(ex => ({
+                exercise: ex,
+                translatedName: ex.id.startsWith('custom_') ? ex.nameKey : t(`exercises.${ex.id}`)
+            }));
+
+        onSelect(selectedList);
+    };
+
     const renderItem = ({ item }: { item: CatalogExercise & { displayName: string } }) => {
         const Icon = getEquipmentIcon(item.equipment);
         const subtitle = `${t(`equipment.${item.equipment}`)} • ${t(`mechanic.${item.mechanic}`)}`;
+        const isCustom = item.id.startsWith('custom_');
+        const isSelected = selectedExercises.has(item.id);
 
         return (
             <TouchableOpacity
-                style={styles.exerciseCard}
-                onPress={() => onSelect(item, item.displayName)}
+                style={[styles.exerciseCard, isSelected && styles.exerciseCardSelected]}
+                onPress={() => toggleSelection(item, item.displayName)}
             >
-                <View style={styles.iconBox}>
+                <View style={[styles.iconBox, isCustom && { backgroundColor: COLORS.primary + '20' }]}>
                     <Icon color={COLORS.primary} size={24} />
                 </View>
                 <View style={styles.exerciseInfo}>
-                    <Text style={styles.exerciseName}>{item.displayName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.exerciseName, isSelected && { color: COLORS.primary }]}>{item.displayName}</Text>
+                        {isCustom && (
+                            <View style={styles.customBadge}>
+                                <Text style={styles.customBadgeText}>Mío</Text>
+                            </View>
+                        )}
+                    </View>
                     <Text style={styles.exerciseSubtitle}>{subtitle}</Text>
                 </View>
-                <PlusCircle color={COLORS.primary} size={24} />
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {isCustom && onEditCustomExercise && (
+                        <TouchableOpacity
+                            onPress={() => onEditCustomExercise(item)}
+                            style={styles.actionButton}
+                        >
+                            <Pencil color={COLORS.textSecondary} size={20} />
+                        </TouchableOpacity>
+                    )}
+
+                    {isSelected && multiSelect && (
+                        <View style={styles.checkCircle}>
+                            <Check color={COLORS.textInverse} size={14} strokeWidth={3} />
+                        </View>
+                    )}
+                </View>
             </TouchableOpacity>
         );
     };
@@ -194,20 +220,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                     contentContainerStyle={styles.chipsContainer}
                     style={styles.chipsScroll}
                 >
-                    {[
-                        { slug: "chest" as BodyPartSlug, label: "Pecho" },
-                        { slug: "deltoids" as BodyPartSlug, label: "Hombros" },
-                        { slug: "triceps" as BodyPartSlug, label: "Tríceps" },
-                        { slug: "biceps" as BodyPartSlug, label: "Bíceps" },
-                        { slug: "lats" as BodyPartSlug, label: "Dorsales" },
-                        { slug: "upper-back" as BodyPartSlug, label: "Espalda Media" },
-                        { slug: "trapezius" as BodyPartSlug, label: "Trapecios" },
-                        { slug: "abs" as BodyPartSlug, label: "Abdomen" },
-                        { slug: "quadriceps" as BodyPartSlug, label: "Cuádriceps" },
-                        { slug: "hamstring" as BodyPartSlug, label: "Isquios" },
-                        { slug: "gluteal" as BodyPartSlug, label: "Glúteos" },
-                        { slug: "calves" as BodyPartSlug, label: "Pantorrillas" },
-                    ].map((muscle) => {
+                    {MUSCLE_CATEGORIES.flatMap(cat => cat.muscles).map((muscle) => {
                         const isSelected = selectedMuscle === muscle.slug;
                         return (
                             <TouchableOpacity
@@ -256,7 +269,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                     }
                 />
 
-                {/* Custom Exercise Button */}
+                {/* Bottom Actions */}
                 <View style={[styles.customButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
                     <TouchableOpacity
                         style={styles.customButton}
@@ -266,6 +279,17 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                             {t('exercise_picker.custom_exercise')}
                         </Text>
                     </TouchableOpacity>
+
+                    {multiSelect && selectedExercises.size > 0 && (
+                        <TouchableOpacity
+                            style={styles.addSelectedButton}
+                            onPress={handleConfirmSelection}
+                        >
+                            <Text style={styles.addSelectedButtonText}>
+                                Añadir {selectedExercises.size} {selectedExercises.size === 1 ? 'ejercicio' : 'ejercicios'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </Modal>
@@ -408,6 +432,18 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         fontSize: 16,
     },
+    addSelectedButton: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: "center",
+        marginTop: 12,
+    },
+    addSelectedButtonText: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: COLORS.textInverse,
+    },
     customButtonContainer: {
         padding: 16,
         borderTopWidth: 1,
@@ -427,5 +463,31 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
         color: COLORS.primary,
+    },
+    customBadge: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    customBadgeText: {
+        fontSize: 10,
+        fontWeight: "700",
+        color: COLORS.textInverse,
+        textTransform: "uppercase",
+    },
+    exerciseCardSelected: {
+        backgroundColor: COLORS.primary + '10', // Light highlight
+    },
+    actionButton: {
+        padding: 8,
+    },
+    checkCircle: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

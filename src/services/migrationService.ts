@@ -1,373 +1,344 @@
-import { collection, doc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, writeBatch } from "firebase/firestore";
 import { RoutineTemplate } from "../types/routineTemplate";
 import { db } from "./firebaseConfig";
 
-// Full dataset from user request
+// Full dataset from user request (PLACEHOLDER - Waiting for user data)
 const MOCK_TEMPLATES_DATA: RoutineTemplate[] = [
-    // --- NOVATO - GYM ---
+    // --- GYM ROUTINES ---
     {
-        name: "Novato Gym - Full Body 2 Días",
-        level: "Novato",
-        goal: "Fuerza", // Default mapping for 'general'
-        equipment: "Gym Completo",
-        daysPerWeek: 2,
-        exercises: [
-            // Día 1
-            { id: "goblet_squat", name: "Sentadilla Goblet", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "cable_row", name: "Remo en Polea Baja", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "lat_raise", name: "Vuelos Laterales", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
-            { id: "plank", name: "Plancha Abdominal", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" },
-            // Día 2
-            { id: "leg_press", name: "Prensa de Piernas Inclinada", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "lat_pulldown", name: "Jalón al Pecho", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "shoulder_press_db", name: "Press de Hombros (Mancuernas)", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            { id: "leg_curl", name: "Curl Femoral", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
-            { id: "dead_bug", name: "Dead Bug", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" },
-        ]
-    },
-    {
-        name: "Novato Gym - Full Body A/B 3 Días",
-        level: "Novato",
-        goal: "Fuerza",
+        name: "routine_templates.routine_fb_3d",
         equipment: "Gym Completo",
         daysPerWeek: 3,
-        exercises: [
-            // Rutina A
-            { id: "squat", name: "Sentadilla con Barra", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 3, restSeconds: 120, targetZone: "chest" },
-            { id: "db_row", name: "Remo con Mancuerna", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "leg_ext", name: "Extensiones de Cuádriceps", type: "isolation", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
-            { id: "tricep_press", name: "Press Francés", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" },
-            // Rutina B
-            { id: "rdl", name: "Peso Muerto Rumano", type: "compound", sets: 3, restSeconds: 120, targetZone: "hamstring" },
-            { id: "lat_pulldown", name: "Jalón al Pecho", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "ohp", name: "Press Militar", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            { id: "lunges", name: "Zancadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "bicep_curl", name: "Curl de Bíceps", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" },
+        days: [
+            {
+                id: "fb_day_1",
+                name: "routine_templates.day.fb_a",
+                exercises: [
+                    { id: "legs_squat_bar_back", name: "exercises.legs_squat_bar_back", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
+                    { id: "chest_incline_press_bar", name: "exercises.chest_incline_press_bar", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_lat_pulldown", name: "exercises.back_lat_pulldown", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "legs_rdl_db", name: "exercises.legs_rdl_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
+                    { id: "shd_overhead_press_db", name: "exercises.shd_overhead_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
+                    { id: "abs_plank", name: "exercises.abs_plank", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            },
+            { id: "rest_1", name: "routine_templates.day.rest", exercises: [] }, // Martes: Descanso
+            {
+                id: "fb_day_2",
+                name: "routine_templates.day.fb_b",
+                exercises: [
+                    { id: "legs_squat_goblet", name: "exercises.legs_squat_goblet", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
+                    { id: "chest_incline_press_db", name: "exercises.chest_incline_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_pullups", name: "exercises.back_pullups", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "legs_rdl_bar", name: "exercises.legs_rdl_bar", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
+                    { id: "shd_overhead_press_bar", name: "exercises.shd_overhead_press_bar", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
+                    { id: "abs_crunch", name: "exercises.abs_crunch", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            },
+            { id: "rest_2", name: "routine_templates.day.rest", exercises: [] }, // Jueves: Descanso
+            {
+                id: "fb_day_3",
+                name: "routine_templates.day.fb_c",
+                exercises: [
+                    { id: "legs_squat_bar_front", name: "exercises.legs_squat_bar_front", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
+                    { id: "chest_bench_press_db", name: "exercises.chest_bench_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_lat_pulldown_close", name: "exercises.back_lat_pulldown_close", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "legs_leg_press", name: "exercises.legs_leg_press", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "tricep_pushdown_rope", name: "exercises.tricep_pushdown_rope", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" },
+                    { id: "bicep_hammer_curl", name: "exercises.bicep_hammer_curl", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" }
+                ]
+            },
+            { id: "rest_3", name: "routine_templates.day.rest", exercises: [] }, // Sabado: Descanso
+            { id: "rest_4", name: "routine_templates.day.rest", exercises: [] }  // Domingo: Descanso
         ]
     },
     {
-        name: "Novato Gym - Torso/Pierna 4 Días",
-        level: "Novato",
-        goal: "Recomposición",
+        name: "routine_templates.routine_tp_4d",
         equipment: "Gym Completo",
         daysPerWeek: 4,
-        exercises: [
-            // Torso
-            { id: "bench_press", name: "Press de Banca Plano", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            { id: "bb_row", name: "Remo con Barra", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            { id: "incline_db_press", name: "Press Inclinado Mancuernas", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "lat_pulldown", name: "Jalón al Pecho", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "lat_raise", name: "Vuelos Laterales", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
-            { id: "arm_super", name: "Bíceps + Tríceps", type: "isolation", sets: 2, restSeconds: 60, targetZone: "biceps" },
-            // Pierna
-            { id: "squat", name: "Sentadilla con Barra", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "rdl", name: "Peso Muerto Rumano", type: "compound", sets: 4, restSeconds: 120, targetZone: "hamstring" },
-            { id: "leg_press", name: "Prensa de Piernas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "leg_curl", name: "Curl Femoral", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
-            { id: "calves", name: "Gemelos en Máquina", type: "isolation", sets: 3, restSeconds: 60, targetZone: "calves" },
-            { id: "plank", name: "Plancha Abdominal", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" },
+        days: [
+            {
+                id: "tp_torso_a",
+                name: "routine_templates.day.tp_torso_a",
+                exercises: [
+                    { id: "chest_bench_press_bar", name: "exercises.chest_bench_press_bar", type: "compound", sets: 3, restSeconds: 120, targetZone: "chest" },
+                    { id: "back_bent_row_bar", name: "exercises.back_bent_row_bar", type: "compound", sets: 3, restSeconds: 90, targetZone: "upper-back" },
+                    { id: "chest_incline_press_db", name: "exercises.chest_incline_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "shd_lateral_raise_db", name: "exercises.shd_lateral_raise_db", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
+                    { id: "bicep_curl_bar", name: "exercises.bicep_curl_bar", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" },
+                    { id: "tricep_pushdown_rope", name: "exercises.tricep_pushdown_rope", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" }
+                ]
+            },
+            {
+                id: "tp_legs_a",
+                name: "routine_templates.day.tp_legs_a",
+                exercises: [
+                    { id: "legs_squat_bar_back", name: "exercises.legs_squat_bar_back", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
+                    { id: "legs_leg_press", name: "exercises.legs_leg_press", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "legs_rdl_db", name: "exercises.legs_rdl_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
+                    { id: "legs_curl_seated", name: "exercises.legs_curl_seated", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
+                    { id: "calves_standing_raise", name: "exercises.calves_standing_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" }
+                ]
+            },
+            { id: "rest_1", name: "routine_templates.day.rest", exercises: [] }, // Miercoles: Descanso
+            {
+                id: "tp_torso_b",
+                name: "routine_templates.day.tp_torso_b",
+                exercises: [
+                    { id: "shd_overhead_press_bar", name: "exercises.shd_overhead_press_bar", type: "compound", sets: 3, restSeconds: 120, targetZone: "deltoids" },
+                    { id: "back_lat_pulldown", name: "exercises.back_lat_pulldown", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "chest_dips", name: "exercises.chest_dips", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_chest_supported_row", name: "exercises.back_chest_supported_row", type: "compound", sets: 3, restSeconds: 90, targetZone: "upper-back" },
+                    { id: "shd_lateral_raise_cable", name: "exercises.shd_lateral_raise_cable", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
+                    { id: "tricep_skullcrusher", name: "exercises.tricep_skullcrusher", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" }
+                ]
+            },
+            {
+                id: "tp_legs_b",
+                name: "routine_templates.day.tp_legs_b",
+                exercises: [
+                    { id: "back_deadlift", name: "exercises.back_deadlift", type: "compound", sets: 3, restSeconds: 120, targetZone: "lower-back" },
+                    { id: "legs_bulgarian_split", name: "exercises.legs_bulgarian_split", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "legs_extension", name: "exercises.legs_extension", type: "isolation", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "legs_curl_lying", name: "exercises.legs_curl_lying", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
+                    { id: "calves_seated_raise", name: "exercises.calves_seated_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" }
+                ]
+            },
+            { id: "rest_2", name: "routine_templates.day.rest", exercises: [] }, // Sabado: Descanso
+            { id: "rest_3", name: "routine_templates.day.rest", exercises: [] }  // Domingo: Descanso
         ]
     },
     {
-        name: "Novato Gym - Adaptación Progresiva 5 Días",
-        level: "Novato",
-        goal: "Resistencia",
+        name: "routine_templates.routine_ppl_ul_5d",
         equipment: "Gym Completo",
         daysPerWeek: 5,
-        exercises: [
-            // Simplification: Representative exercises for the 5 days
-            { id: "bench_press", name: "Press Banca", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "squat", name: "Sentadilla", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "lat_pulldown", name: "Jalón al Pecho", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "rdl", name: "Peso Muerto Rumano", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
-            { id: "full_body_review", name: "Full Body Técnico", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+        days: [
+            {
+                id: "ppl_push",
+                name: "routine_templates.day.ppl_push",
+                exercises: [
+                    { id: "chest_bench_press_bar", name: "exercises.chest_bench_press_bar", type: "compound", sets: 3, restSeconds: 120, targetZone: "chest" },
+                    { id: "shd_overhead_press_db", name: "exercises.shd_overhead_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
+                    { id: "chest_incline_press_db", name: "exercises.chest_incline_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "shd_lateral_raise_db", name: "exercises.shd_lateral_raise_db", type: "isolation", sets: 4, restSeconds: 60, targetZone: "deltoids" },
+                    { id: "tricep_pushdown_rope", name: "exercises.tricep_pushdown_rope", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" }
+                ]
+            },
+            {
+                id: "ppl_pull",
+                name: "routine_templates.day.ppl_pull",
+                exercises: [
+                    { id: "back_lat_pulldown", name: "exercises.back_lat_pulldown", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "back_bent_row_bar", name: "exercises.back_bent_row_bar", type: "compound", sets: 3, restSeconds: 90, targetZone: "upper-back" },
+                    { id: "back_seated_row", name: "exercises.back_seated_row", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "back_face_pull", name: "exercises.back_face_pull", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
+                    { id: "bicep_curl_bar", name: "exercises.bicep_curl_bar", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" }
+                ]
+            },
+            {
+                id: "ppl_legs",
+                name: "routine_templates.day.ppl_legs",
+                exercises: [
+                    { id: "legs_squat_bar_back", name: "exercises.legs_squat_bar_back", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
+                    { id: "legs_rdl_db", name: "exercises.legs_rdl_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
+                    { id: "legs_extension", name: "exercises.legs_extension", type: "isolation", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "calves_standing_raise", name: "exercises.calves_standing_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" },
+                    { id: "abs_leg_raise_lying", name: "exercises.abs_leg_raise_lying", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            },
+            { id: "rest_1", name: "routine_templates.day.rest", exercises: [] }, // Jueves: Descanso
+            {
+                id: "ppl_upper",
+                name: "routine_templates.day.ppl_upper",
+                exercises: [
+                    { id: "chest_incline_press_bar", name: "exercises.chest_incline_press_bar", type: "compound", sets: 3, restSeconds: 120, targetZone: "chest" },
+                    { id: "back_bent_row_db", name: "exercises.back_bent_row_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "shd_arnold_press", name: "exercises.shd_arnold_press", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
+                    { id: "back_lat_pulldown_close", name: "exercises.back_lat_pulldown_close", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "bicep_hammer_curl", name: "exercises.bicep_hammer_curl", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" },
+                    { id: "chest_dips", name: "exercises.chest_dips", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" }
+                ]
+            },
+            {
+                id: "ppl_lower",
+                name: "routine_templates.day.ppl_lower",
+                exercises: [
+                    { id: "back_deadlift", name: "exercises.back_deadlift", type: "compound", sets: 3, restSeconds: 90, targetZone: "lower-back" },
+                    { id: "legs_leg_press", name: "exercises.legs_leg_press", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "legs_curl_lying", name: "exercises.legs_curl_lying", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
+                    { id: "legs_lunge_walking", name: "exercises.legs_lunge_walking", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "abs_plank", name: "exercises.abs_plank", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            },
+            { id: "rest_2", name: "routine_templates.day.rest", exercises: [] } // Domingo: Descanso
         ]
     },
     {
-        name: "Novato Gym - PPL 6 Días",
-        level: "Novato",
-        goal: "Recomposición",
+        name: "routine_templates.routine_ppl_6d",
         equipment: "Gym Completo",
         daysPerWeek: 6,
-        exercises: [
-            // Push
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "shoulder_press", name: "Press de Hombros", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            { id: "dips", name: "Fondos en Máquina", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
-            // Pull
-            { id: "lat_pulldown", name: "Jalón al Pecho", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "cable_row", name: "Remo en Polea", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "facepull", name: "Facepulls", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
-            // Legs
-            { id: "leg_press", name: "Prensa de Piernas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "leg_curl", name: "Curl Femoral", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
-            { id: "leg_ext", name: "Extensión Cuádriceps", type: "isolation", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
+        days: [
+            {
+                id: "ppl6_push_a",
+                name: "routine_templates.day.ppl6_push_a",
+                exercises: [
+                    { id: "chest_bench_press_bar", name: "exercises.chest_bench_press_bar", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
+                    { id: "shd_overhead_press_db", name: "exercises.shd_overhead_press_db", type: "compound", sets: 3, restSeconds: 120, targetZone: "deltoids" },
+                    { id: "chest_incline_press_db", name: "exercises.chest_incline_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "tricep_pushdown_bar", name: "exercises.tricep_pushdown_bar", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" },
+                    { id: "shd_lateral_raise_db", name: "exercises.shd_lateral_raise_db", type: "isolation", sets: 4, restSeconds: 60, targetZone: "deltoids" }
+                ]
+            },
+            {
+                id: "ppl6_pull_a",
+                name: "routine_templates.day.ppl6_pull_a",
+                exercises: [
+                    { id: "back_deadlift", name: "exercises.back_deadlift", type: "compound", sets: 3, restSeconds: 180, targetZone: "lower-back" },
+                    { id: "back_pendlay_row", name: "exercises.back_pendlay_row", type: "compound", sets: 4, restSeconds: 120, targetZone: "upper-back" },
+                    { id: "back_pullups", name: "exercises.back_pullups", type: "compound", sets: 3, restSeconds: 120, targetZone: "lats" },
+                    { id: "back_face_pull_high", name: "exercises.back_face_pull_high", type: "isolation", sets: 3, restSeconds: 60, targetZone: "deltoids" },
+                    { id: "bicep_curl_bar", name: "exercises.bicep_curl_bar", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" }
+                ]
+            },
+            {
+                id: "ppl6_legs_a",
+                name: "routine_templates.day.ppl6_legs_a",
+                exercises: [
+                    { id: "legs_squat_bar_back", name: "exercises.legs_squat_bar_back", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
+                    { id: "legs_leg_press", name: "exercises.legs_leg_press", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "legs_rdl_db", name: "exercises.legs_rdl_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
+                    { id: "legs_extension", name: "exercises.legs_extension", type: "isolation", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "calves_standing_raise", name: "exercises.calves_standing_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" }
+                ]
+            },
+            {
+                id: "ppl6_push_b",
+                name: "routine_templates.day.ppl6_push_b",
+                exercises: [
+                    { id: "chest_incline_press_bar", name: "exercises.chest_incline_press_bar", type: "compound", sets: 3, restSeconds: 120, targetZone: "chest" },
+                    { id: "chest_bench_press_db", name: "exercises.chest_bench_press_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "chest_fly_cable_low", name: "exercises.chest_fly_cable_low", type: "isolation", sets: 3, restSeconds: 60, targetZone: "chest" },
+                    { id: "tricep_skullcrusher", name: "exercises.tricep_skullcrusher", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" },
+                    { id: "shd_lateral_raise_cable", name: "exercises.shd_lateral_raise_cable", type: "isolation", sets: 4, restSeconds: 60, targetZone: "deltoids" }
+                ]
+            },
+            {
+                id: "ppl6_pull_b",
+                name: "routine_templates.day.ppl6_pull_b",
+                exercises: [
+                    { id: "back_lat_pulldown_wide", name: "exercises.back_lat_pulldown_wide", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "back_bent_row_db", name: "exercises.back_bent_row_db", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "back_pullover_cable", name: "exercises.back_pullover_cable", type: "isolation", sets: 3, restSeconds: 60, targetZone: "lats" },
+                    { id: "bicep_hammer_curl", name: "exercises.bicep_hammer_curl", type: "isolation", sets: 3, restSeconds: 60, targetZone: "biceps" },
+                    { id: "shd_rear_fly_machine", name: "exercises.shd_rear_fly_machine", type: "isolation", sets: 4, restSeconds: 60, targetZone: "deltoids" }
+                ]
+            },
+            {
+                id: "ppl6_legs_b",
+                name: "routine_templates.day.ppl6_legs_b",
+                exercises: [
+                    { id: "legs_bulgarian_split", name: "exercises.legs_bulgarian_split", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "glute_hip_thrust_bar", name: "exercises.glute_hip_thrust_bar", type: "compound", sets: 3, restSeconds: 90, targetZone: "gluteal" },
+                    { id: "legs_curl_lying", name: "exercises.legs_curl_lying", type: "isolation", sets: 4, restSeconds: 60, targetZone: "hamstring" },
+                    { id: "legs_lunge_walking", name: "exercises.legs_lunge_walking", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "calves_seated_raise", name: "exercises.calves_seated_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" }
+                ]
+            },
+            { id: "rest_1", name: "routine_templates.day.rest", exercises: [] }  // Domingo: Descanso
         ]
     },
 
-    // --- EXPERIMENTADO - GYM ---
+    // --- CALISTHENICS ROUTINES ---
     {
-        name: "Experimentado Gym - 3 Días",
-        level: "Experimentado",
-        goal: "Fuerza",
-        equipment: "Gym Completo",
-        daysPerWeek: 3,
-        exercises: [
-            // Dia A
-            { id: "squat", name: "Sentadilla con Barra", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            { id: "bb_row", name: "Remo con Barra", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            // Dia B
-            { id: "rdl", name: "Peso Muerto Rumano", type: "compound", sets: 4, restSeconds: 120, targetZone: "hamstring" },
-            { id: "pull_up", name: "Dominadas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            { id: "incline_press", name: "Press Inclinado", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            // Dia C
-            { id: "lunges", name: "Estocadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "dips", name: "Fondos en Paralelas", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "cable_row", name: "Remo en Polea Baja", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-        ]
-    },
-    {
-        name: "Experimentado Gym - Torso/Pierna 4 Días",
-        level: "Experimentado",
-        goal: "Recomposición",
-        equipment: "Gym Completo",
-        daysPerWeek: 4,
-        exercises: [
-            // Torso
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            { id: "bb_row", name: "Remo con Barra", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            { id: "ohp", name: "Press Militar", type: "compound", sets: 4, restSeconds: 120, targetZone: "deltoids" },
-            { id: "pull_up", name: "Dominadas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            // Pierna
-            { id: "squat", name: "Sentadilla con Barra", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "rdl", name: "Peso Muerto Rumano", type: "compound", sets: 4, restSeconds: 120, targetZone: "hamstring" },
-            { id: "lunges", name: "Estocadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "leg_curl", name: "Curl Femoral", type: "isolation", sets: 3, restSeconds: 60, targetZone: "hamstring" },
-        ]
-    },
-    {
-        name: "Experimentado Gym - PPL+Torso/Pierna 5 Días",
-        level: "Experimentado",
-        goal: "Recomposición",
-        equipment: "Gym Completo",
-        daysPerWeek: 5,
-        exercises: [
-            // Push
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            { id: "ohp", name: "Press Militar", type: "compound", sets: 4, restSeconds: 120, targetZone: "deltoids" },
-            // Pull
-            { id: "deadlift", name: "Peso Muerto Convencional", type: "compound", sets: 3, restSeconds: 180, targetZone: "hamstring" },
-            { id: "pull_up_weighted", name: "Dominadas Lastradas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            // Legs
-            { id: "squat", name: "Sentadilla Trasera", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "leg_press", name: "Prensa de Piernas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            // Torso
-            { id: "incline_db", name: "Press Inclinado Mancuernas", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "row_cable", name: "Remo Polea Baja", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            // Leg Focus
-            { id: "rdl", name: "Peso Muerto Rumano", type: "compound", sets: 4, restSeconds: 120, targetZone: "hamstring" },
-            { id: "lunges", name: "Zancadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-        ]
-    },
-    {
-        name: "Experimentado Gym - PPLx2 6 Días",
-        level: "Experimentado",
-        goal: "Recomposición",
-        equipment: "Gym Completo",
-        daysPerWeek: 6,
-        exercises: [
-            // Push A
-            { id: "bench_press", name: "Press de Banca", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            { id: "ohp", name: "Press Militar", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            // Pull A
-            { id: "deadlift", name: "Peso Muerto", type: "compound", sets: 3, restSeconds: 180, targetZone: "hamstring" },
-            { id: "pull_up", name: "Dominadas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            // Legs A
-            { id: "squat", name: "Sentadilla", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            // ... (Implicit repetition for B)
-            { id: "incline_press", name: "Press Inclinado (Push B)", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "lat_pulldown", name: "Jalón al Pecho (Pull B)", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "rdl", name: "Peso Muerto Rumano (Legs B)", type: "compound", sets: 3, restSeconds: 120, targetZone: "hamstring" },
-        ]
-    },
-
-    // --- NOVATO - CALISTENIA (En casa-Sin equipo) ---
-    {
-        name: "Novato Calistenia - Full Body Fundamental 2 Días", // Using 2 days as low freq proxy, title says fundamental
-        level: "Novato",
-        goal: "Resistencia",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 2,
-        exercises: [
-            { id: "pushup_incline", name: "Flexiones Inclinadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "air_squat", name: "Sentadillas Air Squat", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "lunges", name: "Zancadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "plank", name: "Plancha Abdominal", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" },
-        ]
-    },
-    {
-        name: "Novato Calistenia - Full Body A/B 3 Días",
-        level: "Novato",
-        goal: "Resistencia",
+        name: "routine_templates.routine_cali_base_3d",
         equipment: "En casa-Sin equipo",
         daysPerWeek: 3,
-        exercises: [
-            // A
-            { id: "pushup", name: "Flexiones Estándar", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "squat", name: "Sentadillas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            // B
-            { id: "pike_pushup", name: "Pike Pushups", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            { id: "lunges", name: "Zancadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "chin_up_assist", name: "Dominadas Asistidas", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+        days: [
+            {
+                id: "cali_base_a",
+                name: "routine_templates.day.cali_base_a",
+                exercises: [
+                    { id: "legs_air_squats", name: "exercises.legs_air_squats", type: "compound", sets: 4, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "chest_pushups", name: "exercises.chest_pushups", type: "compound", sets: 4, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_inverted_row", name: "exercises.back_inverted_row", type: "compound", sets: 4, restSeconds: 90, targetZone: "upper-back" },
+                    { id: "legs_lunge_reverse", name: "exercises.legs_lunge_reverse", type: "compound", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "chest_dips", name: "exercises.chest_dips", type: "compound", sets: 3, restSeconds: 60, targetZone: "triceps" },
+                    { id: "abs_plank", name: "exercises.abs_plank", type: "isolation", sets: 3, restSeconds: 45, targetZone: "abs" }
+                ]
+            },
+            {
+                id: "cali_base_b",
+                name: "routine_templates.day.cali_base_b",
+                exercises: [
+                    { id: "legs_jump_squats", name: "exercises.legs_jump_squats", type: "compound", sets: 4, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "chest_pushups_diamond", name: "exercises.chest_pushups_diamond", type: "compound", sets: 4, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_pullups", name: "exercises.back_pullups", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
+                    { id: "legs_step_up", name: "exercises.legs_step_up", type: "compound", sets: 3, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "abs_leg_raise_lying", name: "exercises.abs_leg_raise_lying", type: "isolation", sets: 3, restSeconds: 45, targetZone: "abs" }
+                ]
+            },
+            {
+                id: "cali_base_c",
+                name: "routine_templates.day.cali_base_c",
+                exercises: [
+                    { id: "legs_air_squats", name: "exercises.legs_air_squats", type: "compound", sets: 4, restSeconds: 60, targetZone: "quadriceps" },
+                    { id: "chest_pushups_decline", name: "exercises.chest_pushups_decline", type: "compound", sets: 4, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_inverted_row", name: "exercises.back_inverted_row", type: "compound", sets: 4, restSeconds: 90, targetZone: "upper-back" },
+                    { id: "glute_bridge", name: "exercises.glute_bridge", type: "compound", sets: 3, restSeconds: 60, targetZone: "gluteal" },
+                    { id: "tricep_dips_bench", name: "exercises.tricep_dips_bench", type: "isolation", sets: 3, restSeconds: 60, targetZone: "triceps" }
+                ]
+            }
         ]
     },
     {
-        name: "Novato Calistenia - Upper/Lower 4 Días",
-        level: "Novato",
-        goal: "Resistencia",
+        name: "routine_templates.routine_cali_prog_4d",
         equipment: "En casa-Sin equipo",
         daysPerWeek: 4,
-        exercises: [
-            // Upper
-            { id: "pushup", name: "Flexiones", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "pike_pushup", name: "Pike Pushups", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            // Lower
-            { id: "squat", name: "Sentadillas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "rdl_bw", name: "Peso Muerto Rumano (Bodyweight)", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
-            { id: "lunges", name: "Zancadas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-        ]
-    },
-    {
-        name: "Novato Calistenia - Estímulo Progresivo 5 Días",
-        level: "Novato",
-        goal: "Resistencia",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 5,
-        exercises: [
-            // Empuje
-            { id: "pushup", name: "Flexiones", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
-            { id: "dips_bench", name: "Fondos en Banco", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
-            // Pierna
-            { id: "squat", name: "Sentadillas", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            // Traccion
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            // Pierna/Core
-            { id: "cossack_squat", name: "Sentadilla Lateral", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            // Full Body
-            { id: "full_body", name: "Full Body Técnico", type: "compound", sets: 2, restSeconds: 60, targetZone: "quadriceps" },
-        ]
-    },
-    {
-        name: "Novato Calistenia - PPL 6 Días",
-        level: "Novato",
-        goal: "Resistencia",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 6,
-        exercises: [
-            // Push
-            { id: "pushup_diamond", name: "Flexiones Diamante", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
-            { id: "pike_pushup", name: "Pike Pushups", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
-            // Pull
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            { id: "superman", name: "Superman", type: "isolation", sets: 3, restSeconds: 60, targetZone: "lower-back" },
-            // Legs
-            { id: "bulgarian_squat", name: "Sentadilla Búlgara", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "sl_deadlift", name: "Peso Muerto 1 Pierna", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
-        ]
-    },
-
-    // --- EXPERIMENTADO - CALISTENIA ---
-    {
-        name: "Experimentado Calistenia - Full Body Potencia 2 Días", // Mapped to 2 days for low freq
-        level: "Experimentado",
-        goal: "Fuerza", // "Potencia"
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 2,
-        exercises: [
-            { id: "archer_pushup", name: "Flexiones Arqueras", type: "compound", sets: 4, restSeconds: 120, targetZone: "chest" },
-            { id: "bulgarian_squat", name: "Sentadilla Búlgara", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "pull_up", name: "Dominadas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            { id: "dips", name: "Fondos (Dips)", type: "compound", sets: 4, restSeconds: 120, targetZone: "triceps" },
-            { id: "glute_bridge_sl", name: "Puente Glúteo 1 Pierna", type: "isolation", sets: 3, restSeconds: 60, targetZone: "gluteal" },
-        ]
-    },
-    {
-        name: "Experimentado Calistenia - Full Body A/B 3 Días",
-        level: "Experimentado",
-        goal: "Fuerza",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 3,
-        exercises: [
-            // A
-            { id: "diamond_pushup", name: "Flexiones Diamante", type: "compound", sets: 4, restSeconds: 90, targetZone: "triceps" },
-            { id: "pistol_squat", name: "Pistol Squats", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 4, restSeconds: 90, targetZone: "lats" },
-            // B
-            { id: "pike_pushup", name: "Pike Pushups", type: "compound", sets: 4, restSeconds: 90, targetZone: "deltoids" },
-            { id: "cossack_squat", name: "Sentadilla Cosaca", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "pull_up", name: "Dominadas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-        ]
-    },
-    {
-        name: "Experimentado Calistenia - Upper/Lower 4 Días",
-        level: "Experimentado",
-        goal: "Fuerza",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 4,
-        exercises: [
-            // Upper
-            { id: "decline_pushup", name: "Flexiones Pies Elevados", type: "compound", sets: 4, restSeconds: 90, targetZone: "chest" },
-            { id: "inverted_row", name: "Remo Invertido", type: "compound", sets: 4, restSeconds: 90, targetZone: "lats" },
-            { id: "dips", name: "Fondos", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
-            // Lower
-            { id: "pistol_squat", name: "Pistol Squats", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "nordic_curl", name: "Nordic Curls", type: "compound", sets: 3, restSeconds: 120, targetZone: "hamstring" },
-        ]
-    },
-    {
-        name: "Experimentado Calistenia - PPL 5 Días",
-        level: "Experimentado",
-        goal: "Fuerza",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 5,
-        exercises: [
-            // Push
-            { id: "explosive_pushup", name: "Flexiones Explosivas", type: "compound", sets: 4, restSeconds: 90, targetZone: "chest" },
-            { id: "dips", name: "Fondos", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
-            // Pull
-            { id: "inverted_row_narrow", name: "Remo Invertido Estrecho", type: "compound", sets: 4, restSeconds: 90, targetZone: "lats" },
-            { id: "pull_up_neg", name: "Dominadas Negativas", type: "compound", sets: 3, restSeconds: 90, targetZone: "lats" },
-            // Legs
-            { id: "bulgarian_squat", name: "Sentadilla Búlgara", type: "compound", sets: 4, restSeconds: 90, targetZone: "quadriceps" },
-            { id: "rdl_sl", name: "Peso Muerto Rumano 1 Pierna", type: "compound", sets: 3, restSeconds: 90, targetZone: "hamstring" },
-            // Upper
-            { id: "diamond_pushup", name: "Flexiones Diamante", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
-            // Lower
-            { id: "pistol_squat", name: "Pistol Squats", type: "compound", sets: 3, restSeconds: 120, targetZone: "quadriceps" },
-        ]
-    },
-    {
-        name: "Experimentado Calistenia - PPLx2 6 Días",
-        level: "Experimentado",
-        goal: "Fuerza",
-        equipment: "En casa-Sin equipo",
-        daysPerWeek: 6,
-        exercises: [
-            // Push A/B
-            { id: "archer_pushup", name: "Flexiones Archer", type: "compound", sets: 4, restSeconds: 90, targetZone: "chest" },
-            { id: "pike_pushup", name: "Pike Pushups", type: "compound", sets: 4, restSeconds: 90, targetZone: "deltoids" },
-            // Pull A/B
-            { id: "inverted_row_feet", name: "Remo Invertido Pies Elevados", type: "compound", sets: 4, restSeconds: 90, targetZone: "lats" },
-            { id: "pull_up", name: "Dominadas", type: "compound", sets: 4, restSeconds: 120, targetZone: "lats" },
-            // Legs A/B
-            { id: "pistol_squat", name: "Pistol Squats", type: "compound", sets: 4, restSeconds: 120, targetZone: "quadriceps" },
-            { id: "nordic_curl", name: "Nordic Curls", type: "compound", sets: 3, restSeconds: 120, targetZone: "hamstring" },
+        days: [
+            {
+                id: "cali_prog_torso_a",
+                name: "routine_templates.day.cali_prog_torso_a",
+                exercises: [
+                    { id: "chest_pushups_diamond", name: "exercises.chest_pushups_diamond", type: "compound", sets: 3, restSeconds: 90, targetZone: "triceps" },
+                    { id: "back_pullups", name: "exercises.back_pullups", type: "compound", sets: 3, restSeconds: 120, targetZone: "lats" },
+                    { id: "chest_pushups_decline", name: "exercises.chest_pushups_decline", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "shd_pike_pushups", name: "exercises.shd_pike_pushups", type: "compound", sets: 3, restSeconds: 90, targetZone: "deltoids" },
+                    { id: "back_supermans", name: "exercises.back_supermans", type: "isolation", sets: 3, restSeconds: 60, targetZone: "lower-back" }
+                ]
+            },
+            {
+                id: "cali_prog_legs_a",
+                name: "routine_templates.day.cali_prog_legs_a",
+                exercises: [
+                    { id: "legs_bulgarian_split", name: "exercises.legs_bulgarian_split", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "legs_jump_squats", name: "exercises.legs_jump_squats", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "glute_bridge", name: "exercises.glute_bridge", type: "compound", sets: 3, restSeconds: 60, targetZone: "gluteal" },
+                    { id: "calves_standing_raise", name: "exercises.calves_standing_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" },
+                    { id: "abs_leg_raise_lying", name: "exercises.abs_leg_raise_lying", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            },
+            {
+                id: "cali_prog_torso_b",
+                name: "routine_templates.day.cali_prog_torso_b",
+                exercises: [
+                    { id: "chest_dips", name: "exercises.chest_dips", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_chinups", name: "exercises.back_chinups", type: "compound", sets: 3, restSeconds: 120, targetZone: "biceps" },
+                    { id: "chest_pushups", name: "exercises.chest_pushups", type: "compound", sets: 3, restSeconds: 90, targetZone: "chest" },
+                    { id: "back_inverted_row", name: "exercises.back_inverted_row", type: "compound", sets: 3, restSeconds: 90, targetZone: "upper-back" },
+                    { id: "abs_plank", name: "exercises.abs_plank", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            },
+            {
+                id: "cali_prog_legs_b",
+                name: "routine_templates.day.cali_prog_legs_b",
+                exercises: [
+                    { id: "legs_air_squats", name: "exercises.legs_air_squats", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "legs_lunge_walking", name: "exercises.legs_lunge_walking", type: "compound", sets: 3, restSeconds: 90, targetZone: "quadriceps" },
+                    { id: "glute_kickback_cable", name: "exercises.glute_kickback_cable", type: "isolation", sets: 3, restSeconds: 60, targetZone: "gluteal" },
+                    { id: "calves_standing_raise", name: "exercises.calves_standing_raise", type: "isolation", sets: 4, restSeconds: 60, targetZone: "calves" },
+                    { id: "abs_russian_twist", name: "exercises.abs_russian_twist", type: "isolation", sets: 3, restSeconds: 60, targetZone: "abs" }
+                ]
+            }
         ]
     }
 ];
@@ -380,12 +351,23 @@ export const RoutineMigrationService = {
     async uploadRoutineTemplates() {
         try {
             console.log("Starting migration of routine templates...");
-            const batch = writeBatch(db);
             const collectionRef = collection(db, "routines_templates");
 
-            // Optional: clear existing if needed, but for now just appending/overwriting if we had IDs.
-            // Since we use auto-ID, it will duplicate if run multiple times without cleanup.
+            // 1. Clear existing templates to avoid duplicates
+            const existingSnapshot = await getDocs(collectionRef);
+            if (!existingSnapshot.empty) {
+                console.log(`Deleting ${existingSnapshot.size} existing templates...`);
+                // Batch delete (max 500 per batch)
+                const deleteBatch = writeBatch(db);
+                existingSnapshot.docs.forEach((doc) => {
+                    deleteBatch.delete(doc.ref);
+                });
+                await deleteBatch.commit();
+                console.log("Existing templates deleted.");
+            }
 
+            // 2. Upload new templates
+            const batch = writeBatch(db);
             MOCK_TEMPLATES_DATA.forEach((template) => {
                 const docRef = doc(collectionRef);
                 batch.set(docRef, {

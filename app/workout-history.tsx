@@ -1,10 +1,10 @@
+import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import { Check, Edit as EditIcon, Home, Trash2 } from "lucide-react-native";
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     ActivityIndicator,
-    FlatList,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -14,12 +14,123 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-g
 import Animated, { FadeInDown, FadeOutDown, runOnJS } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConfirmDialog } from "../src/components/common/ConfirmDialog";
+import { SkeletonSessionCard } from "../src/components/common/Skeleton";
 import { auth } from "../src/services/firebaseConfig";
 import { WorkoutService } from "../src/services/workoutService";
 import { COLORS, FONT_FAMILY } from "../src/theme/theme";
 import { WorkoutSession } from "../src/types/workout";
+import { MensHaptics } from "../src/utils/haptics";
+import { showToast } from "../src/utils/toast";
+import { translateIfKey } from "../src/utils/translationHelpers";
 
 const PAGE_SIZE = 10;
+const TypedFlashList = FlashList as any;
+
+// --- Helpers moved outside for performance ---
+
+const formatDuration = (minutes: number): string => {
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins}m`;
+};
+
+const getDurationMinutes = (session: WorkoutSession): number => {
+    if (session.durationSeconds && session.durationSeconds > 0) {
+        return Math.round(session.durationSeconds / 60);
+    }
+    let totalSets = 0;
+    for (const exercise of session.exercises) {
+        if (exercise.sets) {
+            totalSets += exercise.sets.length;
+        }
+    }
+    return Math.max(15, totalSets * 2);
+};
+
+const calculateVolume = (session: WorkoutSession): number => {
+    let total = 0;
+    for (const exercise of session.exercises) {
+        if (exercise.sets) {
+            for (const set of exercise.sets) {
+                total += (set.weight || 0) * (set.reps || 0);
+            }
+        }
+    }
+    return total;
+};
+
+// --- Memoized Item Component ---
+
+const SessionItem = memo(({
+    item,
+    isSelected,
+    isSelectionMode,
+    onLongPress,
+    onPress,
+    t,
+    formatDate
+}: {
+    item: WorkoutSession;
+    isSelected: boolean;
+    isSelectionMode: boolean;
+    onLongPress: (id: string) => void;
+    onPress: (id: string) => void;
+    t: any;
+    formatDate: (timestamp: any) => string;
+}) => {
+    return (
+        <TouchableOpacity
+            style={[
+                styles.sessionCard,
+                isSelected && styles.sessionCardSelected,
+                isSelectionMode && !isSelected && styles.sessionCardDimmed
+            ]}
+            onLongPress={() => onLongPress(item.id)}
+            onPress={() => onPress(item.id)}
+            activeOpacity={0.7}
+            delayLongPress={200}
+        >
+            {isSelected && (
+                <View style={styles.selectionIndicator}>
+                    <Check size={16} color={COLORS.surface} strokeWidth={3} />
+                </View>
+            )}
+
+            <View style={styles.sessionHeader}>
+                <Text style={styles.sessionName} numberOfLines={1}>
+                    {translateIfKey(item.routineName) || "Entrenamiento"}
+                </Text>
+                <Text style={styles.sessionDate}>{formatDate(item.performedAt)}</Text>
+            </View>
+
+            <View style={styles.sessionStats}>
+                <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{item.exercises?.length || 0}</Text>
+                    <Text style={styles.statLabel}>{t('common.exercises')}</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{formatDuration(getDurationMinutes(item))}</Text>
+                    <Text style={styles.statLabel}>{t('common.duration')}</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                        {(calculateVolume(item) / 1000).toFixed(1)}k
+                    </Text>
+                    <Text style={styles.statLabel}>kg</Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+}, (prev, next) => {
+    return (
+        prev.item.id === next.item.id &&
+        prev.isSelected === next.isSelected &&
+        prev.isSelectionMode === next.isSelectionMode
+    );
+});
 
 const WorkoutHistoryScreen: React.FC = () => {
     const router = useRouter();
@@ -39,7 +150,7 @@ const WorkoutHistoryScreen: React.FC = () => {
     // Drag Selection State
     const [isScrollEnabled, setIsScrollEnabled] = useState(true);
     const listOffsetRef = useRef(0);
-    const flatListRef = useRef<FlatList>(null);
+    const flashListRef = useRef<any>(null);
     const listLayoutYRef = useRef(0);
 
     useEffect(() => {
@@ -89,37 +200,61 @@ const WorkoutHistoryScreen: React.FC = () => {
         }
     };
 
-    const handleLongPress = (id: string) => {
-        const next = new Set(selectedSessions);
-        if (next.has(id)) {
-            next.delete(id);
-        } else {
-            next.add(id);
-        }
-        setSelectedSessions(next);
-    };
+    const handleLongPress = useCallback((id: string) => {
+        MensHaptics.medium();
+        setSelectedSessions(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }, []);
 
-    const handlePress = (id: string) => {
-        if (isSelectionMode) {
-            handleLongPress(id);
-        } else {
-            console.log("View workout:", id);
-        }
-    };
+    const handlePress = useCallback((id: string) => {
+        setSelectedSessions(prev => {
+            if (prev.size > 0) {
+                const next = new Set(prev);
+                if (next.has(id)) {
+                    next.delete(id);
+                } else {
+                    next.add(id);
+                }
+                return next;
+            } else {
+                console.log("View workout:", id);
+                return prev;
+            }
+        });
+    }, []);
 
     const handleDelete = async () => {
         const userId = auth.currentUser?.uid;
         if (!userId) return;
 
-        try {
-            const idsToDelete = Array.from(selectedSessions);
-            await WorkoutService.deleteWorkoutSessions(userId, idsToDelete);
+        const idsToDelete = Array.from(selectedSessions);
 
-            setSessions(prev => prev.filter(s => !selectedSessions.has(s.id)));
-            setSelectedSessions(new Set());
-            setShowDeleteConfirm(false);
+        // OPTIMISTIC UI: Save current state for potential rollback
+        const previousSessions = [...sessions];
+
+        // Immediately update UI (user sees instant response)
+        setSessions(prev => prev.filter(s => !selectedSessions.has(s.id)));
+        setSelectedSessions(new Set());
+        setShowDeleteConfirm(false);
+        MensHaptics.success(); // Success feedback
+
+        // Sync to server in background
+        try {
+            await WorkoutService.deleteWorkoutSessions(userId, idsToDelete);
+            // Success - data already removed from UI, nothing more to do
         } catch (error) {
             console.error("Error deleting sessions:", error);
+            // ROLLBACK: Restore previous state on failure
+            setSessions(previousSessions);
+            MensHaptics.error();
+            showToast.error("Error al eliminar. Intentá de nuevo.");
         }
     };
 
@@ -161,14 +296,11 @@ const WorkoutHistoryScreen: React.FC = () => {
                 });
             }
         }
-
-        // Auto-scroll logic could be added here if cursor near edges
     };
 
     // Pan Gesture
     const panGesture = Gesture.Pan()
-        .activateAfterLongPress(300) // This prevents conflict with normal scroll? No, we want instant drag if already selected
-        // Better: Manual activation logic.
+        .activateAfterLongPress(300)
         .onStart(() => {
             if (isSelectionMode) {
                 runOnJS(disableScroll)();
@@ -194,7 +326,7 @@ const WorkoutHistoryScreen: React.FC = () => {
 
     // --- Render Helpers ---
 
-    const formatDate = (timestamp: any): string => {
+    const formatDate = useCallback((timestamp: any): string => {
         if (!timestamp?.toDate) return "";
         const date = timestamp.toDate();
         const now = new Date();
@@ -209,88 +341,24 @@ const WorkoutHistoryScreen: React.FC = () => {
             month: "short",
             year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
         });
-    };
+    }, [t]);
 
-    const formatDuration = (minutes: number): string => {
-        const hrs = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        if (hrs > 0) return `${hrs}h ${mins}m`;
-        return `${mins}m`;
-    };
-
-    const getDurationMinutes = (session: WorkoutSession): number => {
-        if (session.durationSeconds && session.durationSeconds > 0) {
-            return Math.round(session.durationSeconds / 60);
-        }
-        let totalSets = 0;
-        for (const exercise of session.exercises) {
-            totalSets += exercise.sets.length;
-        }
-        return Math.max(15, totalSets * 2);
-    };
-
-    const calculateVolume = (session: WorkoutSession): number => {
-        let total = 0;
-        for (const exercise of session.exercises) {
-            for (const set of exercise.sets) {
-                total += set.weight * set.reps;
-            }
-        }
-        return total;
-    };
-
-    const renderSession = ({ item, index }: { item: WorkoutSession; index: number }) => {
-        const isSelected = selectedSessions.has(item.id);
-
+    const renderItem = useCallback(({ item }: { item: WorkoutSession }) => {
         return (
-            <TouchableOpacity
-                style={[
-                    styles.sessionCard,
-                    isSelected && styles.sessionCardSelected,
-                    isSelectionMode && !isSelected && styles.sessionCardDimmed
-                ]}
-                onLongPress={() => handleLongPress(item.id)}
-                onPress={() => handlePress(item.id)}
-                activeOpacity={0.7}
-                delayLongPress={200}
-            >
-                {isSelected && (
-                    <View style={styles.selectionIndicator}>
-                        <Check size={16} color={COLORS.surface} strokeWidth={3} />
-                    </View>
-                )}
-
-                <View style={styles.sessionHeader}>
-                    <Text style={styles.sessionName} numberOfLines={1}>
-                        {item.routineName || "Entrenamiento"}
-                    </Text>
-                    <Text style={styles.sessionDate}>{formatDate(item.performedAt)}</Text>
-                </View>
-
-                <View style={styles.sessionStats}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{item.exercises.length}</Text>
-                        <Text style={styles.statLabel}>{t('common.exercises')}</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{formatDuration(getDurationMinutes(item))}</Text>
-                        <Text style={styles.statLabel}>{t('common.duration')}</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>
-                            {(calculateVolume(item) / 1000).toFixed(1)}k
-                        </Text>
-                        <Text style={styles.statLabel}>kg</Text>
-                    </View>
-                </View>
-            </TouchableOpacity>
+            <SessionItem
+                item={item}
+                isSelected={selectedSessions.has(item.id)}
+                isSelectionMode={selectedSessions.size > 0}
+                onLongPress={handleLongPress}
+                onPress={handlePress}
+                t={t}
+                formatDate={formatDate}
+            />
         );
-    };
+    }, [selectedSessions, handleLongPress, handlePress, t, formatDate]);
 
     const renderFooter = () => {
-        if (!hasMore) {
+        if (!loadingMore && !hasMore) {
             return (
                 <View style={styles.endMessage}>
                     <Text style={styles.endMessageText}>
@@ -347,34 +415,33 @@ const WorkoutHistoryScreen: React.FC = () => {
 
                 {/* Content */}
                 {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={COLORS.primary} />
+                    <View style={styles.skeletonContainer}>
+                        <SkeletonSessionCard />
+                        <SkeletonSessionCard />
+                        <SkeletonSessionCard />
+                        <SkeletonSessionCard />
                     </View>
                 ) : (
                     <GestureDetector gesture={panGesture}>
                         <View
                             style={{ flex: 1 }}
                             onLayout={(e) => {
-                                // Capture container Y position
-                                // in measureInWindow or relative
-                                // Simple relative offset if header is fixed height
-                                // But header helps us know offset.
-                                // We'll rely on insets + hardcoded header height if needed
-                                // Or use absoluteY - headerHeight in logic
                                 listLayoutYRef.current = 60 + insets.top;
                             }}
                         >
-                            <FlatList
-                                ref={flatListRef}
+                            <TypedFlashList
+                                ref={flashListRef}
                                 data={sessions}
-                                renderItem={renderSession}
-                                keyExtractor={(item) => item.id}
+                                renderItem={renderItem}
+                                keyExtractor={(item: any) => item.id}
                                 contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]}
                                 ListFooterComponent={renderFooter}
                                 showsVerticalScrollIndicator={false}
                                 onScroll={handleScroll}
                                 scrollEventThrottle={16}
                                 scrollEnabled={isScrollEnabled}
+                                estimatedItemSize={145}
+                                extraData={selectedSessions}
                             />
                         </View>
                     </GestureDetector>
@@ -465,6 +532,10 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+    },
+    skeletonContainer: {
+        flex: 1,
+        padding: 16,
     },
     listContent: {
         padding: 16,

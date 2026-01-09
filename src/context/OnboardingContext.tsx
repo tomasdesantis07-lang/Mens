@@ -1,10 +1,12 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import i18n from 'i18next';
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { Country } from '../data/countries';
 import { auth, db } from '../services/firebaseConfig';
 import { RoutineService } from '../services/routineService';
 import { WorkoutService } from '../services/workoutService';
+
 import { AcquisitionSource, Equipment, ExperienceLevel, PosturalProblem, UserBiometrics, UserGoal } from '../types/user';
 
 interface OnboardingState {
@@ -27,6 +29,10 @@ interface OnboardingState {
     acquisitionSource: AcquisitionSource;
     country: Country | null;
 
+    // New Step 3: Specific Routine Selection
+    selectedRoutineTemplateId: string | null;
+    isTemplateOnly: boolean;
+
     // Internal flags
     healthCompleted: boolean;
 }
@@ -45,6 +51,8 @@ const INITIAL_STATE: OnboardingState = {
     posturalProblems: [],
     acquisitionSource: null,
     country: null,
+    selectedRoutineTemplateId: null,
+    isTemplateOnly: false,
     healthCompleted: true, // Default true, unless they skip the "medical" part if we had one
 };
 
@@ -136,9 +144,30 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
                 isPremium: false,
             }, { merge: true });
 
-            // 2. Create/Assign Routine only if user selected one AND didn't explicitly skip
-            // If user skipped or chose "create custom", we don't assign any routine
-            if (data.daysPerWeek && !skipRoutineAssignment) {
+            // 2. Create/Assign Routine
+            if (data.selectedRoutineTemplateId && !skipRoutineAssignment) {
+                // New Flow: Specific Template Selection
+                try {
+                    const template = await RoutineService.getRoutineTemplateById(data.selectedRoutineTemplateId);
+                    if (template) {
+                        // Pass i18n.t to translate keys before saving
+                        await WorkoutService.saveTemplateAsRoutine(
+                            user.uid,
+                            template,
+                            {
+                                onlyStructure: data.isTemplateOnly,
+                                translateKey: (key: string) => i18n.t(key)
+                            }
+                        );
+                    } else {
+                        console.error("Selected template not found:", data.selectedRoutineTemplateId);
+                    }
+                } catch (e) {
+                    console.error("Error creating routine from template:", e);
+                }
+
+            } else if (data.daysPerWeek && !skipRoutineAssignment) {
+                // Legacy Smart Engine Flow
                 const tempProfile: any = {
                     experienceLevel: data.experienceLevel,
                     goals: data.goals,
@@ -150,7 +179,8 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
                 try {
                     const assignedRoutineId = await WorkoutService.assignRoutineFromTemplates(
                         user.uid,
-                        tempProfile
+                        tempProfile,
+                        { translateKey: (key: string) => i18n.t(key) }
                     );
 
                     if (!assignedRoutineId) {
@@ -164,14 +194,8 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
                     }
                 } catch (routineError) {
                     console.error("Error creating routine, but user profile saved. Allowing proceed.", routineError);
-                    // We don't block the user if routine generation fails, but we should log it.
-                    // They will land on home with no routine, which is handled.
                 }
             }
-            // If daysPerWeek is null: User skipped or will create custom routine later
-
-            // Reset local state after successful save
-            // resetData(); // Optional, maybe we want to keep it if we need to show success screen
         } catch (error) {
             console.error("Error in saveAndFinish:", error);
             throw error;

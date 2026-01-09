@@ -7,6 +7,7 @@ import { BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-nat
 import { MensLogo } from '../src/components/common/BrandIcons';
 import { useAuth } from '../src/context/AuthContext';
 import { db } from '../src/services/firebaseConfig';
+import { RoutineMigrationService } from '../src/services/migrationService';
 import { COLORS, LETTER_SPACING, TYPOGRAPHY } from '../src/theme/theme';
 
 const WelcomeScreen: React.FC = () => {
@@ -109,6 +110,18 @@ const WelcomeScreen: React.FC = () => {
         onPress={handleStart}
       >
         <Text style={styles.buttonText}>{t('welcome.start')}</Text>
+      </TouchableOpacity>
+
+
+      {/* DEV TOOL: Explicitly positioned to be visible */}
+      <TouchableOpacity
+        style={{ position: 'absolute', top: 50, right: 20, zIndex: 999, backgroundColor: 'red', padding: 8, borderRadius: 8 }}
+        onPress={async () => {
+          await RoutineMigrationService.uploadRoutineTemplates();
+          alert('Database Repaired with Rest Days! Please restart app.');
+        }}
+      >
+        <Text style={{ color: 'white', fontWeight: 'bold' }}>FEED DB</Text>
       </TouchableOpacity>
     </View>
   );

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { Routine } from "../types/routine";
+import { Routine, RoutineExercise } from "../types/routine";
 import { WorkoutSetLog } from "../types/workout";
 
 interface ActiveWorkout {
@@ -24,6 +24,9 @@ interface WorkoutContextType {
     startRestTimer: (seconds: number) => void;
     stopRestTimer: () => void;
     replaceExercise: (oldExerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => void;
+    reorderExercises: (fromIndex: number, toIndex: number) => void;
+    addExerciseToSession: (exercise: RoutineExercise) => void;
+    removeExerciseFromSession: (exerciseId: string) => void;
     restEndTime: number | null;
 }
 
@@ -276,6 +279,108 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     }, []);
 
+    const reorderExercises = useCallback((fromIndex: number, toIndex: number) => {
+        setActiveWorkout(prev => {
+            if (!prev) return null;
+
+            const updatedRoutine = { ...prev.routine };
+            const days = [...updatedRoutine.days];
+            const dayIndexInRoutine = days.findIndex(d => d.dayIndex === prev.dayIndex);
+
+            if (dayIndexInRoutine === -1) return prev;
+
+            const updatedDay = { ...days[dayIndexInRoutine] };
+            const exercises = [...updatedDay.exercises];
+
+            const [movedExercise] = exercises.splice(fromIndex, 1);
+            exercises.splice(toIndex, 0, movedExercise);
+
+            updatedDay.exercises = exercises;
+            days[dayIndexInRoutine] = updatedDay;
+            updatedRoutine.days = days;
+
+            return {
+                ...prev,
+                routine: updatedRoutine
+            };
+        });
+    }, []);
+
+    const addExerciseToSession = useCallback((exercise: RoutineExercise) => {
+        setActiveWorkout(prev => {
+            if (!prev) return null;
+
+            const updatedRoutine = { ...prev.routine };
+            const days = [...updatedRoutine.days];
+            const dayIndexInRoutine = days.findIndex(d => d.dayIndex === prev.dayIndex);
+
+            if (dayIndexInRoutine === -1) return prev;
+
+            const updatedDay = { ...days[dayIndexInRoutine] };
+            updatedDay.exercises = [...updatedDay.exercises, exercise];
+
+            days[dayIndexInRoutine] = updatedDay;
+            updatedRoutine.days = days;
+
+            // Initialize logs for the new exercise
+            const initialLogs = exercise.sets.map((set) => ({
+                setIndex: set.setIndex,
+                weight: set.targetWeight || 0,
+                reps: set.targetReps || 0,
+            }));
+
+            return {
+                ...prev,
+                routine: updatedRoutine,
+                logs: {
+                    ...prev.logs,
+                    [exercise.id]: initialLogs
+                }
+            };
+        });
+    }, []);
+
+    const removeExerciseFromSession = useCallback((exerciseId: string) => {
+        setActiveWorkout(prev => {
+            if (!prev) return null;
+
+            const updatedRoutine = { ...prev.routine };
+            const days = [...updatedRoutine.days];
+            const dayIndexInRoutine = days.findIndex(d => d.dayIndex === prev.dayIndex);
+
+            if (dayIndexInRoutine === -1) return prev;
+
+            const updatedDay = { ...days[dayIndexInRoutine] };
+            updatedDay.exercises = updatedDay.exercises.filter(e => e.id !== exerciseId);
+
+            days[dayIndexInRoutine] = updatedDay;
+            updatedRoutine.days = days;
+
+            // Remove logs and completed status
+            const newLogs = { ...prev.logs };
+            delete newLogs[exerciseId];
+
+            const nextCompleted = new Set(prev.completedSets);
+            // We can't easily iterate a Set to match prefix, but it's okay to leave orphan keys
+            // or we could iterate if strict cleanup is needed. For performance, leaving orphans is fine
+            // as they won't match any existing exercise ID.
+            // But let's do a quick cleanup for correctness if it's not too expensive.
+            // Actually, simplest is to filter by checking if key starts with ID.
+            for (const key of nextCompleted) {
+                if (key.startsWith(`${exerciseId}-`)) {
+                    nextCompleted.delete(key);
+                }
+            }
+
+            return {
+                ...prev,
+                routine: updatedRoutine,
+                logs: newLogs,
+                completedSets: nextCompleted
+            };
+        });
+    }, []);
+
     return (
         <WorkoutContext.Provider value={{
             activeWorkout,
@@ -291,7 +396,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             isResting,
             startRestTimer,
             stopRestTimer,
-            replaceExercise
+            replaceExercise,
+            reorderExercises,
+            addExerciseToSession,
+            removeExerciseFromSession
         }}>
             {children}
         </WorkoutContext.Provider>

@@ -13,8 +13,8 @@ const LanguageScreen: React.FC = () => {
 
     const handleLanguageSelect = async (lang: "es" | "en") => {
         await changeLanguage(lang);
-        // Navigate to terms screen
-        router.replace("/terms");
+        // Navigate directly to auth screen (terms checkbox is now inline)
+        router.replace("/auth");
     };
 
     return (

@@ -8,6 +8,7 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated';
 import { COLORS } from '../../theme/theme';
+import { MensHaptics } from '../../utils/haptics';
 
 export const CustomTabBar: React.FC<BottomTabBarProps> = ({
     state,
@@ -66,6 +67,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
                             });
 
                             if (!isFocused && !event.defaultPrevented) {
+                                MensHaptics.selection();
                                 navigation.navigate(route.name);
                             }
                         };

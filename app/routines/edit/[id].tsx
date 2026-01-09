@@ -1,14 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { X as CloseIcon, Lightbulb } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     ActivityIndicator,
+    LayoutAnimation,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
@@ -21,7 +23,9 @@ import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
 import { COLORS } from "../../../src/theme/theme";
 import { RoutineDay, RoutineDraft } from "../../../src/types/routine";
+import { MensHaptics } from "../../../src/utils/haptics";
 import { showToast } from "../../../src/utils/toast";
+import { translateIfKey } from "../../../src/utils/translationHelpers";
 
 const EditRoutineScreen: React.FC = () => {
     const router = useRouter();
@@ -38,6 +42,18 @@ const EditRoutineScreen: React.FC = () => {
     const [isEditorVisible, setIsEditorVisible] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showTip, setShowTip] = useState(true);
+    const [showInfo, setShowInfo] = useState(true);
+
+    const dismissTip = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowTip(false);
+    };
+
+    const dismissInfo = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowInfo(false);
+    };
 
     useEffect(() => {
         const loadRoutine = async () => {
@@ -63,8 +79,13 @@ const EditRoutineScreen: React.FC = () => {
                     });
 
                     setDraft({
-                        name: routine.name,
-                        days: allDays,
+                        name: translateIfKey(routine.name), // Convert key to text for editing
+                        days: allDays.map(day => ({
+                            ...day,
+                            label: translateIfKey(day.label), // Convert day labels too
+                            // Keep exercise names as translation keys for dynamic translation
+                            exercises: day.exercises
+                        })),
                     });
                     setIsCurrentPlan(routine.isCurrentPlan || false);
                 }
@@ -147,7 +168,6 @@ const EditRoutineScreen: React.FC = () => {
         const user = auth.currentUser;
         if (!user) return;
 
-        // Si intenta desactivar el plan, mostrar alerta
         if (!value && isCurrentPlan) {
             showToast.info(
                 t('routines.current_plan_change_info'),
@@ -156,15 +176,23 @@ const EditRoutineScreen: React.FC = () => {
             return;
         }
 
-        try {
-            if (value) {
+        if (value) {
+            // OPTIMISTIC UI: Update immediately
+            const previousState = isCurrentPlan;
+            setIsCurrentPlan(true);
+            MensHaptics.success();
+            showToast.success(t('routines.current_plan_activated'), t('common.success'));
+
+            // Sync to server in background
+            try {
                 await RoutineService.setRoutineAsCurrent(user.uid, id);
-                setIsCurrentPlan(true);
-                showToast.success(t('routines.current_plan_activated'), t('common.success'));
+            } catch (error) {
+                console.error('Error toggling current plan:', error);
+                // ROLLBACK on failure
+                setIsCurrentPlan(previousState);
+                MensHaptics.error();
+                showToast.error('Error al actualizar el plan actual');
             }
-        } catch (error) {
-            console.error('Error toggling current plan:', error);
-            showToast.error('Error al actualizar el plan actual');
         }
     };
 
@@ -189,7 +217,6 @@ const EditRoutineScreen: React.FC = () => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Text style={styles.backButton}>← {t('common.back')}</Text>
@@ -202,14 +229,30 @@ const EditRoutineScreen: React.FC = () => {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Tip about rest days */}
-                <View style={styles.tipCard}>
-                    <Text style={styles.tipText}>
-                        💡 {t('routines.rest_days_tip')}
-                    </Text>
-                </View>
+                {(!hasExercises && showInfo) && (
+                    <View style={styles.infoCard}>
+                        <Lightbulb size={18} color={COLORS.primary} style={{ marginRight: 10 }} />
+                        <Text style={styles.infoText}>
+                            Agregá ejercicios a <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>al menos un día</Text> para guardar la rutina
+                        </Text>
+                        <TouchableOpacity onPress={dismissInfo} style={styles.closeCardButton}>
+                            <CloseIcon size={16} color={COLORS.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
 
-                {/* Routine Name Input */}
+                {showTip && (
+                    <View style={styles.tipCard}>
+                        <Lightbulb size={18} color={COLORS.primary} style={{ marginRight: 10 }} />
+                        <Text style={styles.tipText}>
+                            Los <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>días vacíos</Text> se consideran automáticamente días de <Text style={{ color: COLORS.success, fontWeight: '700' }}>descanso</Text>.
+                        </Text>
+                        <TouchableOpacity onPress={dismissTip} style={styles.closeCardButton}>
+                            <CloseIcon size={16} color={COLORS.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.name_label')}</Text>
                     <CustomInput
@@ -220,7 +263,6 @@ const EditRoutineScreen: React.FC = () => {
                     />
                 </View>
 
-                {/* Current Plan Toggle - Only show if user has more than 1 routine */}
                 {userRoutineCount > 1 && (
                     <View style={styles.section}>
                         <View style={styles.currentPlanRow}>
@@ -240,9 +282,9 @@ const EditRoutineScreen: React.FC = () => {
                     </View>
                 )}
 
-                {/* Days Grid - Draggable */}
                 <View style={styles.section}>
                     <Text style={styles.sectionLabel}>{t('routines.days_label')}</Text>
+
                     <Text style={styles.sectionHint}>
                         {t('routines.days_hint_drag', 'Mantén presionado para mover un día')}
                     </Text>
@@ -264,18 +306,8 @@ const EditRoutineScreen: React.FC = () => {
                         onDayPress={handleDayPress}
                     />
                 </View>
-
-                {/* Info Card */}
-                {!hasExercises && (
-                    <View style={styles.infoCard}>
-                        <Text style={styles.infoText}>
-                            {t('routines.info_save_exercises')}
-                        </Text>
-                    </View>
-                )}
             </ScrollView>
 
-            {/* Bottom Action */}
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 + (activeWorkout ? 60 : 0) }]}>
                 <PrimaryButton
                     title={t('routines.save_changes')}
@@ -294,8 +326,7 @@ const EditRoutineScreen: React.FC = () => {
                 </TouchableOpacity>
             </View>
 
-            {/* Day Editor Modal */}
-            {editingDayIndex !== null && (
+            {editingDayIndex !== null && draft && (
                 <DayEditorSheet
                     day={draft.days[editingDayIndex]}
                     visible={isEditorVisible}
@@ -304,7 +335,6 @@ const EditRoutineScreen: React.FC = () => {
                 />
             )}
 
-            {/* Delete Routine Confirmation Dialog */}
             <ConfirmDialog
                 visible={showDeleteDialog}
                 title={t('routines.delete_confirm_title')}
@@ -365,24 +395,23 @@ const styles = StyleSheet.create({
     nameInput: {
         marginBottom: 0,
     },
-    daysGrid: {
-        gap: 12,
-    },
-    dayCardWrapper: {
-        marginBottom: 0,
-    },
     infoCard: {
         backgroundColor: COLORS.surface,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.border,
         padding: 16,
+        paddingRight: 40,
         marginBottom: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        position: 'relative',
     },
     infoText: {
         fontSize: 14,
         color: COLORS.textSecondary,
         lineHeight: 20,
+        flex: 1,
     },
     bottomBar: {
         paddingHorizontal: 24,
@@ -415,12 +444,17 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
         padding: 16,
+        paddingRight: 40,
         marginBottom: 24,
+        flexDirection: "row",
+        alignItems: "center",
+        position: 'relative',
     },
     tipText: {
         fontSize: 14,
         color: COLORS.textSecondary,
         lineHeight: 20,
+        flex: 1,
     },
     currentPlanRow: {
         flexDirection: "row",
@@ -430,5 +464,11 @@ const styles = StyleSheet.create({
     currentPlanInfo: {
         flex: 1,
         marginRight: 16,
+    },
+    closeCardButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        padding: 4,
     },
 });

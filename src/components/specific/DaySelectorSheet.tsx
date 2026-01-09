@@ -4,6 +4,7 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../../theme/theme";
 import { Routine } from "../../types/routine";
+import { translateIfKey } from "../../utils/translationHelpers";
 
 interface DaySelectorSheetProps {
     visible: boolean;
@@ -35,7 +36,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
                 <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
                     <View style={styles.handle} />
                     <Text style={styles.title}>{t('day_selector.title')}</Text>
-                    <Text style={styles.subtitle}>{routine.name}</Text>
+                    <Text style={styles.subtitle}>{translateIfKey(routine.name)}</Text>
 
                     <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
                         {routine.days.map((day) => (
@@ -45,7 +46,7 @@ export const DaySelectorSheet: React.FC<DaySelectorSheetProps> = ({
                                 onPress={() => onSelectDay(day.dayIndex)}
                             >
                                 <View style={styles.dayInfo}>
-                                    <Text style={styles.dayLabel}>{day.label}</Text>
+                                    <Text style={styles.dayLabel}>{translateIfKey(day.label)}</Text>
                                     <Text style={styles.exerciseCount}>
                                         {day.exercises.length} {t('day_selector.exercise', { count: day.exercises.length })}
                                     </Text>
