@@ -19,8 +19,7 @@ export const ActiveWorkoutOverlay: React.FC = () => {
     const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
     const restSeconds = useRestTimer(restEndTime || null);
 
-    // Hide if no active workout or if we're on the train screen
-    if (!activeWorkout || pathname.includes('/train')) return null;
+    const isNavigating = React.useRef(false);
 
     const formatTime = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
@@ -31,57 +30,73 @@ export const ActiveWorkoutOverlay: React.FC = () => {
     };
 
     const handlePress = () => {
+        if (!activeWorkout) return;
+        if (isNavigating.current) return;
+        isNavigating.current = true;
+
         router.push(`/routines/${activeWorkout.routine.id}/train` as any);
+
+        // Reset the lock after a short delay (enough for navigation to start)
+        setTimeout(() => {
+            isNavigating.current = false;
+        }, 1000);
     };
+
+    // Only hide if no active workout. The shared transition handles the visual hand-off.
+    if (!activeWorkout) return null;
 
     return (
         <TouchableOpacity
             style={[
-                styles.container,
-                { bottom: TAB_BAR_BOTTOM + TAB_BAR_HEIGHT + 8 } // 8px gap above tab bar
+                styles.containerWrapper,
+                { bottom: TAB_BAR_BOTTOM + TAB_BAR_HEIGHT + 8 },
             ]}
             onPress={handlePress}
             activeOpacity={0.8}
         >
-            <BlurView
-                intensity={95}
-                tint="dark"
-                style={StyleSheet.absoluteFill}
-            />
+            <View
+                style={styles.container}
+            >
+                <BlurView
+                    intensity={95}
+                    tint="dark"
+                    style={StyleSheet.absoluteFill}
+                />
 
-            {/* Rest indicator bar */}
-            {isResting && (
-                <View style={styles.restIndicator} />
-            )}
+                {/* Rest indicator bar */}
+                {isResting && (
+                    <View style={styles.restIndicator} />
+                )}
 
-            {/* Main content */}
-            <View style={styles.content}>
-                <View style={styles.iconContainer}>
-                    <Dumbbell size={18} color={COLORS.primary} strokeWidth={2.5} />
-                </View>
-
-                <View style={styles.info}>
-                    <Text style={styles.routineName} numberOfLines={1}>
-                        {translateIfKey(activeWorkout.routine.name)}
-                    </Text>
-                    <View style={styles.metaRow}>
-                        {isResting ? (
-                            <>
-                                <Clock size={11} color={COLORS.accent} />
-                                <Text style={styles.restText}>
-                                    Descanso: {formatTime(restSeconds)}
-                                </Text>
-                            </>
-                        ) : (
-                            <Text style={styles.duration}>
-                                {formatTime(elapsedSeconds)}
-                            </Text>
-                        )}
+                {/* Main content */}
+                <View style={styles.content}>
+                    <View style={styles.iconContainer}>
+                        <Dumbbell size={18} color={COLORS.primary} strokeWidth={2.5} />
                     </View>
-                </View>
 
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>→</Text>
+                    <View style={styles.info}>
+                        <Text style={styles.routineName} numberOfLines={1}>
+                            {translateIfKey(activeWorkout.routine.name)}
+                        </Text>
+                        <View style={styles.metaRow}>
+                            {isResting ? (
+                                <>
+                                    <Clock size={11} color={COLORS.accent} />
+                                    <Text style={styles.restText}>
+                                        Descanso: {formatTime(restSeconds)}
+                                    </Text>
+                                </>
+                            ) : (
+                                <Text style={styles.duration}>
+                                    {formatTime(elapsedSeconds)}
+                                </Text>
+                            )}
+                        </View>
+                    </View>
+
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>→</Text>
+                    </View>
                 </View>
             </View>
         </TouchableOpacity>
@@ -89,24 +104,24 @@ export const ActiveWorkoutOverlay: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
+    containerWrapper: {
         position: 'absolute',
-        left: 40,   // More margin than tab bar (20) to be narrower
-        right: 40,  // More margin than tab bar (20) to be narrower
-        backgroundColor: 'rgba(10, 10, 15, 0.85)',
+        left: 40,
+        right: 40,
+        zIndex: 999,
+        // Shadow for the wrapper because children are overflows
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    container: {
+        backgroundColor: COLORS.surface, // Solid fallback for transition smoothness
         borderRadius: 20,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.15)',
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
-        zIndex: 999,
     },
     restIndicator: {
         position: "absolute",

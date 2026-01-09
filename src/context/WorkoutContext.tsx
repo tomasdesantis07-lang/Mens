@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Routine, RoutineExercise } from "../types/routine";
 import { WorkoutSetLog } from "../types/workout";
 
@@ -381,26 +381,45 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     }, []);
 
+    const contextValue = useMemo(() => ({
+        activeWorkout,
+        startWorkout,
+        cancelWorkout,
+        finishWorkout,
+        logSet,
+        toggleSetComplete,
+        addSet,
+        removeSet,
+        restEndTime,
+        isResting,
+        startRestTimer,
+        stopRestTimer,
+        replaceExercise,
+        reorderExercises,
+        addExerciseToSession,
+        removeExerciseFromSession,
+        restTimerDuration: restEndTime ? Math.max(0, Math.ceil((restEndTime - Date.now()) / 1000)) : 0
+    }), [
+        activeWorkout,
+        startWorkout,
+        cancelWorkout,
+        finishWorkout,
+        logSet,
+        toggleSetComplete,
+        addSet,
+        removeSet,
+        restEndTime,
+        isResting,
+        startRestTimer,
+        stopRestTimer,
+        replaceExercise,
+        reorderExercises,
+        addExerciseToSession,
+        removeExerciseFromSession
+    ]);
+
     return (
-        <WorkoutContext.Provider value={{
-            activeWorkout,
-            startWorkout,
-            cancelWorkout,
-            finishWorkout,
-            logSet,
-            toggleSetComplete,
-            addSet,
-            removeSet,
-            restTimerDuration: restEndTime ? Math.ceil((restEndTime - Date.now()) / 1000) : 0, // Computed for compatibility
-            restEndTime, // New
-            isResting,
-            startRestTimer,
-            stopRestTimer,
-            replaceExercise,
-            reorderExercises,
-            addExerciseToSession,
-            removeExerciseFromSession
-        }}>
+        <WorkoutContext.Provider value={contextValue}>
             {children}
         </WorkoutContext.Provider>
     );

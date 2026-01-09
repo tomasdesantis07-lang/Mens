@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
   InteractionManager,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,7 +29,7 @@ import { CalorieResultsModal } from "../../src/components/home/CalorieResultsMod
 import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
 import { RoutineCard } from "../../src/components/specific/RoutineCard";
-import { useWorkout } from "../../src/context/WorkoutContext";
+import { useWorkout, useWorkoutTimer } from "../../src/context/WorkoutContext";
 import { useRoutines } from "../../src/hooks/useRoutines";
 import { useTabBarInset } from "../../src/hooks/useTabBarInset";
 import { auth, db } from "../../src/services/firebaseConfig";
@@ -57,6 +58,19 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_GAP = 12;
 const PADDING_H = 24;
 const STAT_CARD_HEIGHT = 100;
+
+// Helper component for the timer inside the shared element to avoid re-rendering layout
+const ActiveTimer: React.FC<{ startTime: number | null }> = ({ startTime }) => {
+  const elapsed = useWorkoutTimer(startTime);
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+  return <Text style={styles.activeTimerText}>{formatTime(elapsed)}</Text>;
+};
 
 const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -283,7 +297,7 @@ const HomeScreen: React.FC = () => {
         MensHaptics.heavy();
         setShowFloatingButton(false);
         startWorkout(routine, nextWorkout.dayIndex);
-        router.push(`../routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
+        router.push(`/routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
       }
     }
   }, [nextWorkout, userRoutines, startWorkout, router]);
@@ -323,7 +337,7 @@ const HomeScreen: React.FC = () => {
           </AnimatedHeader>
 
           {/* No Routine Reminder Card */}
-          {userRoutines.length === 0 && (
+          {userRoutines.length === 0 && !activeWorkout && (
             <AnimatedSection delay={50} style={styles.heroSection}>
               <TouchableOpacity
                 style={styles.noRoutineCard}
@@ -457,6 +471,7 @@ const HomeScreen: React.FC = () => {
             </AnimatedCard>
           </AnimatedSection>
         </ScrollView>
+
 
         {/* Floating Quick Start Button */}
         {nextWorkout && showFloatingButton && !activeWorkout && !isTodayRestDay && (
@@ -829,7 +844,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: 'rgba(255,255,255,0.4)',
     elevation: 8,
     shadowColor: '#fff',
     shadowOffset: { width: 0, height: 0 },
@@ -920,5 +935,10 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 20,
   },
-
+  activeTimerText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
 });

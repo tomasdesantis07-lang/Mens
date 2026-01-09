@@ -116,8 +116,6 @@ export default function RootLayout() {
                                     <Stack screenOptions={{
                                         headerShown: false,
                                         contentStyle: { backgroundColor: COLORS.background },
-                                        animation: 'fade_from_bottom', // Smother than just fade
-                                        animationDuration: 200
                                     }}>
                                         <Stack.Screen name="index" />
                                         <Stack.Screen name="language" />
@@ -135,8 +133,8 @@ export default function RootLayout() {
                                         <Stack.Screen
                                             name="routines/[id]/train"
                                             options={{
+                                                animation: 'fade',
                                                 presentation: 'transparentModal',
-                                                animation: 'slide_from_bottom',
                                                 contentStyle: { backgroundColor: 'transparent' },
                                             }}
                                         />

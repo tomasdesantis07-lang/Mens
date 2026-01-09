@@ -2,13 +2,10 @@ import { ArrowLeftRight, Check, Dumbbell, Info, Plus } from "lucide-react-native
 import React, { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    LayoutAnimation,
-    Platform,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    UIManager,
     View
 } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
@@ -18,11 +15,6 @@ import { WorkoutSetLog } from "../../types/workout";
 import { MensHaptics } from '../../utils/haptics';
 import { showToast } from "../../utils/toast";
 import { translateIfKey } from "../../utils/translationHelpers";
-
-// Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface WorkoutExerciseCardProps {
     exercise: RoutineExercise;
@@ -169,13 +161,6 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
     }, [exercise.id, exercise.restSeconds, completedSets, onToggleSetComplete]);
 
     const handleToggleExpand = useCallback(() => {
-        // Fast height animation with subtle ease (Lyfta-style)
-        LayoutAnimation.configureNext({
-            duration: 200,
-            update: {
-                type: LayoutAnimation.Types.easeOut,
-            },
-        });
         MensHaptics.light();
         onToggleExpand();
     }, [onToggleExpand]);
@@ -283,13 +268,18 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
 
 // Memoized export to prevent re-renders when parent state changes
 export const WorkoutExerciseCard = memo(WorkoutExerciseCardComponent, (prevProps, nextProps) => {
-    // Custom comparison for better performance
-    return (
-        prevProps.exercise.id === nextProps.exercise.id &&
-        prevProps.isExpanded === nextProps.isExpanded &&
-        prevProps.logs === nextProps.logs &&
-        prevProps.completedSets === nextProps.completedSets
-    );
+    // Performance optimization: only re-render if something relevant changed for THIS component
+    if (prevProps.exercise.id !== nextProps.exercise.id) return false;
+    if (prevProps.isExpanded !== nextProps.isExpanded) return false;
+    if (prevProps.logs !== nextProps.logs) return false;
+
+    // Check if completion status actually changed for this specific exercise
+    const prevCount = prevProps.logs.filter((s: any) => prevProps.completedSets.has(`${prevProps.exercise.id}-${s.setIndex}`)).length;
+    const nextCount = nextProps.logs.filter((s: any) => nextProps.completedSets.has(`${nextProps.exercise.id}-${s.setIndex}`)).length;
+
+    if (prevCount !== nextCount) return false;
+
+    return true;
 });
 
 const styles = StyleSheet.create({
