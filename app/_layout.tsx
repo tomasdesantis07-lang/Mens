@@ -133,8 +133,10 @@ export default function RootLayout() {
                                         <Stack.Screen
                                             name="routines/[id]/train"
                                             options={{
-                                                animation: 'fade',
+                                                animation: 'slide_from_bottom',
+                                                animationDuration: 250,
                                                 presentation: 'transparentModal',
+                                                gestureEnabled: false, // We handle gestures manually in the component
                                                 contentStyle: { backgroundColor: 'transparent' },
                                             }}
                                         />

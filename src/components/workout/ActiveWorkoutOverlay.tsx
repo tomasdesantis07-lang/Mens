@@ -1,8 +1,7 @@
 import { BlurView } from "expo-blur";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Clock, Dumbbell } from "lucide-react-native";
-import React from "react";
-import { useTranslation } from "react-i18next";
+import React, { memo, useCallback, useMemo, useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRestTimer, useWorkout, useWorkoutTimer } from "../../context/WorkoutContext";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
@@ -11,25 +10,46 @@ import { translateIfKey } from "../../utils/translationHelpers";
 const TAB_BAR_HEIGHT = 60;
 const TAB_BAR_BOTTOM = 20;
 
-export const ActiveWorkoutOverlay: React.FC = () => {
+// Memoized time formatter to avoid recreation on each render
+const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+};
+
+// Memoized workout timer display - only re-renders when elapsed time changes
+const WorkoutTimerText = memo(({ startTime }: { startTime: number | null }) => {
+    const elapsedSeconds = useWorkoutTimer(startTime);
+    return (
+        <Text style={styles.duration}>
+            {formatTime(elapsedSeconds)}
+        </Text>
+    );
+});
+
+// Memoized rest timer display - only re-renders when rest time changes
+const RestTimerText = memo(({ endTime }: { endTime: number | null }) => {
+    const restSeconds = useRestTimer(endTime);
+    return (
+        <>
+            <Clock size={11} color={COLORS.accent} />
+            <Text style={styles.restText}>
+                Descanso: {formatTime(restSeconds)}
+            </Text>
+        </>
+    );
+});
+
+// Main overlay component - memoized to prevent parent re-renders from affecting it
+const ActiveWorkoutOverlayComponent: React.FC = () => {
     const router = useRouter();
-    const pathname = usePathname();
     const { activeWorkout, restEndTime, isResting } = useWorkout();
-    const { t } = useTranslation();
-    const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
-    const restSeconds = useRestTimer(restEndTime || null);
 
-    const isNavigating = React.useRef(false);
+    const isNavigating = useRef(false);
 
-    const formatTime = (seconds: number) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-    };
-
-    const handlePress = () => {
+    const handlePress = useCallback(() => {
         if (!activeWorkout) return;
         if (isNavigating.current) return;
         isNavigating.current = true;
@@ -40,10 +60,16 @@ export const ActiveWorkoutOverlay: React.FC = () => {
         setTimeout(() => {
             isNavigating.current = false;
         }, 1000);
-    };
+    }, [activeWorkout, router]);
 
-    // Only hide if no active workout. The shared transition handles the visual hand-off.
+    // Early return if no active workout - memoization still works
     if (!activeWorkout) return null;
+
+    // Memoize routine name translation to avoid recalculating
+    const routineName = useMemo(() =>
+        translateIfKey(activeWorkout.routine.name),
+        [activeWorkout.routine.name]
+    );
 
     return (
         <TouchableOpacity
@@ -54,9 +80,7 @@ export const ActiveWorkoutOverlay: React.FC = () => {
             onPress={handlePress}
             activeOpacity={0.8}
         >
-            <View
-                style={styles.container}
-            >
+            <View style={styles.container}>
                 <BlurView
                     intensity={95}
                     tint="dark"
@@ -76,20 +100,13 @@ export const ActiveWorkoutOverlay: React.FC = () => {
 
                     <View style={styles.info}>
                         <Text style={styles.routineName} numberOfLines={1}>
-                            {translateIfKey(activeWorkout.routine.name)}
+                            {routineName}
                         </Text>
                         <View style={styles.metaRow}>
                             {isResting ? (
-                                <>
-                                    <Clock size={11} color={COLORS.accent} />
-                                    <Text style={styles.restText}>
-                                        Descanso: {formatTime(restSeconds)}
-                                    </Text>
-                                </>
+                                <RestTimerText endTime={restEndTime} />
                             ) : (
-                                <Text style={styles.duration}>
-                                    {formatTime(elapsedSeconds)}
-                                </Text>
+                                <WorkoutTimerText startTime={activeWorkout.startTime} />
                             )}
                         </View>
                     </View>
@@ -102,6 +119,9 @@ export const ActiveWorkoutOverlay: React.FC = () => {
         </TouchableOpacity>
     );
 };
+
+// Export memoized component
+export const ActiveWorkoutOverlay = memo(ActiveWorkoutOverlayComponent);
 
 const styles = StyleSheet.create({
     containerWrapper: {

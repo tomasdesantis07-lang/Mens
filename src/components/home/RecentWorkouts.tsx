@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Dumbbell } from 'lucide-react-native';
-import React, { memo, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     LayoutAnimation,
@@ -21,12 +21,57 @@ interface RecentWorkoutsProps {
 
 const VISIBLE_COUNT = 2;
 
-const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => {
-    const { t } = useTranslation();
-    const { recentSessions: workouts, loading } = useRecentWorkouts(5);
-    const [expanded, setExpanded] = useState(false);
+// --- Helper Functions (Moved outside to be stable) ---
+const calculateTotalVolume = (workout: WorkoutSession): number => {
+    let totalVolume = 0;
+    workout.exercises.forEach(exercise => {
+        exercise.sets.forEach(set => {
+            totalVolume += set.weight * set.reps;
+        });
+    });
+    return Math.round(totalVolume);
+};
 
-    const formatRelativeDate = (timestamp: any): string => {
+const getDurationMinutes = (workout: WorkoutSession): number => {
+    // Use real duration if available
+    if (workout.durationSeconds && workout.durationSeconds > 0) {
+        return Math.round(workout.durationSeconds / 60);
+    }
+    // Fallback estimate for old sessions without durationSeconds
+    let totalSets = 0;
+    workout.exercises.forEach(exercise => {
+        totalSets += exercise.sets.length;
+    });
+    return Math.max(15, totalSets * 2);
+};
+
+const formatDuration = (minutes: number): string => {
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins}m`;
+};
+
+// --- Memoized Item Component ---
+const RecentWorkoutItem = memo(({
+    workout,
+    index,
+    onPress,
+    t
+}: {
+    workout: WorkoutSession;
+    index: number;
+    onPress: () => void;
+    t: any
+}) => {
+    // Memoized derived data for this specific item
+    const volume = useMemo(() => (calculateTotalVolume(workout) / 1000).toFixed(1), [workout]);
+    const duration = useMemo(() => formatDuration(getDurationMinutes(workout)), [workout]);
+    const exerciseCount = workout.exercises.length;
+
+    // Memoize date formatting
+    const formattedDate = useMemo(() => {
+        const timestamp = workout.performedAt;
         const date = timestamp.toDate();
         const now = new Date();
         const diffTime = now.getTime() - date.getTime();
@@ -37,42 +82,73 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
         if (diffDays < 7) return `${diffDays} ${t('recent_workouts.days_ago') || 'días'}`;
 
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-    };
+    }, [workout.performedAt, t]);
 
-    const calculateTotalVolume = (workout: WorkoutSession): number => {
-        let totalVolume = 0;
-        workout.exercises.forEach(exercise => {
-            exercise.sets.forEach(set => {
-                totalVolume += set.weight * set.reps;
-            });
-        });
-        return Math.round(totalVolume);
-    };
+    return (
+        <AnimatedCard delay={100 + index * 50}>
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onPress}
+            >
+                <View style={styles.workoutCard}>
+                    {/* Header: Name + Date */}
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.workoutName} numberOfLines={1}>
+                            {translateIfKey(workout.routineName)}
+                        </Text>
+                        <Text style={styles.dateText}>
+                            {formattedDate}
+                        </Text>
+                    </View>
 
-    const getDurationMinutes = (workout: WorkoutSession): number => {
-        // Use real duration if available
-        if (workout.durationSeconds && workout.durationSeconds > 0) {
-            return Math.round(workout.durationSeconds / 60);
-        }
-        // Fallback estimate for old sessions without durationSeconds
-        let totalSets = 0;
-        workout.exercises.forEach(exercise => {
-            totalSets += exercise.sets.length;
-        });
-        return Math.max(15, totalSets * 2);
-    };
+                    {/* Stats Row: Centered columns */}
+                    <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{exerciseCount}</Text>
+                            <Text style={styles.statLabel}>{t('common.exercises')}</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{duration}</Text>
+                            <Text style={styles.statLabel}>{t('common.duration')}</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{volume}k</Text>
+                            <Text style={styles.statLabel}>kg</Text>
+                        </View>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        </AnimatedCard>
+    );
+});
 
-    const formatDuration = (minutes: number): string => {
-        const hrs = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        if (hrs > 0) return `${hrs}h ${mins}m`;
-        return `${mins}m`;
-    };
+const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) => {
+    const { t } = useTranslation();
+    const { recentSessions: workouts, loading } = useRecentWorkouts(5);
+    const [expanded, setExpanded] = useState(false);
 
-    const handleToggleExpand = () => {
+    const handleToggleExpand = useCallback(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setExpanded(!expanded);
-    };
+        setExpanded(prev => !prev);
+    }, []);
+
+    // Stabilize the onPress handler for items
+    const handleItemPress = useCallback(() => {
+        if (onViewAll) {
+            onViewAll();
+        } else {
+            handleToggleExpand();
+        }
+    }, [onViewAll, handleToggleExpand]);
+
+    const visibleWorkouts = useMemo(() => {
+        return expanded ? workouts : workouts.slice(0, VISIBLE_COUNT);
+    }, [expanded, workouts]);
+
+    const hasMore = workouts.length > VISIBLE_COUNT;
+    const moreCount = workouts.length;
 
     if (loading) {
         return null; // Or a skeleton
@@ -97,53 +173,19 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
         );
     }
 
-    const visibleWorkouts = expanded ? workouts : workouts.slice(0, VISIBLE_COUNT);
-    const hasMore = workouts.length > VISIBLE_COUNT;
-
     return (
         <View style={styles.container}>
             <Text style={styles.sectionTitle}>{t('recent_workouts.title') || 'Entrenamientos Recientes'}</Text>
 
             <View style={styles.workoutsList}>
                 {visibleWorkouts.map((workout, index) => (
-                    <AnimatedCard key={workout.id} delay={100 + index * 50}>
-                        <TouchableOpacity
-                            activeOpacity={0.7}
-                            onPress={onViewAll || handleToggleExpand}
-                        >
-                            <View style={styles.workoutCard}>
-                                {/* Header: Name + Date */}
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.workoutName} numberOfLines={1}>
-                                        {translateIfKey(workout.routineName)}
-                                    </Text>
-                                    <Text style={styles.dateText}>
-                                        {formatRelativeDate(workout.performedAt)}
-                                    </Text>
-                                </View>
-
-                                {/* Stats Row: Centered columns */}
-                                <View style={styles.statsRow}>
-                                    <View style={styles.statItem}>
-                                        <Text style={styles.statValue}>{workout.exercises.length}</Text>
-                                        <Text style={styles.statLabel}>{t('common.exercises')}</Text>
-                                    </View>
-                                    <View style={styles.statDivider} />
-                                    <View style={styles.statItem}>
-                                        <Text style={styles.statValue}>{formatDuration(getDurationMinutes(workout))}</Text>
-                                        <Text style={styles.statLabel}>{t('common.duration')}</Text>
-                                    </View>
-                                    <View style={styles.statDivider} />
-                                    <View style={styles.statItem}>
-                                        <Text style={styles.statValue}>
-                                            {(calculateTotalVolume(workout) / 1000).toFixed(1)}k
-                                        </Text>
-                                        <Text style={styles.statLabel}>kg</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    </AnimatedCard>
+                    <RecentWorkoutItem
+                        key={workout.id}
+                        workout={workout}
+                        index={index}
+                        onPress={handleItemPress} // Use stable handler
+                        t={t}
+                    />
                 ))}
 
                 {/* Blur overlay for "more" items */}
@@ -162,11 +204,11 @@ const RecentWorkoutsComponent: React.FC<RecentWorkoutsProps> = ({ onViewAll }) =
                         />
                         <TouchableOpacity
                             style={styles.viewAllButton}
-                            onPress={onViewAll || handleToggleExpand}
+                            onPress={handleItemPress}
                             activeOpacity={0.8}
                         >
                             <Text style={styles.viewAllText}>
-                                {t('recent_workouts.view_all') || 'Ver Todos'} ({workouts.length})
+                                {t('recent_workouts.view_all') || 'Ver Todos'} ({moreCount})
                             </Text>
                         </TouchableOpacity>
                     </View>

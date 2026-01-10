@@ -3,7 +3,6 @@ import { Plus, Trash2 } from "lucide-react-native";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    ActivityIndicator,
     Dimensions,
     InteractionManager,
     StyleSheet,
@@ -17,7 +16,6 @@ import DraggableFlatList, {
 } from "react-native-draggable-flatlist";
 import { Gesture, GestureDetector, Swipeable } from "react-native-gesture-handler";
 import Animated, {
-    FadeIn,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
@@ -56,6 +54,37 @@ const WorkoutTimerDisplay: React.FC<{ startTime: number | null }> = memo(({ star
     return <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>;
 });
 
+// Skeleton UI for loading state (fallback when accessing via deep link)
+const ExerciseCardSkeleton: React.FC = memo(() => (
+    <View style={skeletonStyles.card}>
+        <View style={skeletonStyles.header}>
+            <View style={skeletonStyles.iconPlaceholder} />
+            <View style={skeletonStyles.textContainer}>
+                <View style={skeletonStyles.titleBar} />
+                <View style={skeletonStyles.subtitleBar} />
+            </View>
+        </View>
+        <View style={skeletonStyles.setsContainer}>
+            {[1, 2, 3].map((i) => (
+                <View key={i} style={skeletonStyles.setRow}>
+                    <View style={skeletonStyles.setNumber} />
+                    <View style={skeletonStyles.inputPlaceholder} />
+                    <View style={skeletonStyles.inputPlaceholder} />
+                    <View style={skeletonStyles.checkPlaceholder} />
+                </View>
+            ))}
+        </View>
+    </View>
+));
+
+const WorkoutSkeleton: React.FC = memo(() => (
+    <View style={skeletonStyles.container}>
+        {[1, 2, 3, 4].map((i) => (
+            <ExerciseCardSkeleton key={i} />
+        ))}
+    </View>
+));
+
 const TrainScreen: React.FC = () => {
     const { t } = useTranslation();
     const router = useRouter();
@@ -78,59 +107,91 @@ const TrainScreen: React.FC = () => {
         removeExerciseFromSession
     } = useWorkout();
 
+    // ===== CRITICAL OPTIMIZATION: Immediate sync from context =====
+    // When coming from ActiveWorkoutOverlay, data is already in context - use it immediately
     const hasActiveSession = activeWorkout && activeWorkout.routine.id === id;
-    const [loading, setLoading] = useState(!hasActiveSession);
-    const [routine, setRoutine] = useState<Routine | null>(hasActiveSession ? activeWorkout.routine : null);
-    const [selectedDayIndex, setSelectedDayIndex] = useState<number>(
-        activeWorkout?.dayIndex ?? (dayIndex ? parseInt(dayIndex) : 0)
+
+    // Synchronous state initialization - no loading delay when context has data
+    const [routine, setRoutine] = useState<Routine | null>(
+        hasActiveSession ? activeWorkout.routine : null
     );
+    const selectedDayIndex = hasActiveSession
+        ? activeWorkout.dayIndex
+        : (dayIndex ? parseInt(dayIndex) : 0);
+
+    // ===== PROGRESSIVE RENDERING: Defer heavy list until transition completes =====
+    // This is the KEY optimization - render header instantly, list after animation
+    const [isListReady, setIsListReady] = useState(false);
 
     useEffect(() => {
-        if (!loading && routine) {
-            const isSameSession = activeWorkout
-                && activeWorkout.routine.id === routine.id
-                && activeWorkout.dayIndex === selectedDayIndex;
+        // Wait for the navigation transition to complete before rendering the heavy list
+        const interaction = InteractionManager.runAfterInteractions(() => {
+            setIsListReady(true);
+        });
+        return () => interaction.cancel();
+    }, []);
 
-            if (!isSameSession) {
-                startWorkout(routine, selectedDayIndex);
+    // ===== Deep link fallback: Only fetch if no context data =====
+    // This path is rarely taken - only for direct URL access
+    const needsFirebaseFetch = !hasActiveSession && !routine;
+
+    useEffect(() => {
+        if (!needsFirebaseFetch || !id) return;
+
+        let cancelled = false;
+
+        // Defer Firebase fetch to not block initial render
+        InteractionManager.runAfterInteractions(async () => {
+            try {
+                const data = await RoutineService.getRoutineById(id);
+                if (!cancelled && data) {
+                    setRoutine(data);
+                    startWorkout(data, selectedDayIndex);
+                }
+            } catch (error) {
+                console.error('Failed to load routine:', error);
             }
-            setLoading(false);
-        }
-    }, [loading, routine, selectedDayIndex]);
+        });
+
+        return () => { cancelled = true; };
+    }, [id, needsFirebaseFetch, selectedDayIndex, startWorkout]);
+
+    // Derived values - memoized and computed synchronously from context
+    const displayRoutine = hasActiveSession ? activeWorkout.routine : routine;
+    const effectiveDayIndex = hasActiveSession ? activeWorkout.dayIndex : selectedDayIndex;
+
+    const currentDay = useMemo(() =>
+        displayRoutine?.days.find((d: any) => d.dayIndex === effectiveDayIndex),
+        [displayRoutine, effectiveDayIndex]
+    );
+
+    const exercises = useMemo(() => currentDay?.exercises || [], [currentDay]);
+
+    // All exercises collapsed by default - user expands manually
+    const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
 
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
-    const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
     const flatListRef = useRef<any>(null);
 
-    const isViewingActiveSession = activeWorkout
-        && (routine || activeWorkout.routine)
-        && (activeWorkout.routine.id === id || activeWorkout.routine.id === routine?.id)
-        && activeWorkout.dayIndex === selectedDayIndex;
-
-    const displayRoutine = isViewingActiveSession ? activeWorkout?.routine : routine;
-    const currentDay = displayRoutine?.days.find((d: any) => d.dayIndex === selectedDayIndex);
-
+    // Scroll to expanded exercise
+    // Scroll to expanded exercise with centering logic
     useEffect(() => {
-        if (expandedExerciseId && currentDay?.exercises) {
-            const index = currentDay.exercises.findIndex((e: any) => e.id === expandedExerciseId);
+        if (expandedExerciseId && exercises.length > 0 && isListReady) {
+            const index = exercises.findIndex((e: any) => e.id === expandedExerciseId);
             if (index !== -1) {
+                // Wait slightly for layout change to begin
                 setTimeout(() => {
                     flatListRef.current?.scrollToIndex({
                         index,
                         animated: true,
-                        viewPosition: 0.3,
+                        viewPosition: 0.15, // Places it near top with breathing room
                     });
-                }, 100);
+                }, 50);
             }
         }
-    }, [expandedExerciseId, currentDay]);
-
-    const openedRow = useRef<Swipeable | null>(null);
-    const closeOpenedRow = useCallback(() => {
-        if (openedRow.current) openedRow.current.close();
-    }, []);
+    }, [expandedExerciseId, exercises, isListReady]);
 
     const emptySet = useMemo(() => new Set<string>(), []);
 
@@ -143,9 +204,20 @@ const TrainScreen: React.FC = () => {
     const [recommendations, setRecommendations] = useState<CatalogExercise[]>([]);
     const [addExerciseModalVisible, setAddExerciseModalVisible] = useState(false);
 
+    // ===== Defer modal mounting until after list is ready =====
+    const [modalsReady, setModalsReady] = useState(false);
+    useEffect(() => {
+        if (isListReady) {
+            // Extra delay to ensure smooth list rendering first
+            const timeout = setTimeout(() => setModalsReady(true), 300);
+            return () => clearTimeout(timeout);
+        }
+    }, [isListReady]);
+
     const translateY = useSharedValue(0);
     const { height: SCREEN_HEIGHT } = Dimensions.get('window');
     const DISMISS_THRESHOLD = SCREEN_HEIGHT * 0.4;
+    const VELOCITY_THRESHOLD = 800; // pixels per second - fast swipe
     const dismissScreen = () => router.back();
 
     const panGesture = Gesture.Pan()
@@ -153,7 +225,12 @@ const TrainScreen: React.FC = () => {
             if (event.translationY > 0) translateY.value = event.translationY;
         })
         .onEnd((event) => {
-            if (event.translationY > DISMISS_THRESHOLD) {
+            // Dismiss if: crossed threshold OR fast swipe down
+            const shouldDismiss =
+                event.translationY > DISMISS_THRESHOLD ||
+                (event.velocityY > VELOCITY_THRESHOLD && event.translationY > 50);
+
+            if (shouldDismiss) {
                 translateY.value = withTiming(SCREEN_HEIGHT, { duration: 200 }, () => {
                     runOnJS(dismissScreen)();
                 });
@@ -165,25 +242,6 @@ const TrainScreen: React.FC = () => {
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: translateY.value }],
     }));
-
-    useEffect(() => {
-        if (!id) return;
-        const interaction = InteractionManager.runAfterInteractions(() => {
-            const loadData = async () => {
-                if (!routine) {
-                    try {
-                        const data = await RoutineService.getRoutineById(id);
-                        setRoutine(data);
-                        setLoading(false);
-                    } catch (error) {
-                        setLoading(false);
-                    }
-                }
-            };
-            loadData();
-        });
-        return () => interaction.cancel();
-    }, [id, routine]);
 
     const handleToggleSet = useCallback((exerciseId: string, setIndex: number, restSeconds: number) => {
         toggleSetComplete(exerciseId, setIndex);
@@ -295,7 +353,7 @@ const TrainScreen: React.FC = () => {
                         logs={activeWorkout?.logs[item.id] || []}
                         completedSets={activeWorkout?.completedSets || emptySet}
                         isExpanded={expandedExerciseId === item.id}
-                        onToggleExpand={() => handleToggleExpand(item.id)}
+                        onToggleExpand={handleToggleExpand}
                         onLogSet={logSet}
                         onToggleSetComplete={handleToggleSet}
                         onAddSet={addSet}
@@ -311,14 +369,14 @@ const TrainScreen: React.FC = () => {
         /* @ts-ignore */
         <Animated.View
             style={[styles.container, { paddingTop: Math.max(insets.top, 20) }, animatedStyle]}
-            entering={FadeIn.duration(300)}
+        // REMOVED: FadeIn.duration(300) - This was blocking the native slide animation
         >
-            {loading ? (
-                <View style={styles.loaderContainer}><ActivityIndicator color={COLORS.primary} size="large" /></View>
-            ) : !routine && !activeWorkout ? (
-                <View style={styles.loaderContainer}><Text>{t('train.routine_not_found')}</Text></View>
+            {!displayRoutine ? (
+                // Only show full skeleton for deep link access without context data
+                <WorkoutSkeleton />
             ) : (
                 <>
+                    {/* Header renders IMMEDIATELY - lightweight, no heavy components */}
                     <GestureDetector gesture={panGesture}>
                         <View style={styles.header}>
                             <View style={styles.dragHandle}><View style={styles.dragIndicator} /></View>
@@ -336,33 +394,52 @@ const TrainScreen: React.FC = () => {
                                     </View>
                                 </View>
                             </View>
-                            <Text style={styles.routineName}>{displayRoutine ? translateIfKey(displayRoutine.name) : ''}</Text>
+                            <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
                         </View>
                     </GestureDetector>
 
-                    <DraggableFlatList
-                        ref={flatListRef}
-                        data={currentDay?.exercises || []}
-                        onDragEnd={({ from, to }) => reorderExercises(from, to)}
-                        keyExtractor={(item) => item.id}
-                        renderItem={renderItem}
-                        contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 24 }}
-                        ListFooterComponent={
-                            <TouchableOpacity style={styles.addExerciseButton} onPress={() => setAddExerciseModalVisible(true)}>
-                                <Plus size={20} color={COLORS.primary} /><Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
-                            </TouchableOpacity>
-                        }
-                    />
+                    {/* PROGRESSIVE RENDERING: List waits for transition to complete */}
+                    {isListReady ? (
+                        <DraggableFlatList
+                            ref={flatListRef}
+                            containerStyle={{ flex: 1 }}
+                            data={exercises}
+                            onDragEnd={({ from, to }) => reorderExercises(from, to)}
+                            keyExtractor={(item) => item.id}
+                            renderItem={renderItem}
+                            contentContainerStyle={{ paddingBottom: 180, paddingHorizontal: 24 }}
+                            // ===== PERFORMANCE OPTIMIZATIONS =====
+                            removeClippedSubviews={true}
+                            initialNumToRender={3}
+                            maxToRenderPerBatch={2}
+                            windowSize={5}
+                            ListFooterComponent={
+                                <TouchableOpacity style={styles.addExerciseButton} onPress={() => setAddExerciseModalVisible(true)}>
+                                    <Plus size={20} color={COLORS.primary} /><Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
+                                </TouchableOpacity>
+                            }
+                        />
+                    ) : (
+                        // Show skeleton in list area while waiting for transition
+                        <View style={{ flex: 1, paddingHorizontal: 24 }}>
+                            <WorkoutSkeleton />
+                        </View>
+                    )}
 
-                    <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+                    <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24), position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
                         <PrimaryButton title={t('train.finish_session')} onPress={handleFinishWorkout} loading={isSaving} />
                         <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}><Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text></TouchableOpacity>
                     </View>
                 </>
             )}
-            <ConfirmDialog visible={showCancelDialog} onConfirm={confirmCancelWorkout} onCancel={() => setShowCancelDialog(false)} title={t('train.cancel_dialog.title')} message={t('train.cancel_dialog.message')} variant="danger" />
-            <ExercisePickerModal visible={replacementModalVisible} onClose={() => setReplacementModalVisible(false)} onSelect={handleConfirmReplace} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} recommendedExercises={recommendations} multiSelect={false} />
-            <ExercisePickerModal visible={addExerciseModalVisible} onClose={() => setAddExerciseModalVisible(false)} onSelect={handleAddExercises} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} multiSelect={true} />
+            {/* Defer heavy modals until after initial render to prioritize main UI */}
+            {modalsReady && (
+                <>
+                    <ConfirmDialog visible={showCancelDialog} onConfirm={confirmCancelWorkout} onCancel={() => setShowCancelDialog(false)} title={t('train.cancel_dialog.title')} message={t('train.cancel_dialog.message')} variant="danger" />
+                    <ExercisePickerModal visible={replacementModalVisible} onClose={() => setReplacementModalVisible(false)} onSelect={handleConfirmReplace} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} recommendedExercises={recommendations} multiSelect={false} />
+                    <ExercisePickerModal visible={addExerciseModalVisible} onClose={() => setAddExerciseModalVisible(false)} onSelect={handleAddExercises} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} multiSelect={true} />
+                </>
+            )}
         </Animated.View>
     );
 };
@@ -409,4 +486,80 @@ const styles = StyleSheet.create({
     deleteButton: { backgroundColor: COLORS.error + '20', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%', borderRadius: 16 },
     addExerciseButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed', borderRadius: 16, marginVertical: 16, gap: 8, backgroundColor: COLORS.surface },
     addExerciseButtonText: { color: COLORS.primary, fontSize: 16, fontWeight: '600' }
+});
+
+// Skeleton styles for loading state (deep link fallback)
+const skeletonStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        paddingHorizontal: 24,
+        paddingTop: 80, // Account for header space
+    },
+    card: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    iconPlaceholder: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.border,
+        opacity: 0.5,
+    },
+    textContainer: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    titleBar: {
+        height: 18,
+        width: '70%',
+        borderRadius: 9,
+        backgroundColor: COLORS.border,
+        opacity: 0.5,
+        marginBottom: 8,
+    },
+    subtitleBar: {
+        height: 12,
+        width: '40%',
+        borderRadius: 6,
+        backgroundColor: COLORS.border,
+        opacity: 0.3,
+    },
+    setsContainer: {
+        gap: 8,
+    },
+    setRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 8,
+    },
+    setNumber: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: COLORS.border,
+        opacity: 0.4,
+    },
+    inputPlaceholder: {
+        flex: 1,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: COLORS.border,
+        opacity: 0.3,
+    },
+    checkPlaceholder: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: COLORS.border,
+        opacity: 0.4,
+    },
 });

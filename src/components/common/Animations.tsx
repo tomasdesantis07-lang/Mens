@@ -36,7 +36,13 @@ export const STAGGER = {
 };
 
 // ============================================
-// ANIMATED CARD WRAPPER (Disabled for performance)
+// PERFORMANCE: Entry animations DISABLED for PagerView compatibility
+// All wrappers now render children directly without animation
+// This prevents JS thread blocking when swiping between tabs
+// ============================================
+
+// ============================================
+// ANIMATED CARD WRAPPER (No animation - performance)
 // ============================================
 interface AnimatedCardProps {
     children: React.ReactNode;
@@ -53,7 +59,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
 };
 
 // ============================================
-// ANIMATED POP-IN (Disabled for performance)
+// ANIMATED POP-IN (No animation - performance)
 // ============================================
 interface AnimatedPopInProps {
     children: React.ReactNode;
@@ -70,11 +76,11 @@ export const AnimatedPopIn: React.FC<AnimatedPopInProps> = ({
 };
 
 // ============================================
-// ANIMATED SLIDE-IN (Disabled for performance)
+// ANIMATED SLIDE-IN (No animation - performance)
 // ============================================
 interface AnimatedSlideInProps {
     children: React.ReactNode;
-    direction?: "up" | "down" | "right";
+    direction?: "up" | "down" | "right" | "left";
     index?: number;
     delay?: number;
     style?: StyleProp<ViewStyle>;
@@ -88,7 +94,7 @@ export const AnimatedSlideIn: React.FC<AnimatedSlideInProps> = ({
 };
 
 // ============================================
-// ANIMATED SECTION (Disabled for performance)
+// ANIMATED SECTION (No animation - performance)
 // ============================================
 interface AnimatedSectionProps {
     children: React.ReactNode;
@@ -104,7 +110,7 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
 };
 
 // ============================================
-// ANIMATED HEADER (Disabled for performance)
+// ANIMATED HEADER (No animation - performance)
 // ============================================
 interface AnimatedHeaderProps {
     children: React.ReactNode;
@@ -119,7 +125,7 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
 };
 
 // ============================================
-// ANIMATED LIST ITEM (Disabled for performance)
+// ANIMATED LIST ITEM (No animation - performance)
 // ============================================
 interface AnimatedListItemProps {
     children: React.ReactNode;

@@ -1,8 +1,8 @@
+import { FlashList } from "@shopify/flash-list";
 import { Activity, Check, Dumbbell, Pencil, Search, X } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    FlatList,
     Modal,
     Platform,
     ScrollView,
@@ -10,13 +10,15 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EXERCISE_CATALOG } from "../../data/exerciseCatalog";
 import { COLORS } from "../../theme/theme";
 import { BodyPartSlug } from "../../types/bodyParts";
 import { CatalogExercise } from "../../types/exercise";
+
+const TypedFlashList = FlashList as any;
 
 interface ExercisePickerModalProps {
     visible: boolean;
@@ -255,19 +257,22 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                 </View>
 
                 {/* Exercise List */}
-                <FlatList
-                    data={filteredExercises}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyText}>
-                                {t('exercise_picker.no_results')}
-                            </Text>
-                        </View>
-                    }
-                />
+                <View style={{ flex: 1 }}>
+                    <TypedFlashList
+                        data={filteredExercises}
+                        renderItem={renderItem}
+                        keyExtractor={(item: any) => item.id}
+                        contentContainerStyle={styles.listContent}
+                        estimatedItemSize={75}
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyText}>
+                                    {t('exercise_picker.no_results')}
+                                </Text>
+                            </View>
+                        }
+                    />
+                </View>
 
                 {/* Bottom Actions */}
                 <View style={[styles.customButtonContainer, { paddingBottom: insets.bottom + 16 }]}>

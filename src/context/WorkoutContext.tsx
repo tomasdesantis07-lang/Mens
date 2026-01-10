@@ -19,7 +19,6 @@ interface WorkoutContextType {
     toggleSetComplete: (exerciseId: string, setIndex: number) => void;
     addSet: (exerciseId: string) => void;
     removeSet: (exerciseId: string, setIndex: number) => void;
-    restTimerDuration: number;
     isResting: boolean;
     startRestTimer: (seconds: number) => void;
     stopRestTimer: () => void;
@@ -397,8 +396,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         replaceExercise,
         reorderExercises,
         addExerciseToSession,
-        removeExerciseFromSession,
-        restTimerDuration: restEndTime ? Math.max(0, Math.ceil((restEndTime - Date.now()) / 1000)) : 0
+        removeExerciseFromSession
     }), [
         activeWorkout,
         startWorkout,
