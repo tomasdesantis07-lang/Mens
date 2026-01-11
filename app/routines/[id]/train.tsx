@@ -1,5 +1,6 @@
+import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Plus, Trash2 } from "lucide-react-native";
+import { CheckSquare, Edit3, Plus, Trash2 } from "lucide-react-native";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -159,8 +160,30 @@ const TrainScreen: React.FC = () => {
 
     // All exercises collapsed by default - user expands manually
     const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
 
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
+
+    // Fetch Last Session for History Display
+    useEffect(() => {
+        const loadLastSession = async () => {
+            if (routine?.id && auth.currentUser?.uid) {
+                try {
+                    // Fix: Use correct method name and pass selectedDayIndex
+                    const session = await WorkoutService.getLastWorkoutSessionForRoutine(
+                        auth.currentUser.uid,
+                        routine.id,
+                        selectedDayIndex
+                    );
+                    setLastSession(session);
+                } catch (e) {
+                    console.log("Error loading last session", e);
+                }
+            }
+        };
+        loadLastSession();
+    }, [routine?.id, selectedDayIndex]);
+
     const [isSaving, setIsSaving] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const flatListRef = useRef<any>(null);
@@ -324,6 +347,58 @@ const TrainScreen: React.FC = () => {
         setAddExerciseModalVisible(false);
     };
 
+    // ===== MEMOIZED RENDER ITEMS =====
+    const renderFlashListItem = useCallback(({ item }: { item: any }) => (
+        <View style={{ marginBottom: 4 }}>
+            <Swipeable
+                renderRightActions={() => (
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => removeExerciseFromSession(item.id)}
+                    >
+                        <Trash2 size={24} color={COLORS.error} />
+                    </TouchableOpacity>
+                )}
+            >
+                <WorkoutExerciseCard
+                    exercise={item}
+                    logs={activeWorkout?.logs[item.id] || []}
+                    completedSets={activeWorkout?.completedSets || emptySet}
+                    isExpanded={expandedExerciseId === item.id}
+                    onToggleExpand={handleToggleExpand}
+                    onLogSet={logSet}
+                    onToggleSetComplete={handleToggleSet}
+                    onAddSet={addSet}
+                    getLastSessionSet={getLastSessionSet}
+                    onReplace={handleInitiateReplace}
+                // No onLongPress in View Mode
+                />
+            </Swipeable>
+        </View>
+    ), [activeWorkout?.logs, activeWorkout?.completedSets, emptySet, expandedExerciseId, handleToggleExpand, logSet, handleToggleSet, addSet, getLastSessionSet, handleInitiateReplace, removeExerciseFromSession]);
+
+    const renderDraggableItem = useCallback(({ item, drag, isActive }: RenderItemParams<any>) => (
+        <ScaleDecorator activeScale={1.03}>
+            <View style={{ marginBottom: 4, opacity: isActive ? 0.8 : 1 }}>
+                {/* In Edit Mode, we disable Swipeable to avoid gesture conflicts */}
+                <WorkoutExerciseCard
+                    exercise={item}
+                    logs={activeWorkout?.logs[item.id] || []}
+                    // Lock completed sets logic in edit mode if desired, or keep as is.
+                    completedSets={activeWorkout?.completedSets || emptySet}
+                    isExpanded={false} // Force collapsed in edit mode
+                    onToggleExpand={() => { }} // Disable expand in edit mode
+                    onLogSet={() => { }} // Disable editing
+                    onToggleSetComplete={() => { }}
+                    onAddSet={() => { }}
+                    getLastSessionSet={() => null}
+                    onReplace={() => { }}
+                    onLongPress={drag} // Enable drag
+                />
+            </View>
+        </ScaleDecorator>
+    ), [activeWorkout?.logs, activeWorkout?.completedSets, emptySet]);
+
 
 
 
@@ -355,64 +430,71 @@ const TrainScreen: React.FC = () => {
                                         <WorkoutTimerDisplay startTime={activeWorkout?.startTime ?? null} />
                                     </View>
                                 </View>
+
+                                {/* Edit Mode Toggle */}
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (isEditMode) {
+                                            // Exit edit mode
+                                            setIsEditMode(false);
+                                        } else {
+                                            // Enter edit mode - collapse all for better drag performance
+                                            setExpandedExerciseId(null);
+                                            setIsEditMode(true);
+                                            showToast.info(t('train.reorder_mode_active') || "Reorder Mode Active");
+                                        }
+                                    }}
+                                    style={styles.editButton}
+                                >
+                                    {isEditMode ? (
+                                        <CheckSquare size={22} color={COLORS.primary} />
+                                    ) : (
+                                        <Edit3 size={20} color={COLORS.textSecondary} />
+                                    )}
+                                </TouchableOpacity>
                             </View>
                             <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
                         </View>
                     </GestureDetector>
 
-                    {/* OPTIMIZED: DraggableFlatList for drag-and-drop reordering */}
+                    {/* OPTIMIZED: Dual List Engine - FlashList (View) / DraggableFlatList (Edit) */}
                     {isListReady ? (
-                        <DraggableFlatList
-                            data={exercises}
-                            keyExtractor={(item) => item.id}
-                            onDragEnd={({ data }) => {
-                                // Sync the reordered exercises with context
-                                reorderExercises(data.map(e => e.id));
-                            }}
-                            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
-                            activationDistance={10}
-                            renderItem={({ item, drag, isActive }: RenderItemParams<typeof exercises[0]>) => (
-                                <ScaleDecorator activeScale={1.03}>
-                                    <View style={{ marginBottom: 4, opacity: isActive ? 0.8 : 1 }}>
-                                        <Swipeable
-                                            enabled={!isActive}
-                                            renderRightActions={() => (
-                                                <TouchableOpacity
-                                                    style={styles.deleteButton}
-                                                    onPress={() => removeExerciseFromSession(item.id)}
-                                                >
-                                                    <Trash2 size={24} color={COLORS.error} />
-                                                </TouchableOpacity>
-                                            )}
-                                        >
-                                            <WorkoutExerciseCard
-                                                exercise={item}
-                                                logs={activeWorkout?.logs[item.id] || []}
-                                                completedSets={activeWorkout?.completedSets || emptySet}
-                                                isExpanded={expandedExerciseId === item.id}
-                                                onToggleExpand={handleToggleExpand}
-                                                onLogSet={logSet}
-                                                onToggleSetComplete={handleToggleSet}
-                                                onAddSet={addSet}
-                                                getLastSessionSet={getLastSessionSet}
-                                                onReplace={handleInitiateReplace}
-                                                onLongPress={drag}
-                                            />
-                                        </Swipeable>
-                                    </View>
-                                </ScaleDecorator>
-                            )}
-                            ListFooterComponent={
-                                <TouchableOpacity
-                                    style={styles.addExerciseButton}
-                                    onPress={() => setAddExerciseModalVisible(true)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Plus size={20} color={COLORS.primary} />
-                                    <Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
-                                </TouchableOpacity>
-                            }
-                        />
+                        isEditMode ? (
+                            <DraggableFlatList
+                                data={exercises}
+                                keyExtractor={(item) => item.id}
+                                onDragEnd={({ data }) => {
+                                    reorderExercises(data.map(e => e.id));
+                                }}
+                                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
+                                activationDistance={10}
+                                renderItem={renderDraggableItem}
+                                ListFooterComponent={<View style={{ height: 80 }} />}
+                            />
+                        ) : (
+                            // @ts-ignore - Force bypass broken type definition
+                            <FlashList
+                                ref={flatListRef}
+                                data={exercises}
+                                keyExtractor={(item: any) => item.id}
+                                {...({ estimatedItemSize: 160 } as any)} // Force prop injection
+                                extraData={[activeWorkout?.logs, activeWorkout?.completedSets, expandedExerciseId]}
+                                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
+                                removeClippedSubviews={true}
+                                drawDistance={500} // Render ahead for smooth scroll
+                                renderItem={renderFlashListItem}
+                                ListFooterComponent={
+                                    <TouchableOpacity
+                                        style={styles.addExerciseButton}
+                                        onPress={() => setAddExerciseModalVisible(true)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Plus size={20} color={COLORS.primary} />
+                                        <Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
+                                    </TouchableOpacity>
+                                }
+                            />
+                        )
                     ) : (
                         <View style={{ flex: 1, paddingHorizontal: 24 }}>
                             <WorkoutSkeleton />
@@ -456,9 +538,17 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     minimizeButton: {
+        // Positioned absolutely left
         position: 'absolute',
         left: 0,
         zIndex: 10,
+        padding: 8,
+    },
+    editButton: {
+        position: 'absolute',
+        right: 0,
+        zIndex: 10,
+        padding: 8,
     },
     timerWrapper: {
         flex: 1,

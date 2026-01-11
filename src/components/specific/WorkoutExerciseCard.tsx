@@ -38,44 +38,41 @@ interface WorkoutExerciseCardProps {
 // Fixed heights for reliable animation
 const ROW_HEIGHT = 54;
 const HEADER_HEIGHT = 40;
-// Isolated Input Component to prevent re-renders while typing
+// Isolated Input Component - STRICTLY UNCONTROLLED for 0-lag typing
 const IsolatedInput = memo(({
-    value,
+    initialValue,
     onChange,
     placeholder,
-    isCompleted
+    isCompleted,
+    testID
 }: {
-    value: number;
+    initialValue: number;
     onChange: (val: number) => void;
     placeholder: string;
     isCompleted: boolean;
+    testID?: string;
 }) => {
-    // Initial value from props
-    const [localValue, setLocalValue] = React.useState(value > 0 ? value.toString() : "");
-
-    // Sync from props if external change happens (e.g. initial load or reset)
-    // We only update if the prop value is significantly different to avoid cursor jumps,
-    // but here we mostly rely on local state for the typing session.
-    React.useEffect(() => {
-        setLocalValue(value > 0 ? value.toString() : "");
-    }, [value]);
+    // Initialize ONCE. No useEffect sync to avoid re-renders while typing.
+    const [localValue, setLocalValue] = React.useState(initialValue > 0 ? initialValue.toString() : "");
 
     const handleChangeText = (text: string) => {
-        // Allow decimals
         setLocalValue(text);
     };
 
     const handleEndEditing = () => {
-        const num = parseFloat(localValue);
-        if (!isNaN(num) && num !== value) {
+        const num = parseFloat(localValue.replace(',', '.')); // Handle commas
+        if (!isNaN(num)) {
+            // Only fire if value is valid. 
+            // We pass it even if it's the same, to ensure context logic runs if needed (though context usually dedupes)
             onChange(num);
-        } else if (localValue === "" && value !== 0) {
+        } else if (localValue === "" && initialValue !== 0) {
             onChange(0);
         }
     };
 
     return (
         <TextInput
+            testID={testID}
             style={[styles.input, isCompleted && styles.inputCompleted]}
             keyboardType="numeric"
             value={localValue}
@@ -85,6 +82,9 @@ const IsolatedInput = memo(({
             placeholder={placeholder}
             placeholderTextColor={COLORS.textTertiary}
             selectTextOnFocus
+            // Important for preserving performant input on Android
+            textContentType="none"
+            autoComplete="off"
         />
     );
 });
@@ -108,14 +108,14 @@ const SetRow = memo(({ set, index, isCompleted, lastSet, exerciseId, onLogSet, o
             </View>
 
             <IsolatedInput
-                value={set.weight}
+                initialValue={set.weight}
                 onChange={handleWeightChange}
                 placeholder="0"
                 isCompleted={isCompleted}
             />
 
             <IsolatedInput
-                value={set.reps}
+                initialValue={set.reps}
                 onChange={handleRepsChange}
                 placeholder="0"
                 isCompleted={isCompleted}
@@ -228,7 +228,8 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
 
                 {logs.map((set, index) => (
                     <SetRow
-                        key={set.setIndex}
+                        // Force remount if the catalog exercise changes (replace)
+                        key={`${exercise.exerciseId}-${set.setIndex}`}
                         set={set}
                         index={index}
                         isCompleted={completedSets.has(`${exercise.id}-${set.setIndex}`)}
@@ -250,6 +251,7 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
 export const WorkoutExerciseCard = memo(WorkoutExerciseCardComponent, (prev, next) => {
     if (prev.isExpanded !== next.isExpanded) return false;
     if (prev.exercise.id !== next.exercise.id) return false;
+    if (prev.exercise.exerciseId !== next.exercise.exerciseId) return false; // Check catalog ID change (Replace)
     if (prev.logs.length !== next.logs.length) return false;
     const prevDone = prev.logs.filter(s => prev.completedSets.has(`${prev.exercise.id}-${s.setIndex}`)).length;
     const nextDone = next.logs.filter(s => next.completedSets.has(`${next.exercise.id}-${s.setIndex}`)).length;
