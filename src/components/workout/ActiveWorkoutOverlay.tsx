@@ -3,7 +3,8 @@ import { useRouter } from "expo-router";
 import { Clock, Dumbbell } from "lucide-react-native";
 import React, { memo, useCallback, useMemo, useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useRestTimer, useWorkout, useWorkoutTimer } from "../../context/WorkoutContext";
+import { useWorkout } from "../../context/WorkoutContext";
+import { useWorkoutTimerContext } from "../../context/WorkoutTimerContext";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
 import { translateIfKey } from "../../utils/translationHelpers";
 
@@ -20,23 +21,23 @@ const formatTime = (seconds: number) => {
 };
 
 // Memoized workout timer display - only re-renders when elapsed time changes
-const WorkoutTimerText = memo(({ startTime }: { startTime: number | null }) => {
-    const elapsedSeconds = useWorkoutTimer(startTime);
+const WorkoutTimerText = memo(() => {
+    const { elapsedTime } = useWorkoutTimerContext();
     return (
         <Text style={styles.duration}>
-            {formatTime(elapsedSeconds)}
+            {formatTime(elapsedTime)}
         </Text>
     );
 });
 
 // Memoized rest timer display - only re-renders when rest time changes
-const RestTimerText = memo(({ endTime }: { endTime: number | null }) => {
-    const restSeconds = useRestTimer(endTime);
+const RestTimerText = memo(() => {
+    const { restRemaining } = useWorkoutTimerContext();
     return (
         <>
             <Clock size={11} color={COLORS.accent} />
             <Text style={styles.restText}>
-                Descanso: {formatTime(restSeconds)}
+                Descanso: {formatTime(restRemaining)}
             </Text>
         </>
     );
@@ -45,7 +46,8 @@ const RestTimerText = memo(({ endTime }: { endTime: number | null }) => {
 // Main overlay component - memoized to prevent parent re-renders from affecting it
 const ActiveWorkoutOverlayComponent: React.FC = () => {
     const router = useRouter();
-    const { activeWorkout, restEndTime, isResting } = useWorkout();
+    const { activeWorkout } = useWorkout();
+    const { isResting } = useWorkoutTimerContext();
 
     const isNavigating = useRef(false);
 
@@ -104,9 +106,9 @@ const ActiveWorkoutOverlayComponent: React.FC = () => {
                         </Text>
                         <View style={styles.metaRow}>
                             {isResting ? (
-                                <RestTimerText endTime={restEndTime} />
+                                <RestTimerText />
                             ) : (
-                                <WorkoutTimerText startTime={activeWorkout.startTime} />
+                                <WorkoutTimerText />
                             )}
                         </View>
                     </View>

@@ -36,7 +36,8 @@ import { CalorieResultsModal } from "../../src/components/home/CalorieResultsMod
 import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
 import { RoutineCard } from "../../src/components/specific/RoutineCard";
-import { useWorkout, useWorkoutTimer } from "../../src/context/WorkoutContext";
+import { useWorkout } from "../../src/context/WorkoutContext";
+import { useWorkoutTimerContext } from "../../src/context/WorkoutTimerContext";
 import { useRoutines } from "../../src/hooks/useRoutines";
 import { useTabBarInset } from "../../src/hooks/useTabBarInset";
 import { auth, db } from "../../src/services/firebaseConfig";
@@ -68,7 +69,8 @@ const STAT_CARD_HEIGHT = 100;
 
 // Helper component for the timer inside the shared element to avoid re-rendering layout
 const ActiveTimer: React.FC<{ startTime: number | null }> = ({ startTime }) => {
-  const elapsed = useWorkoutTimer(startTime);
+  const { elapsedTime } = useWorkoutTimerContext();
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -76,7 +78,7 @@ const ActiveTimer: React.FC<{ startTime: number | null }> = ({ startTime }) => {
     if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
-  return <Text style={styles.activeTimerText}>{formatTime(elapsed)}</Text>;
+  return <Text style={styles.activeTimerText}>{formatTime(elapsedTime)}</Text>;
 };
 
 const HomeScreen: React.FC = () => {

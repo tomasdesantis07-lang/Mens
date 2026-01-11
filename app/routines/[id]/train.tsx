@@ -5,9 +5,12 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "
 import { useTranslation } from "react-i18next";
 import {
     Dimensions,
+    LayoutAnimation,
+    Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
+    UIManager,
     View
 } from "react-native";
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
@@ -25,7 +28,8 @@ import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { ExercisePickerModal } from "../../../src/components/specific/ExercisePickerModal";
 import { WorkoutExerciseCard } from "../../../src/components/specific/WorkoutExerciseCard";
-import { useWorkout, useWorkoutTimer } from "../../../src/context/WorkoutContext";
+import { useWorkout } from "../../../src/context/WorkoutContext";
+import { useWorkoutTimerContext } from "../../../src/context/WorkoutTimerContext";
 import { ExerciseRecommendationService } from "../../../src/services/ExerciseRecommendationService";
 import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
@@ -38,7 +42,8 @@ import { showToast } from "../../../src/utils/toast";
 import { translateIfKey } from "../../../src/utils/translationHelpers";
 
 const WorkoutTimerDisplay: React.FC<{ startTime: number | null }> = memo(({ startTime }: { startTime: number | null }) => {
-    const elapsedSeconds = useWorkoutTimer(startTime);
+    const { elapsedTime } = useWorkoutTimerContext();
+
 
     const formatElapsedTime = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
@@ -48,7 +53,7 @@ const WorkoutTimerDisplay: React.FC<{ startTime: number | null }> = memo(({ star
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    return <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>;
+    return <Text style={styles.timerText}>{formatElapsedTime(elapsedTime)}</Text>;
 });
 
 // Skeleton UI for loading state - COLLAPSED style to match actual cards
@@ -87,12 +92,12 @@ const TrainScreen: React.FC = () => {
         removeSet,
         finishWorkout,
         cancelWorkout,
-        startRestTimer,
         replaceExercise,
         reorderExercises,
         addExerciseToSession,
         removeExerciseFromSession
     } = useWorkout();
+    const { startRest } = useWorkoutTimerContext();
 
     // ===== CRITICAL OPTIMIZATION: Immediate sync from context =====
     // When coming from ActiveWorkoutOverlay, data is already in context - use it immediately
@@ -208,7 +213,15 @@ const TrainScreen: React.FC = () => {
 
     const emptySet = useMemo(() => new Set<string>(), []);
 
+    // Enable LayoutAnimation for Android
+    if (Platform.OS === 'android') {
+        if (UIManager.setLayoutAnimationEnabledExperimental) {
+            UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+    }
+
     const handleToggleExpand = useCallback((exerciseId: string) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpandedExerciseId(prev => prev === exerciseId ? null : exerciseId);
     }, []);
 
@@ -258,8 +271,8 @@ const TrainScreen: React.FC = () => {
 
     const handleToggleSet = useCallback((exerciseId: string, setIndex: number, restSeconds: number) => {
         toggleSetComplete(exerciseId, setIndex);
-        startRestTimer(restSeconds);
-    }, [toggleSetComplete, startRestTimer]);
+        startRest(restSeconds);
+    }, [toggleSetComplete, startRest]);
 
     const getLastSessionSet = useCallback((exerciseId: string, setIndex: number) => {
         if (!lastSession) return null;

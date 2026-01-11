@@ -8,12 +8,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
-} from "react-native-reanimated";
 import { COLORS } from "../../theme/theme";
 import { RoutineExercise } from "../../types/routine";
 import { WorkoutSetLog } from "../../types/workout";
@@ -143,39 +137,8 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
         logs.filter(s => completedSets.has(`${exercise.id}-${s.setIndex}`)).length
         , [logs.length, completedSets.size]);
 
-    // Exact height calculation
-    const contentHeight = (logs.length * ROW_HEIGHT) + HEADER_HEIGHT + FOOTER_HEIGHT;
-
-    // Use SharedValue for height interpolation
-    const progress = useSharedValue(isExpanded ? 1 : 0);
-
-    // STABLE ANIMATION: Using withTiming avoids spring oscillation bugs
-    React.useEffect(() => {
-        progress.value = withTiming(isExpanded ? 1 : 0, {
-            duration: 300,
-            easing: Easing.bezier(0.4, 0.0, 0.2, 1), // Standard, predictable ease
-        });
-    }, [isExpanded]);
-
-    const contentStyle = useAnimatedStyle(() => ({
-        height: progress.value * contentHeight,
-        opacity: progress.value,
-        overflow: 'hidden',
-    }));
-
-    // Simplify container animation to avoid List layout thrashing
-    const containerStyle = useAnimatedStyle(() => ({
-        backgroundColor: isExpanded ? COLORS.card : COLORS.background,
-        // Removed dynamic margins to prevent jumping
-        borderWidth: isExpanded ? 1 : 0,
-        borderColor: isExpanded ? COLORS.border : 'transparent',
-        borderRadius: isExpanded ? 16 : 0,
-        paddingHorizontal: isExpanded ? 16 : 0,
-        marginBottom: 8, // Fixed margin
-    }));
-
     return (
-        <Animated.View style={[styles.containerBase, containerStyle]}>
+        <View style={[styles.containerBase, isExpanded && styles.containerExpanded]}>
             <View style={styles.headerRow}>
                 {/* Drag Handle */}
                 {onLongPress && (
@@ -194,7 +157,7 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                         onToggleExpand(exercise.id);
                     }}
                     activeOpacity={1}
-                    delayPressIn={0}
+                    // delayPressIn={0} // Default is fine
                     style={[styles.header, isExpanded && styles.headerExpanded, { flex: 1 }]}
                 >
                     <View style={styles.headerLeft}>
@@ -217,34 +180,36 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                 </TouchableOpacity>
             </View>
 
-            <Animated.View style={contentStyle}>
-                <View style={styles.setsHeader}>
-                    <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
-                    <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
-                    <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
-                    <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
-                    <View style={{ width: 40 }} />
+            {isExpanded && (
+                <View style={styles.contentContainer}>
+                    <View style={styles.setsHeader}>
+                        <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
+                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.prev')}</Text>
+                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.kg')}</Text>
+                        <Text style={[styles.colHeader, { flex: 1 }]}>{t('train.reps')}</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+
+                    {logs.map((set, index) => (
+                        <SetRow
+                            // Force remount if the catalog exercise changes (replace)
+                            key={`${exercise.exerciseId}-${set.setIndex}`}
+                            set={set}
+                            index={index}
+                            isCompleted={completedSets.has(`${exercise.id}-${set.setIndex}`)}
+                            lastSet={getLastSessionSet(exercise.id, set.setIndex)}
+                            exerciseId={exercise.id}
+                            onLogSet={onLogSet}
+                            onToggleSet={(idx: any) => onToggleSetComplete(exercise.id, idx, exercise.restSeconds)}
+                        />
+                    ))}
+
+                    <TouchableOpacity style={styles.addSetButton} onPress={() => onAddSet(exercise.id)}>
+                        <Plus size={16} color={COLORS.primary} /><Text style={styles.addSetText}>{t('train.add_set')}</Text>
+                    </TouchableOpacity>
                 </View>
-
-                {logs.map((set, index) => (
-                    <SetRow
-                        // Force remount if the catalog exercise changes (replace)
-                        key={`${exercise.exerciseId}-${set.setIndex}`}
-                        set={set}
-                        index={index}
-                        isCompleted={completedSets.has(`${exercise.id}-${set.setIndex}`)}
-                        lastSet={getLastSessionSet(exercise.id, set.setIndex)}
-                        exerciseId={exercise.id}
-                        onLogSet={onLogSet}
-                        onToggleSet={(idx: any) => onToggleSetComplete(exercise.id, idx, exercise.restSeconds)}
-                    />
-                ))}
-
-                <TouchableOpacity style={styles.addSetButton} onPress={() => onAddSet(exercise.id)}>
-                    <Plus size={16} color={COLORS.primary} /><Text style={styles.addSetText}>{t('train.add_set')}</Text>
-                </TouchableOpacity>
-            </Animated.View>
-        </Animated.View>
+            )}
+        </View>
     );
 };
 
@@ -260,6 +225,15 @@ export const WorkoutExerciseCard = memo(WorkoutExerciseCardComponent, (prev, nex
 
 const styles = StyleSheet.create({
     containerBase: { width: '100%', overflow: 'hidden' },
+    containerExpanded: {
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        marginBottom: 8
+    },
+    contentContainer: { paddingBottom: 16 }, // Added padding bottom for expanded content
     headerRow: { flexDirection: 'row', alignItems: 'center' },
     dragHandle: { paddingVertical: 16, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center' },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 60, paddingVertical: 10 },

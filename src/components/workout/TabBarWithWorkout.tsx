@@ -4,15 +4,15 @@ import { Clock, Dumbbell } from "lucide-react-native";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useRestTimer, useWorkout, useWorkoutTimer } from "../../context/WorkoutContext";
+import { useWorkout } from "../../context/WorkoutContext";
+import { useWorkoutTimerContext } from "../../context/WorkoutTimerContext";
 import { COLORS } from "../../theme/theme";
 import { translateIfKey } from "../../utils/translationHelpers";
 
 export const TabBarWithWorkout: React.FC = () => {
     const router = useRouter();
-    const { activeWorkout, restEndTime, isResting } = useWorkout();
-    const elapsedSeconds = useWorkoutTimer(activeWorkout?.startTime ?? null);
-    const restSeconds = useRestTimer(restEndTime || null);
+    const { activeWorkout } = useWorkout();
+    const { elapsedTime, restRemaining, isResting } = useWorkoutTimerContext();
     const { t } = useTranslation();
 
     const formatTime = (seconds: number) => {
@@ -66,12 +66,12 @@ export const TabBarWithWorkout: React.FC = () => {
                                     <>
                                         <Clock size={11} color={COLORS.accent} />
                                         <Text style={styles.restText}>
-                                            Descanso: {formatTime(restSeconds)}
+                                            Descanso: {formatTime(restRemaining)}
                                         </Text>
                                     </>
                                 ) : (
                                     <Text style={styles.duration}>
-                                        {formatTime(elapsedSeconds)}
+                                        {formatTime(elapsedTime)}
                                     </Text>
                                 )}
                             </View>

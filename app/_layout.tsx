@@ -15,6 +15,7 @@ import { AuthProvider } from '../src/context/AuthContext';
 import { OnboardingProvider } from '../src/context/OnboardingContext';
 import { SettingsProvider } from '../src/context/SettingsContext';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
+import { WorkoutTimerProvider } from '../src/context/WorkoutTimerContext';
 import { auth, db } from '../src/services/firebaseConfig';
 import { COLORS } from '../src/theme/theme';
 
@@ -110,41 +111,43 @@ export default function RootLayout() {
                 {appIsReady && (
                     <AuthProvider>
                         <SettingsProvider>
-                            <WorkoutProvider>
-                                <OnboardingProvider>
-                                    <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-                                    <Stack screenOptions={{
-                                        headerShown: false,
-                                        contentStyle: { backgroundColor: COLORS.background },
-                                    }}>
-                                        <Stack.Screen name="index" />
-                                        <Stack.Screen name="language" />
-                                        <Stack.Screen name="terms" />
-                                        <Stack.Screen name="auth" />
-                                        <Stack.Screen name="forgot" />
-                                        <Stack.Screen name="onboarding/identity" />
-                                        <Stack.Screen name="onboarding/biometrics" />
-                                        <Stack.Screen name="onboarding/routine" />
-                                        <Stack.Screen name="warning" />
-                                        <Stack.Screen name="(tabs)" />
-                                        <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
-                                        <Stack.Screen name="routines/create" />
-                                        <Stack.Screen name="routines/manual-editor" />
-                                        <Stack.Screen
-                                            name="routines/[id]/train"
-                                            options={{
-                                                animation: 'slide_from_bottom',
-                                                animationDuration: 250,
-                                                presentation: 'transparentModal',
-                                                gestureEnabled: false, // We handle gestures manually in the component
-                                                contentStyle: { backgroundColor: 'transparent' },
-                                            }}
-                                        />
-                                        <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-                                    </Stack>
-                                    <Toast />
-                                </OnboardingProvider>
-                            </WorkoutProvider>
+                            <WorkoutTimerProvider>
+                                <WorkoutProvider>
+                                    <OnboardingProvider>
+                                        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+                                        <Stack screenOptions={{
+                                            headerShown: false,
+                                            contentStyle: { backgroundColor: COLORS.background },
+                                        }}>
+                                            <Stack.Screen name="index" />
+                                            <Stack.Screen name="language" />
+                                            <Stack.Screen name="terms" />
+                                            <Stack.Screen name="auth" />
+                                            <Stack.Screen name="forgot" />
+                                            <Stack.Screen name="onboarding/identity" />
+                                            <Stack.Screen name="onboarding/biometrics" />
+                                            <Stack.Screen name="onboarding/routine" />
+                                            <Stack.Screen name="warning" />
+                                            <Stack.Screen name="(tabs)" />
+                                            <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+                                            <Stack.Screen name="routines/create" />
+                                            <Stack.Screen name="routines/manual-editor" />
+                                            <Stack.Screen
+                                                name="routines/[id]/train"
+                                                options={{
+                                                    animation: 'slide_from_bottom',
+                                                    animationDuration: 250,
+                                                    presentation: 'transparentModal',
+                                                    gestureEnabled: false, // We handle gestures manually in the component
+                                                    contentStyle: { backgroundColor: 'transparent' },
+                                                }}
+                                            />
+                                            <Stack.Screen name="routines/edit/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                                        </Stack>
+                                        <Toast />
+                                    </OnboardingProvider>
+                                </WorkoutProvider>
+                            </WorkoutTimerProvider>
                         </SettingsProvider>
                     </AuthProvider>
                 )}

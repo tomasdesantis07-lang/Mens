@@ -15,12 +15,18 @@ import {
     writeBatch,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
+import { MMKVStorage } from "../storage/mmkv";
 import { RoutineDay, RoutineExercise } from "../types/routine";
 import { RoutineTemplate, TemplateEquipment } from "../types/routineTemplate";
 import { UserProfile } from "../types/user";
 import { WorkoutSession } from "../types/workout";
 import { db } from "./firebaseConfig";
 import { calculateRepRange } from "./logicEngine";
+
+const CACHE_KEYS = {
+    RECENT_SESSIONS: (userId: string) => `sessions_recent_${userId}`,
+    LAST_SESSION: (userId: string, routineId: string) => `session_last_${userId}_${routineId}`,
+};
 
 export const WorkoutService = {
     /**
@@ -77,6 +83,13 @@ export const WorkoutService = {
         limitCount: number = 10,
         callback: (sessions: WorkoutSession[]) => void
     ): Unsubscribe {
+        // 1. Immediate Cache Return
+        const cached = MMKVStorage.getItem<WorkoutSession[]>(CACHE_KEYS.RECENT_SESSIONS(userId));
+        if (cached) {
+            console.log("[WorkoutService] Returning cached recent sessions");
+            callback(cached);
+        }
+
         try {
             const q = query(
                 collection(db, "workoutSessions"),
@@ -90,10 +103,12 @@ export const WorkoutService = {
                     id: doc.id,
                     ...doc.data(),
                 })) as WorkoutSession[];
+
+                // Update Cache
+                MMKVStorage.setItem(CACHE_KEYS.RECENT_SESSIONS(userId), sessions);
                 callback(sessions);
             }, (error) => {
                 console.error("Error subscribing to recent sessions:", error);
-                // Don't modify state on error to avoid flickering
             });
         } catch (error) {
             console.error("Error setting up session subscription:", error);

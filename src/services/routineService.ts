@@ -14,10 +14,17 @@ import {
     writeBatch,
 } from "firebase/firestore";
 import { templateToRoutineDays } from "../data/starterRoutineTemplates";
+import { MMKVStorage } from "../storage/mmkv";
 import { Routine, RoutineDraft } from "../types/routine";
 import { RoutineTemplate } from "../types/routineTemplate"; // Added import
 import { getRecommendedTemplate, UserGoal, UserLevel } from "../utils/routineRecommendation";
 import { db } from "./firebaseConfig";
+
+const CACHE_KEYS = {
+    USER_ROUTINES: (userId: string) => `routines_${userId}`,
+    COMMUNITY_ROUTINES: "routines_community",
+    TEMPLATES: "routine_templates",
+};
 
 export const RoutineService = {
     /**
@@ -105,6 +112,16 @@ export const RoutineService = {
      * Returns an unsubscribe function
      */
     subscribeToUserRoutines(userId: string, callback: (routines: Routine[]) => void): Unsubscribe {
+        // 1. Immediate Cache Return (Disk First)
+        const cached = MMKVStorage.getItem<Routine[]>(CACHE_KEYS.USER_ROUTINES(userId));
+        if (cached) {
+            console.log("[RoutineService] Returning cached routines from MMKV");
+            // Convert string dates back to objects if necessary, though Routines usually use native Firestore timestamps
+            // which might be lost in JSON. For display, we might need a transformer if using toDate().
+            // Ideally we store normalized data. For now, we assume basic structure works.
+            callback(cached);
+        }
+
         try {
             const q = query(
                 collection(db, "routines"),
@@ -124,11 +141,11 @@ export const RoutineService = {
                     return bTime - aTime;
                 });
 
+                // Update Cache
+                MMKVStorage.setItem(CACHE_KEYS.USER_ROUTINES(userId), sortedRoutines);
                 callback(sortedRoutines);
             }, (error) => {
                 console.error("Error subscribing to routines:", error);
-                // Don't call callback with empty list on error to avoid flashing empty state
-                // asking UI to handle error if needed, or just log it.
             });
         } catch (error) {
             console.error("Error setting up routine subscription:", error);
