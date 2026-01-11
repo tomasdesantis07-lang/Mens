@@ -23,7 +23,7 @@ interface WorkoutContextType {
     startRestTimer: (seconds: number) => void;
     stopRestTimer: () => void;
     replaceExercise: (oldExerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => void;
-    reorderExercises: (fromIndex: number, toIndex: number) => void;
+    reorderExercises: (orderedIds: string[]) => void;
     addExerciseToSession: (exercise: RoutineExercise) => void;
     removeExerciseFromSession: (exerciseId: string) => void;
     restEndTime: number | null;
@@ -278,7 +278,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     }, []);
 
-    const reorderExercises = useCallback((fromIndex: number, toIndex: number) => {
+    const reorderExercises = useCallback((orderedIds: string[]) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
 
@@ -289,12 +289,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (dayIndexInRoutine === -1) return prev;
 
             const updatedDay = { ...days[dayIndexInRoutine] };
-            const exercises = [...updatedDay.exercises];
+            const currentExercises = [...updatedDay.exercises];
 
-            const [movedExercise] = exercises.splice(fromIndex, 1);
-            exercises.splice(toIndex, 0, movedExercise);
+            // Re-order exercises based on the provided ordered IDs
+            const exerciseMap = new Map(currentExercises.map(e => [e.id, e]));
+            const reorderedExercises = orderedIds
+                .map(id => exerciseMap.get(id))
+                .filter((e): e is RoutineExercise => e !== undefined);
 
-            updatedDay.exercises = exercises;
+            updatedDay.exercises = reorderedExercises;
             days[dayIndexInRoutine] = updatedDay;
             updatedRoutine.days = days;
 

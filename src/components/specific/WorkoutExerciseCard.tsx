@@ -1,5 +1,5 @@
-import { ArrowLeftRight, Check, Dumbbell, Info, Plus } from "lucide-react-native";
-import React, { memo, useMemo } from "react";
+import { ArrowLeftRight, Check, Dumbbell, GripVertical, Info, Plus } from "lucide-react-native";
+import React, { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
     StyleSheet,
@@ -32,51 +32,110 @@ interface WorkoutExerciseCardProps {
     onAddSet: (exerciseId: string) => void;
     getLastSessionSet: (exerciseId: string, setIndex: number) => { weight: number; reps: number } | null;
     onReplace: (exerciseId: string) => void;
+    onLongPress?: () => void; // For drag-and-drop
 }
 
 // Fixed heights for reliable animation
 const ROW_HEIGHT = 54;
 const HEADER_HEIGHT = 40;
+// Isolated Input Component to prevent re-renders while typing
+const IsolatedInput = memo(({
+    value,
+    onChange,
+    placeholder,
+    isCompleted
+}: {
+    value: number;
+    onChange: (val: number) => void;
+    placeholder: string;
+    isCompleted: boolean;
+}) => {
+    // Initial value from props
+    const [localValue, setLocalValue] = React.useState(value > 0 ? value.toString() : "");
+
+    // Sync from props if external change happens (e.g. initial load or reset)
+    // We only update if the prop value is significantly different to avoid cursor jumps,
+    // but here we mostly rely on local state for the typing session.
+    React.useEffect(() => {
+        setLocalValue(value > 0 ? value.toString() : "");
+    }, [value]);
+
+    const handleChangeText = (text: string) => {
+        // Allow decimals
+        setLocalValue(text);
+    };
+
+    const handleEndEditing = () => {
+        const num = parseFloat(localValue);
+        if (!isNaN(num) && num !== value) {
+            onChange(num);
+        } else if (localValue === "" && value !== 0) {
+            onChange(0);
+        }
+    };
+
+    return (
+        <TextInput
+            style={[styles.input, isCompleted && styles.inputCompleted]}
+            keyboardType="numeric"
+            value={localValue}
+            onChangeText={handleChangeText}
+            onEndEditing={handleEndEditing}
+            editable={!isCompleted}
+            placeholder={placeholder}
+            placeholderTextColor={COLORS.textTertiary}
+            selectTextOnFocus
+        />
+    );
+});
+
+// Optimized SetRow - Uses IsolatedInput
+const SetRow = memo(({ set, index, isCompleted, lastSet, exerciseId, onLogSet, onToggleSet }: any) => {
+    // Memoized handlers to avoid re-creating functions for IsolatedInput
+    const handleWeightChange = useCallback((val: number) => {
+        onLogSet(exerciseId, set.setIndex, "weight", val);
+    }, [exerciseId, set.setIndex, onLogSet]);
+
+    const handleRepsChange = useCallback((val: number) => {
+        onLogSet(exerciseId, set.setIndex, "reps", val);
+    }, [exerciseId, set.setIndex, onLogSet]);
+
+    return (
+        <View style={[styles.setRow, isCompleted && styles.setRowCompleted]}>
+            <View style={styles.setNumberContainer}><Text style={styles.setNumber}>{index + 1}</Text></View>
+            <View style={styles.historyContainer}>
+                <Text style={styles.historyText}>{lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}</Text>
+            </View>
+
+            <IsolatedInput
+                value={set.weight}
+                onChange={handleWeightChange}
+                placeholder="0"
+                isCompleted={isCompleted}
+            />
+
+            <IsolatedInput
+                value={set.reps}
+                onChange={handleRepsChange}
+                placeholder="0"
+                isCompleted={isCompleted}
+            />
+
+            <TouchableOpacity
+                onPress={() => onToggleSet(set.setIndex)}
+                style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
+                activeOpacity={0.7}
+            >
+                <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
+            </TouchableOpacity>
+        </View>
+    );
+});
+
 const FOOTER_HEIGHT = 60;
 
-const SetRow = memo(({ set, index, isCompleted, lastSet, exerciseId, onLogSet, onToggleSet }: any) => (
-    <View style={[styles.setRow, isCompleted && styles.setRowCompleted]}>
-        <View style={styles.setNumberContainer}><Text style={styles.setNumber}>{index + 1}</Text></View>
-        <View style={styles.historyContainer}>
-            <Text style={styles.historyText}>{lastSet ? `${lastSet.weight}kg x ${lastSet.reps}` : "-"}</Text>
-        </View>
-        <TextInput
-            style={[styles.input, isCompleted && styles.inputCompleted]}
-            keyboardType="numeric"
-            defaultValue={set.weight > 0 ? set.weight.toString() : ""}
-            onEndEditing={(e) => onLogSet(exerciseId, set.setIndex, "weight", parseFloat(e.nativeEvent.text) || 0)}
-            editable={!isCompleted}
-            placeholder="0"
-            placeholderTextColor={COLORS.textTertiary}
-            selectTextOnFocus
-        />
-        <TextInput
-            style={[styles.input, isCompleted && styles.inputCompleted]}
-            keyboardType="numeric"
-            defaultValue={set.reps > 0 ? set.reps.toString() : ""}
-            onEndEditing={(e) => onLogSet(exerciseId, set.setIndex, "reps", parseFloat(e.nativeEvent.text) || 0)}
-            editable={!isCompleted}
-            placeholder="0"
-            placeholderTextColor={COLORS.textTertiary}
-            selectTextOnFocus
-        />
-        <TouchableOpacity
-            onPress={() => onToggleSet(set.setIndex)}
-            style={[styles.checkButton, isCompleted && styles.checkButtonActive]}
-            activeOpacity={0.7}
-        >
-            <Check size={16} color={isCompleted ? COLORS.textInverse : COLORS.textSecondary} />
-        </TouchableOpacity>
-    </View>
-));
-
 const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
-    exercise, logs, completedSets, isExpanded, onToggleExpand, onLogSet, onToggleSetComplete, onAddSet, getLastSessionSet, onReplace,
+    exercise, logs, completedSets, isExpanded, onToggleExpand, onLogSet, onToggleSetComplete, onAddSet, getLastSessionSet, onReplace, onLongPress,
 }) => {
     const { t } = useTranslation();
 
@@ -117,33 +176,46 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
 
     return (
         <Animated.View style={[styles.containerBase, containerStyle]}>
-            <TouchableOpacity
-                onPress={() => {
-                    MensHaptics.light();
-                    onToggleExpand(exercise.id);
-                }}
-                activeOpacity={1}
-                delayPressIn={0}
-                style={[styles.header, isExpanded && styles.headerExpanded]}
-            >
-                <View style={styles.headerLeft}>
-                    <View style={styles.iconBox}><Dumbbell size={20} color={COLORS.textSecondary} /></View>
-                    <View style={styles.headerInfo}>
-                        <Text style={styles.title} numberOfLines={1}>{translateIfKey(exercise.name, t)}</Text>
-                        <Text style={styles.subtitle}>{doneCount}/{logs.length} {t('train.set')}</Text>
-                    </View>
-                </View>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); onReplace(exercise.id); }} style={styles.actionBtn}>
-                        <ArrowLeftRight size={18} color={COLORS.textSecondary} />
+            <View style={styles.headerRow}>
+                {/* Drag Handle */}
+                {onLongPress && (
+                    <TouchableOpacity
+                        onPressIn={onLongPress}
+                        style={styles.dragHandle}
+                        activeOpacity={0.6}
+                    >
+                        <GripVertical size={18} color={COLORS.textTertiary} />
                     </TouchableOpacity>
-                    {exercise.notes && (
-                        <TouchableOpacity onPress={(e) => { e.stopPropagation(); showToast.info(exercise.notes || ""); }} style={styles.actionBtn}>
-                            <Info size={18} color={COLORS.primary} />
+                )}
+
+                <TouchableOpacity
+                    onPress={() => {
+                        MensHaptics.light();
+                        onToggleExpand(exercise.id);
+                    }}
+                    activeOpacity={1}
+                    delayPressIn={0}
+                    style={[styles.header, isExpanded && styles.headerExpanded, { flex: 1 }]}
+                >
+                    <View style={styles.headerLeft}>
+                        <View style={styles.iconBox}><Dumbbell size={20} color={COLORS.textSecondary} /></View>
+                        <View style={styles.headerInfo}>
+                            <Text style={styles.title} numberOfLines={1}>{translateIfKey(exercise.name, t)}</Text>
+                            <Text style={styles.subtitle}>{doneCount}/{logs.length} {t('train.set')}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity onPress={(e) => { e.stopPropagation(); onReplace(exercise.id); }} style={styles.actionBtn}>
+                            <ArrowLeftRight size={18} color={COLORS.textSecondary} />
                         </TouchableOpacity>
-                    )}
-                </View>
-            </TouchableOpacity>
+                        {exercise.notes && (
+                            <TouchableOpacity onPress={(e) => { e.stopPropagation(); showToast.info(exercise.notes || ""); }} style={styles.actionBtn}>
+                                <Info size={18} color={COLORS.primary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </View>
 
             <Animated.View style={contentStyle}>
                 <View style={styles.setsHeader}>
@@ -186,6 +258,8 @@ export const WorkoutExerciseCard = memo(WorkoutExerciseCardComponent, (prev, nex
 
 const styles = StyleSheet.create({
     containerBase: { width: '100%', overflow: 'hidden' },
+    headerRow: { flexDirection: 'row', alignItems: 'center' },
+    dragHandle: { paddingVertical: 16, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center' },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 60, paddingVertical: 10 },
     headerExpanded: { borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingBottom: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", flex: 1 },

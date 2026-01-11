@@ -1,4 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
+import { FlashList } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -82,6 +83,7 @@ const HomeScreen: React.FC = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
+  const AnyFlashList = FlashList as any;
   const { t } = useTranslation();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -485,33 +487,39 @@ const HomeScreen: React.FC = () => {
                 </Text>
               </AnimatedCard>
             ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalList}
-              >
-                {communityRoutines.map((routine, index) => {
-                  // Calculate total exercise count
-                  const exerciseCount = routine.days.reduce(
-                    (total, day) => total + day.exercises.length,
-                    0
-                  );
+              // OPTIMIZATION: FlashList for horizontal scrolling
+              <View style={{ height: 180 }}>
+                {/* Cast to any to resolve estimatedItemSize type conflict */}
+                <AnyFlashList
+                  data={communityRoutines}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  estimatedItemSize={280}
+                  contentContainerStyle={{ paddingHorizontal: 24 }}
+                  renderItem={({ item, index }: { item: Routine | any, index: number }) => {
+                    const routine = item as Routine;
+                    // Calculate total exercise count
+                    const exerciseCount = routine.days.reduce(
+                      (total, day) => total + day.exercises.length,
+                      0
+                    );
 
-                  return (
-                    <AnimatedSlideIn key={routine.id} direction="right" index={index} delay={350}>
-                      <View style={styles.communityCard}>
-                        <RoutineCard
-                          name={routine.name}
-                          days={routine.daysPerWeek}
-                          exerciseCount={exerciseCount}
-                          variant="community"
-                          onPress={() => console.log("Start:", routine.name)}
-                        />
-                      </View>
-                    </AnimatedSlideIn>
-                  );
-                })}
-              </ScrollView>
+                    return (
+                      <AnimatedSlideIn key={routine.id} direction="right" index={index} delay={350}>
+                        <View style={styles.communityCard}>
+                          <RoutineCard
+                            name={routine.name}
+                            days={routine.daysPerWeek}
+                            exerciseCount={exerciseCount}
+                            variant="community"
+                            onPress={() => console.log("Start:", routine.name)}
+                          />
+                        </View>
+                      </AnimatedSlideIn>
+                    );
+                  }}
+                />
+              </View>
             )}
 
             <AnimatedCard index={0} delay={500}>

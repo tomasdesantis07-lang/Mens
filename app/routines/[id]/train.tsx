@@ -4,16 +4,12 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "
 import { useTranslation } from "react-i18next";
 import {
     Dimensions,
-    InteractionManager,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from "react-native";
-import DraggableFlatList, {
-    RenderItemParams,
-    ScaleDecorator,
-} from "react-native-draggable-flatlist";
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
 import { Gesture, GestureDetector, Swipeable } from "react-native-gesture-handler";
 import Animated, {
     runOnJS,
@@ -35,7 +31,7 @@ import { RoutineService } from "../../../src/services/routineService";
 import { WorkoutService } from "../../../src/services/workoutService";
 import { COLORS } from "../../../src/theme/theme";
 import { CatalogExercise } from "../../../src/types/exercise";
-import { Routine, RoutineExercise } from "../../../src/types/routine";
+import { Routine } from "../../../src/types/routine";
 import { WorkoutExerciseLog, WorkoutSession } from "../../../src/types/workout";
 import { showToast } from "../../../src/utils/toast";
 import { translateIfKey } from "../../../src/utils/translationHelpers";
@@ -54,7 +50,7 @@ const WorkoutTimerDisplay: React.FC<{ startTime: number | null }> = memo(({ star
     return <Text style={styles.timerText}>{formatElapsedTime(elapsedSeconds)}</Text>;
 });
 
-// Skeleton UI for loading state (fallback when accessing via deep link)
+// Skeleton UI for loading state - COLLAPSED style to match actual cards
 const ExerciseCardSkeleton: React.FC = memo(() => (
     <View style={skeletonStyles.card}>
         <View style={skeletonStyles.header}>
@@ -63,16 +59,6 @@ const ExerciseCardSkeleton: React.FC = memo(() => (
                 <View style={skeletonStyles.titleBar} />
                 <View style={skeletonStyles.subtitleBar} />
             </View>
-        </View>
-        <View style={skeletonStyles.setsContainer}>
-            {[1, 2, 3].map((i) => (
-                <View key={i} style={skeletonStyles.setRow}>
-                    <View style={skeletonStyles.setNumber} />
-                    <View style={skeletonStyles.inputPlaceholder} />
-                    <View style={skeletonStyles.inputPlaceholder} />
-                    <View style={skeletonStyles.checkPlaceholder} />
-                </View>
-            ))}
         </View>
     </View>
 ));
@@ -120,15 +106,17 @@ const TrainScreen: React.FC = () => {
         : (dayIndex ? parseInt(dayIndex) : 0);
 
     // ===== PROGRESSIVE RENDERING: Defer heavy list until transition completes =====
-    // This is the KEY optimization - render header instantly, list after animation
-    const [isListReady, setIsListReady] = useState(false);
+    // If we have active session data, render list immediately (coming from overlay)
+    // Otherwise wait for transition (deep link case)
+    const [isListReady, setIsListReady] = useState(hasActiveSession);
 
     useEffect(() => {
-        // Wait for the navigation transition to complete before rendering the heavy list
-        const interaction = InteractionManager.runAfterInteractions(() => {
+        if (isListReady) return; // Already ready, skip
+        // For deep link case only - wait minimal time
+        const timeout = setTimeout(() => {
             setIsListReady(true);
-        });
-        return () => interaction.cancel();
+        }, 50); // Minimal delay, just let first paint happen
+        return () => clearTimeout(timeout);
     }, []);
 
     // ===== Deep link fallback: Only fetch if no context data =====
@@ -140,8 +128,8 @@ const TrainScreen: React.FC = () => {
 
         let cancelled = false;
 
-        // Defer Firebase fetch to not block initial render
-        InteractionManager.runAfterInteractions(async () => {
+        // Fetch routine data for deep link case
+        const fetchRoutine = async () => {
             try {
                 const data = await RoutineService.getRoutineById(id);
                 if (!cancelled && data) {
@@ -151,7 +139,9 @@ const TrainScreen: React.FC = () => {
             } catch (error) {
                 console.error('Failed to load routine:', error);
             }
-        });
+        };
+
+        fetchRoutine();
 
         return () => { cancelled = true; };
     }, [id, needsFirebaseFetch, selectedDayIndex, startWorkout]);
@@ -335,35 +325,7 @@ const TrainScreen: React.FC = () => {
     };
 
 
-    const renderItem = useCallback(({ item, drag, isActive }: RenderItemParams<RoutineExercise>) => (
-        <ScaleDecorator>
-            <Swipeable
-                renderRightActions={() => (
-                    <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => removeExerciseFromSession(item.id)}
-                    >
-                        <Trash2 size={24} color={COLORS.error} />
-                    </TouchableOpacity>
-                )}
-            >
-                <TouchableOpacity onLongPress={drag} disabled={isActive} activeOpacity={1}>
-                    <WorkoutExerciseCard
-                        exercise={item}
-                        logs={activeWorkout?.logs[item.id] || []}
-                        completedSets={activeWorkout?.completedSets || emptySet}
-                        isExpanded={expandedExerciseId === item.id}
-                        onToggleExpand={handleToggleExpand}
-                        onLogSet={logSet}
-                        onToggleSetComplete={handleToggleSet}
-                        onAddSet={addSet}
-                        getLastSessionSet={getLastSessionSet}
-                        onReplace={handleInitiateReplace}
-                    />
-                </TouchableOpacity>
-            </Swipeable>
-        </ScaleDecorator>
-    ), [activeWorkout?.logs, activeWorkout?.completedSets, expandedExerciseId, handleToggleExpand, logSet, handleToggleSet, addSet, getLastSessionSet, handleInitiateReplace, removeExerciseFromSession, emptySet]);
+
 
     return (
         /* @ts-ignore */
@@ -398,29 +360,60 @@ const TrainScreen: React.FC = () => {
                         </View>
                     </GestureDetector>
 
-                    {/* PROGRESSIVE RENDERING: List waits for transition to complete */}
+                    {/* OPTIMIZED: DraggableFlatList for drag-and-drop reordering */}
                     {isListReady ? (
                         <DraggableFlatList
-                            ref={flatListRef}
-                            containerStyle={{ flex: 1 }}
                             data={exercises}
-                            onDragEnd={({ from, to }) => reorderExercises(from, to)}
                             keyExtractor={(item) => item.id}
-                            renderItem={renderItem}
-                            contentContainerStyle={{ paddingBottom: 180, paddingHorizontal: 24 }}
-                            // ===== PERFORMANCE OPTIMIZATIONS =====
-                            removeClippedSubviews={true}
-                            initialNumToRender={3}
-                            maxToRenderPerBatch={2}
-                            windowSize={5}
+                            onDragEnd={({ data }) => {
+                                // Sync the reordered exercises with context
+                                reorderExercises(data.map(e => e.id));
+                            }}
+                            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
+                            activationDistance={10}
+                            renderItem={({ item, drag, isActive }: RenderItemParams<typeof exercises[0]>) => (
+                                <ScaleDecorator activeScale={1.03}>
+                                    <View style={{ marginBottom: 4, opacity: isActive ? 0.8 : 1 }}>
+                                        <Swipeable
+                                            enabled={!isActive}
+                                            renderRightActions={() => (
+                                                <TouchableOpacity
+                                                    style={styles.deleteButton}
+                                                    onPress={() => removeExerciseFromSession(item.id)}
+                                                >
+                                                    <Trash2 size={24} color={COLORS.error} />
+                                                </TouchableOpacity>
+                                            )}
+                                        >
+                                            <WorkoutExerciseCard
+                                                exercise={item}
+                                                logs={activeWorkout?.logs[item.id] || []}
+                                                completedSets={activeWorkout?.completedSets || emptySet}
+                                                isExpanded={expandedExerciseId === item.id}
+                                                onToggleExpand={handleToggleExpand}
+                                                onLogSet={logSet}
+                                                onToggleSetComplete={handleToggleSet}
+                                                onAddSet={addSet}
+                                                getLastSessionSet={getLastSessionSet}
+                                                onReplace={handleInitiateReplace}
+                                                onLongPress={drag}
+                                            />
+                                        </Swipeable>
+                                    </View>
+                                </ScaleDecorator>
+                            )}
                             ListFooterComponent={
-                                <TouchableOpacity style={styles.addExerciseButton} onPress={() => setAddExerciseModalVisible(true)}>
-                                    <Plus size={20} color={COLORS.primary} /><Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
+                                <TouchableOpacity
+                                    style={styles.addExerciseButton}
+                                    onPress={() => setAddExerciseModalVisible(true)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Plus size={20} color={COLORS.primary} />
+                                    <Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
                                 </TouchableOpacity>
                             }
                         />
                     ) : (
-                        // Show skeleton in list area while waiting for transition
                         <View style={{ flex: 1, paddingHorizontal: 24 }}>
                             <WorkoutSkeleton />
                         </View>
@@ -428,7 +421,9 @@ const TrainScreen: React.FC = () => {
 
                     <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24), position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
                         <PrimaryButton title={t('train.finish_session')} onPress={handleFinishWorkout} loading={isSaving} />
-                        <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}><Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
+                            <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
+                        </TouchableOpacity>
                     </View>
                 </>
             )}
@@ -488,78 +483,52 @@ const styles = StyleSheet.create({
     addExerciseButtonText: { color: COLORS.primary, fontSize: 16, fontWeight: '600' }
 });
 
-// Skeleton styles for loading state (deep link fallback)
+// Skeleton styles for loading state - matches collapsed card style
 const skeletonStyles = StyleSheet.create({
     container: {
         flex: 1,
         paddingHorizontal: 24,
-        paddingTop: 80, // Account for header space
+        paddingTop: 16,
+        width: '100%',
     },
     card: {
-        backgroundColor: COLORS.surface,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
+        backgroundColor: 'transparent',
+        paddingVertical: 10,
+        marginBottom: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
+        flex: 1,
     },
     iconPlaceholder: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.border,
-        opacity: 0.5,
+        borderRadius: 8,
+        backgroundColor: COLORS.surface,
+        opacity: 0.7,
     },
     textContainer: {
         flex: 1,
         marginLeft: 12,
     },
     titleBar: {
-        height: 18,
-        width: '70%',
-        borderRadius: 9,
-        backgroundColor: COLORS.border,
-        opacity: 0.5,
-        marginBottom: 8,
+        height: 16,
+        width: '60%',
+        borderRadius: 8,
+        backgroundColor: COLORS.surface,
+        opacity: 0.6,
+        marginBottom: 6,
     },
     subtitleBar: {
         height: 12,
-        width: '40%',
+        width: '30%',
         borderRadius: 6,
-        backgroundColor: COLORS.border,
-        opacity: 0.3,
-    },
-    setsContainer: {
-        gap: 8,
-    },
-    setRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingVertical: 8,
-    },
-    setNumber: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: COLORS.border,
-        opacity: 0.4,
-    },
-    inputPlaceholder: {
-        flex: 1,
-        height: 36,
-        borderRadius: 8,
-        backgroundColor: COLORS.border,
-        opacity: 0.3,
-    },
-    checkPlaceholder: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: COLORS.border,
+        backgroundColor: COLORS.surface,
         opacity: 0.4,
     },
 });
+
