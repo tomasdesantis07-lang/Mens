@@ -137,8 +137,7 @@ export default function RootLayout() {
                                                 options={{
                                                     animation: 'slide_from_bottom',
                                                     animationDuration: 250,
-                                                    presentation: 'transparentModal',
-                                                    gestureEnabled: false, // We handle gestures manually in the component
+                                                    gestureEnabled: true,
                                                     contentStyle: { backgroundColor: 'transparent' },
                                                 }}
                                             />

@@ -7,7 +7,7 @@ import {
   User,
   Users
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from "react-native";
 import PagerView, { PagerViewOnPageScrollEvent } from "react-native-pager-view";
@@ -93,11 +93,12 @@ export default function TabsLayout() {
 
     if (index !== currentIndex) {
       setCurrentIndex(index);
-      pagerRef.current?.setPage(index);
-      // We can optionally update router here as it's an explicit action, 
-      // but for stability let's keep it purely local for now.
+      // INSTANT page change - no scrolling through intermediate pages
+      pagerRef.current?.setPageWithoutAnimation(index);
+      // Animate the tab bar indicator smoothly (withSpring handled in FluidTabBar)
+      scrollPosition.value = index;
     }
-  }, [currentIndex]);
+  }, [currentIndex, scrollPosition]);
 
   return (
     <View style={styles.container}>
@@ -141,7 +142,7 @@ interface FluidTabBarProps {
   currentIndex: number;
 }
 
-const FluidTabBar: React.FC<FluidTabBarProps> = ({
+const FluidTabBar = memo<FluidTabBarProps>(({
   tabs,
   scrollPosition,
   onTabPress,
@@ -218,7 +219,7 @@ const FluidTabBar: React.FC<FluidTabBarProps> = ({
       </BlurView>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

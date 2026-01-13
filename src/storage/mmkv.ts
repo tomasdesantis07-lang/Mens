@@ -53,3 +53,46 @@ export const MMKVStorage = {
         }
     }
 };
+
+// Workout-specific storage helpers
+const ACTIVE_WORKOUT_KEY = 'active_workout';
+
+export const workoutStorage = {
+    saveActiveWorkout: (workout: any) => {
+        if (!mmkvAvailable || !workout) return;
+        try {
+            // Convert Set to Array for JSON serialization
+            const serializable = {
+                ...workout,
+                completedSets: Array.from(workout.completedSets || [])
+            };
+            storage?.set(ACTIVE_WORKOUT_KEY, JSON.stringify(serializable));
+        } catch (e) {
+            console.error('MMKV saveActiveWorkout error', e);
+        }
+    },
+    getActiveWorkout: (): any | null => {
+        if (!mmkvAvailable) return null;
+        try {
+            const value = storage?.getString(ACTIVE_WORKOUT_KEY);
+            if (!value) return null;
+            const parsed = JSON.parse(value);
+            // Convert Array back to Set
+            return {
+                ...parsed,
+                completedSets: new Set(parsed.completedSets || [])
+            };
+        } catch (e) {
+            console.error('MMKV getActiveWorkout error', e);
+            return null;
+        }
+    },
+    clearActiveWorkout: () => {
+        if (!mmkvAvailable) return;
+        try {
+            storage?.delete(ACTIVE_WORKOUT_KEY);
+        } catch (e) {
+            console.error('MMKV clearActiveWorkout error', e);
+        }
+    }
+};

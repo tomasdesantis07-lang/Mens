@@ -4,7 +4,7 @@ import { Clock, Dumbbell } from "lucide-react-native";
 import React, { memo, useCallback, useMemo, useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useWorkout } from "../../context/WorkoutContext";
-import { useWorkoutTimerContext } from "../../context/WorkoutTimerContext";
+import { useWorkoutTick, useWorkoutTimerContext } from "../../context/WorkoutTimerContext";
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from "../../theme/theme";
 import { translateIfKey } from "../../utils/translationHelpers";
 
@@ -22,7 +22,7 @@ const formatTime = (seconds: number) => {
 
 // Memoized workout timer display - only re-renders when elapsed time changes
 const WorkoutTimerText = memo(() => {
-    const { elapsedTime } = useWorkoutTimerContext();
+    const { elapsedTime } = useWorkoutTick();
     return (
         <Text style={styles.duration}>
             {formatTime(elapsedTime)}
@@ -32,7 +32,7 @@ const WorkoutTimerText = memo(() => {
 
 // Memoized rest timer display - only re-renders when rest time changes
 const RestTimerText = memo(() => {
-    const { restRemaining } = useWorkoutTimerContext();
+    const { restRemaining } = useWorkoutTick();
     return (
         <>
             <Clock size={11} color={COLORS.accent} />
@@ -51,6 +51,12 @@ const ActiveWorkoutOverlayComponent: React.FC = () => {
 
     const isNavigating = useRef(false);
 
+    // Memoize routine name translation (must be before early return for Rules of Hooks)
+    const routineName = useMemo(() =>
+        activeWorkout ? translateIfKey(activeWorkout.routine.name) : '',
+        [activeWorkout?.routine?.name]
+    );
+
     const handlePress = useCallback(() => {
         if (!activeWorkout) return;
         if (isNavigating.current) return;
@@ -62,16 +68,10 @@ const ActiveWorkoutOverlayComponent: React.FC = () => {
         setTimeout(() => {
             isNavigating.current = false;
         }, 1000);
-    }, [activeWorkout, router]);
+    }, [activeWorkout?.routine?.id, router]);
 
-    // Early return if no active workout - memoization still works
-    if (!activeWorkout) return null;
-
-    // Memoize routine name translation to avoid recalculating
-    const routineName = useMemo(() =>
-        translateIfKey(activeWorkout.routine.name),
-        [activeWorkout.routine.name]
-    );
+    // Early return if no active workout or if it's currently focused (not minimized)
+    if (!activeWorkout || !activeWorkout.isMinimized) return null;
 
     return (
         <TouchableOpacity
@@ -122,7 +122,7 @@ const ActiveWorkoutOverlayComponent: React.FC = () => {
     );
 };
 
-// Export memoized component
+// Export memoized component with custom comparator
 export const ActiveWorkoutOverlay = memo(ActiveWorkoutOverlayComponent);
 
 const styles = StyleSheet.create({

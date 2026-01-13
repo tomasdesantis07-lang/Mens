@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native';
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { CheckSquare, Edit3, Plus, Trash2 } from "lucide-react-native";
@@ -7,6 +8,7 @@ import {
     Dimensions,
     LayoutAnimation,
     Platform,
+    Animated as RNAnimated,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -14,8 +16,11 @@ import {
     View
 } from "react-native";
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
-import { Gesture, GestureDetector, Swipeable } from "react-native-gesture-handler";
+import { Gesture, Swipeable } from "react-native-gesture-handler";
 import Animated, {
+    FadeInDown,
+    FadeOut,
+    LinearTransition,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
@@ -29,7 +34,7 @@ import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { ExercisePickerModal } from "../../../src/components/specific/ExercisePickerModal";
 import { WorkoutExerciseCard } from "../../../src/components/specific/WorkoutExerciseCard";
 import { useWorkout } from "../../../src/context/WorkoutContext";
-import { useWorkoutTimerContext } from "../../../src/context/WorkoutTimerContext";
+import { useWorkoutTick, useWorkoutTimerContext } from "../../../src/context/WorkoutTimerContext";
 import { ExerciseRecommendationService } from "../../../src/services/ExerciseRecommendationService";
 import { auth } from "../../../src/services/firebaseConfig";
 import { RoutineService } from "../../../src/services/routineService";
@@ -38,11 +43,12 @@ import { COLORS } from "../../../src/theme/theme";
 import { CatalogExercise } from "../../../src/types/exercise";
 import { Routine } from "../../../src/types/routine";
 import { WorkoutExerciseLog, WorkoutSession } from "../../../src/types/workout";
+import { MensHaptics } from "../../../src/utils/haptics";
 import { showToast } from "../../../src/utils/toast";
 import { translateIfKey } from "../../../src/utils/translationHelpers";
 
 const WorkoutTimerDisplay: React.FC<{ startTime: number | null }> = memo(({ startTime }: { startTime: number | null }) => {
-    const { elapsedTime } = useWorkoutTimerContext();
+    const { elapsedTime } = useWorkoutTick();
 
 
     const formatElapsedTime = (seconds: number) => {
@@ -77,6 +83,13 @@ const WorkoutSkeleton: React.FC = memo(() => (
     </View>
 ));
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android') {
+    if (UIManager.setLayoutAnimationEnabledExperimental) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+}
+
 const TrainScreen: React.FC = () => {
     const { t } = useTranslation();
     const router = useRouter();
@@ -95,9 +108,18 @@ const TrainScreen: React.FC = () => {
         replaceExercise,
         reorderExercises,
         addExerciseToSession,
-        removeExerciseFromSession
+        removeExerciseFromSession,
+        setIsMinimized
     } = useWorkout();
     const { startRest } = useWorkoutTimerContext();
+    const isFocused = useIsFocused();
+
+    // Focus management: when entering screen, it's not minimized
+    useEffect(() => {
+        if (isFocused) {
+            setIsMinimized(false);
+        }
+    }, [isFocused, setIsMinimized]);
 
     // ===== CRITICAL OPTIMIZATION: Immediate sync from context =====
     // When coming from ActiveWorkoutOverlay, data is already in context - use it immediately
@@ -213,14 +235,8 @@ const TrainScreen: React.FC = () => {
 
     const emptySet = useMemo(() => new Set<string>(), []);
 
-    // Enable LayoutAnimation for Android
-    if (Platform.OS === 'android') {
-        if (UIManager.setLayoutAnimationEnabledExperimental) {
-            UIManager.setLayoutAnimationEnabledExperimental(true);
-        }
-    }
-
     const handleToggleExpand = useCallback((exerciseId: string) => {
+        // Native LayoutAnimation for 100% smooth "Accordion" effect
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpandedExerciseId(prev => prev === exerciseId ? null : exerciseId);
     }, []);
@@ -270,9 +286,39 @@ const TrainScreen: React.FC = () => {
     }));
 
     const handleToggleSet = useCallback((exerciseId: string, setIndex: number, restSeconds: number) => {
+        const isNowCompleting = !activeWorkout?.completedSets.has(`${exerciseId}-${setIndex}`);
+
         toggleSetComplete(exerciseId, setIndex);
+        MensHaptics.success();
         startRest(restSeconds);
-    }, [toggleSetComplete, startRest]);
+
+        // Auto-advance logic: If this was the last set, move to next exercise
+        if (isNowCompleting) {
+            const exercise = exercises.find(e => e.id === exerciseId);
+            if (exercise) {
+                const exerciseSets = activeWorkout?.logs[exerciseId] || [];
+                const allSetsDone = exerciseSets.every(s =>
+                    s.setIndex === setIndex || activeWorkout?.completedSets.has(`${exerciseId}-${s.setIndex}`)
+                );
+
+                if (allSetsDone) {
+                    // Small delay so user sees the checkmark before collapse
+                    setTimeout(() => {
+                        const currentIndex = exercises.findIndex(e => e.id === exerciseId);
+                        // Find the next exercise that still has work to do
+                        const nextExercise = exercises.slice(currentIndex + 1).find(e => {
+                            const sets = activeWorkout?.logs[e.id] || [];
+                            const isDone = sets.length > 0 && sets.every(s => activeWorkout?.completedSets.has(`${e.id}-${s.setIndex}`));
+                            return !isDone;
+                        });
+
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setExpandedExerciseId(nextExercise ? nextExercise.id : null);
+                    }, 400);
+                }
+            }
+        }
+    }, [toggleSetComplete, startRest, activeWorkout, exercises]);
 
     const getLastSessionSet = useCallback((exerciseId: string, setIndex: number) => {
         if (!lastSession) return null;
@@ -360,35 +406,30 @@ const TrainScreen: React.FC = () => {
         setAddExerciseModalVisible(false);
     };
 
-    // ===== MEMOIZED RENDER ITEMS =====
-    const renderFlashListItem = useCallback(({ item }: { item: any }) => (
-        <View style={{ marginBottom: 4 }}>
-            <Swipeable
-                renderRightActions={() => (
-                    <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => removeExerciseFromSession(item.id)}
-                    >
-                        <Trash2 size={24} color={COLORS.error} />
-                    </TouchableOpacity>
-                )}
-            >
-                <WorkoutExerciseCard
-                    exercise={item}
-                    logs={activeWorkout?.logs[item.id] || []}
-                    completedSets={activeWorkout?.completedSets || emptySet}
-                    isExpanded={expandedExerciseId === item.id}
-                    onToggleExpand={handleToggleExpand}
-                    onLogSet={logSet}
-                    onToggleSetComplete={handleToggleSet}
-                    onAddSet={addSet}
-                    getLastSessionSet={getLastSessionSet}
-                    onReplace={handleInitiateReplace}
-                // No onLongPress in View Mode
-                />
-            </Swipeable>
-        </View>
-    ), [activeWorkout?.logs, activeWorkout?.completedSets, emptySet, expandedExerciseId, handleToggleExpand, logSet, handleToggleSet, addSet, getLastSessionSet, handleInitiateReplace, removeExerciseFromSession]);
+    const flashListExtraData = useMemo(() => [
+        activeWorkout?.logs,
+        activeWorkout?.completedSets,
+        expandedExerciseId,
+        isEditMode
+    ], [activeWorkout?.logs, activeWorkout?.completedSets, expandedExerciseId, isEditMode]);
+
+    const renderFlashListItem = useCallback(({ item, index }: { item: any, index: number }) => (
+        <TrainingListItem
+            item={item}
+            index={index}
+            logs={activeWorkout?.logs[item.id] || []}
+            isExpanded={expandedExerciseId === item.id}
+            completedSets={activeWorkout?.completedSets || emptySet}
+            onToggleExpand={handleToggleExpand}
+            onLogSet={logSet}
+            onToggleSetComplete={handleToggleSet}
+            onAddSet={addSet}
+            getLastSessionSet={getLastSessionSet}
+            onReplace={handleInitiateReplace}
+            onRemove={removeExerciseFromSession}
+            onRemoveSet={removeSet}
+        />
+    ), [activeWorkout?.logs, activeWorkout?.completedSets, emptySet, expandedExerciseId, handleToggleExpand, logSet, handleToggleSet, addSet, getLastSessionSet, handleInitiateReplace, removeExerciseFromSession, removeSet]);
 
     const renderDraggableItem = useCallback(({ item, drag, isActive }: RenderItemParams<any>) => (
         <ScaleDecorator activeScale={1.03}>
@@ -406,6 +447,7 @@ const TrainScreen: React.FC = () => {
                     onAddSet={() => { }}
                     getLastSessionSet={() => null}
                     onReplace={() => { }}
+                    onRemoveSet={() => { }}
                     onLongPress={drag} // Enable drag
                 />
             </View>
@@ -427,48 +469,54 @@ const TrainScreen: React.FC = () => {
             ) : (
                 <>
                     {/* Header renders IMMEDIATELY - lightweight, no heavy components */}
-                    <GestureDetector gesture={panGesture}>
-                        <View style={styles.header}>
-                            <View style={styles.dragHandle}><View style={styles.dragIndicator} /></View>
-                            <View style={styles.headerTop}>
-                                <TouchableOpacity
-                                    onPress={() => router.back()}
-                                    style={styles.minimizeButton}
-                                >
-                                    <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
-                                </TouchableOpacity>
+                    <View style={styles.header}>
+                        <View style={styles.dragHandle}><View style={styles.dragIndicator} /></View>
+                        <View style={styles.headerTop}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    MensHaptics.light();
+                                    setIsMinimized(true);
+                                    // Use explicit animation instead of pan gesture
+                                    translateY.value = withTiming(SCREEN_HEIGHT, { duration: 300 }, () => {
+                                        runOnJS(router.back)();
+                                    });
+                                }}
+                                style={styles.minimizeButton}
+                            >
+                                <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
+                            </TouchableOpacity>
 
-                                <View style={styles.timerWrapper}>
-                                    <View style={styles.timerContainer}>
-                                        <WorkoutTimerDisplay startTime={activeWorkout?.startTime ?? null} />
-                                    </View>
+                            <View style={styles.timerWrapper}>
+                                <View style={styles.timerContainer}>
+                                    <WorkoutTimerDisplay startTime={activeWorkout?.startTime ?? null} />
                                 </View>
-
-                                {/* Edit Mode Toggle */}
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        if (isEditMode) {
-                                            // Exit edit mode
-                                            setIsEditMode(false);
-                                        } else {
-                                            // Enter edit mode - collapse all for better drag performance
-                                            setExpandedExerciseId(null);
-                                            setIsEditMode(true);
-                                            showToast.info(t('train.reorder_mode_active') || "Reorder Mode Active");
-                                        }
-                                    }}
-                                    style={styles.editButton}
-                                >
-                                    {isEditMode ? (
-                                        <CheckSquare size={22} color={COLORS.primary} />
-                                    ) : (
-                                        <Edit3 size={20} color={COLORS.textSecondary} />
-                                    )}
-                                </TouchableOpacity>
                             </View>
-                            <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
+
+                            {/* Edit Mode Toggle */}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (isEditMode) {
+                                        // Exit edit mode
+                                        setIsEditMode(false);
+                                    } else {
+                                        // Enter edit mode - collapse all for better drag performance
+                                        setExpandedExerciseId(null);
+                                        setIsEditMode(true);
+                                        MensHaptics.light();
+                                        showToast.info(t('train.reorder_mode_active') || "Reorder Mode Active");
+                                    }
+                                }}
+                                style={styles.editButton}
+                            >
+                                {isEditMode ? (
+                                    <CheckSquare size={22} color={COLORS.primary} />
+                                ) : (
+                                    <Edit3 size={20} color={COLORS.textSecondary} />
+                                )}
+                            </TouchableOpacity>
                         </View>
-                    </GestureDetector>
+                        <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
+                    </View>
 
                     {/* OPTIMIZED: Dual List Engine - FlashList (View) / DraggableFlatList (Edit) */}
                     {isListReady ? (
@@ -491,11 +539,13 @@ const TrainScreen: React.FC = () => {
                                 data={exercises}
                                 keyExtractor={(item: any) => item.id}
                                 {...({ estimatedItemSize: 160 } as any)} // Force prop injection
-                                extraData={[activeWorkout?.logs, activeWorkout?.completedSets, expandedExerciseId]}
+                                extraData={flashListExtraData}
                                 contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
                                 removeClippedSubviews={true}
                                 drawDistance={500} // Render ahead for smooth scroll
                                 renderItem={renderFlashListItem}
+                                // Native-side layout animation for item resizing/reordering
+                                itemLayoutAnimation={LinearTransition}
                                 ListFooterComponent={
                                     <TouchableOpacity
                                         style={styles.addExerciseButton}
@@ -520,14 +570,15 @@ const TrainScreen: React.FC = () => {
                             <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
                         </TouchableOpacity>
                     </View>
-                </>
-            )}
-            {/* Defer heavy modals until after initial render to prioritize main UI */}
-            {modalsReady && (
-                <>
-                    <ConfirmDialog visible={showCancelDialog} onConfirm={confirmCancelWorkout} onCancel={() => setShowCancelDialog(false)} title={t('train.cancel_dialog.title')} message={t('train.cancel_dialog.message')} variant="danger" />
-                    <ExercisePickerModal visible={replacementModalVisible} onClose={() => setReplacementModalVisible(false)} onSelect={handleConfirmReplace} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} recommendedExercises={recommendations} multiSelect={false} />
-                    <ExercisePickerModal visible={addExerciseModalVisible} onClose={() => setAddExerciseModalVisible(false)} onSelect={handleAddExercises} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} multiSelect={true} />
+
+                    {/* Defer heavy modals until after initial render to prioritize main UI */}
+                    {modalsReady && (
+                        <>
+                            <ConfirmDialog visible={showCancelDialog} onConfirm={confirmCancelWorkout} onCancel={() => setShowCancelDialog(false)} title={t('train.cancel_dialog.title') || ""} message={t('train.cancel_dialog.message') || ""} variant="danger" />
+                            <ExercisePickerModal visible={replacementModalVisible} onClose={() => setReplacementModalVisible(false)} onSelect={handleConfirmReplace} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} recommendedExercises={recommendations} multiSelect={false} />
+                            <ExercisePickerModal visible={addExerciseModalVisible} onClose={() => setAddExerciseModalVisible(false)} onSelect={handleAddExercises} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} multiSelect={true} />
+                        </>
+                    )}
                 </>
             )}
         </Animated.View>
@@ -535,6 +586,69 @@ const TrainScreen: React.FC = () => {
 };
 
 export default TrainScreen;
+
+// Moved OUTSIDE TrainScreen for perfect memoization (prevents component re-creation)
+const TrainingListItem = memo(({
+    item, index, logs, isExpanded, completedSets, onToggleExpand,
+    onLogSet, onToggleSetComplete, onAddSet, getLastSessionSet, onReplace, onRemove, onRemoveSet
+}: any) => {
+    const renderRightActions = (progress: RNAnimated.AnimatedInterpolation<number>) => (
+        <View style={styles.deleteActionContainer}>
+            <RNAnimated.View
+                style={[
+                    styles.deleteActionInner,
+                    {
+                        opacity: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 1] }),
+                        transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }]
+                    }
+                ]}
+            >
+                <Trash2 size={26} color="#FFFFFF" />
+            </RNAnimated.View>
+        </View>
+    );
+
+    return (
+        <Animated.View
+            entering={FadeInDown.delay(index * 50).springify()}
+            exiting={FadeOut.duration(300)}
+            style={{ marginBottom: 12 }}
+        >
+            <Swipeable
+                friction={2}
+                enabled={!isExpanded} // Prevent swipe when expanded to avoid bugs
+                rightThreshold={80} // increased threshold to prevent accidental deletes
+                renderRightActions={renderRightActions}
+                onSwipeableOpen={(direction) => {
+                    if (direction === 'right') {
+                        onRemove(item.id);
+                        MensHaptics.success();
+                    }
+                }}
+            >
+                <WorkoutExerciseCard
+                    exercise={item}
+                    logs={logs}
+                    completedSets={completedSets}
+                    isExpanded={isExpanded}
+                    onToggleExpand={onToggleExpand}
+                    onLogSet={onLogSet}
+                    onToggleSetComplete={onToggleSetComplete}
+                    onAddSet={onAddSet}
+                    getLastSessionSet={getLastSessionSet}
+                    onReplace={onReplace}
+                    onRemoveSet={onRemoveSet}
+                />
+            </Swipeable>
+        </Animated.View>
+    );
+}, (prev, next) => {
+    // Custom comparator for ultra-performance: only re-render if essential data changes
+    return prev.isExpanded === next.isExpanded &&
+        prev.logs === next.logs &&
+        prev.completedSets === next.completedSets &&
+        prev.item.id === next.item.id;
+});
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
@@ -581,7 +695,20 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
     },
     timerText: { color: COLORS.primary, fontWeight: "700", fontSize: 16, fontVariant: ['tabular-nums'] },
-    deleteButton: { backgroundColor: COLORS.error + '20', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%', borderRadius: 16 },
+    deleteActionContainer: {
+        backgroundColor: COLORS.error,
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+        flex: 1,
+        borderRadius: 16,
+        // Match card margin - 12 from container - card internal 12? 
+        // We'll set card margin to 0 and handle it in the container for perfect alignment
+    },
+    deleteActionInner: {
+        paddingRight: 24,
+        justifyContent: 'center',
+        height: '100%'
+    },
     addExerciseButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed', borderRadius: 16, marginVertical: 16, gap: 8, backgroundColor: COLORS.surface },
     addExerciseButtonText: { color: COLORS.primary, fontSize: 16, fontWeight: '600' }
 });

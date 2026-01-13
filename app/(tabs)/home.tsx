@@ -37,7 +37,7 @@ import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
 import { RoutineCard } from "../../src/components/specific/RoutineCard";
 import { useWorkout } from "../../src/context/WorkoutContext";
-import { useWorkoutTimerContext } from "../../src/context/WorkoutTimerContext";
+import { useWorkoutTick } from "../../src/context/WorkoutTimerContext";
 import { useRoutines } from "../../src/hooks/useRoutines";
 import { useTabBarInset } from "../../src/hooks/useTabBarInset";
 import { auth, db } from "../../src/services/firebaseConfig";
@@ -69,7 +69,7 @@ const STAT_CARD_HEIGHT = 100;
 
 // Helper component for the timer inside the shared element to avoid re-rendering layout
 const ActiveTimer: React.FC<{ startTime: number | null }> = ({ startTime }) => {
-  const { elapsedTime } = useWorkoutTimerContext();
+  const { elapsedTime } = useWorkoutTick();
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -106,6 +106,8 @@ const HomeScreen: React.FC = () => {
   const rotateAnimation = useSharedValue(0);
 
   const { startWorkout, activeWorkout } = useWorkout();
+  // Memoize the boolean to avoid re-renders when workout details change
+  const hasActiveWorkout = !!activeWorkout;
 
   // Rotating border glow animation
   useEffect(() => {
@@ -394,7 +396,7 @@ const HomeScreen: React.FC = () => {
           </AnimatedHeader>
 
           {/* No Routine Reminder Card */}
-          {userRoutines.length === 0 && !activeWorkout && (
+          {userRoutines.length === 0 && !hasActiveWorkout && (
             <AnimatedSection delay={50} style={styles.heroSection}>
               <TouchableOpacity
                 style={styles.noRoutineCard}
@@ -537,7 +539,7 @@ const HomeScreen: React.FC = () => {
 
 
         {/* Floating Quick Start Button */}
-        {nextWorkout && showFloatingButton && !activeWorkout && !isTodayRestDay && (
+        {nextWorkout && showFloatingButton && !hasActiveWorkout && !isTodayRestDay && (
           <View
             style={[
               styles.floatingButtonContainer,
@@ -626,7 +628,7 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Upper Floating Button - Empty Workout */}
-        {showFloatingButton && !activeWorkout && (
+        {showFloatingButton && !hasActiveWorkout && (
           <View
             style={[
               styles.floatingButtonContainerRight,

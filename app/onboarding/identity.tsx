@@ -97,7 +97,6 @@ const IdentityScreen = () => {
             <ScrollView contentContainerStyle={styles.content}>
                 <Text style={styles.appTitle}>MENS</Text>
                 <Text style={styles.title}>{t('onboarding.step1_title')}</Text>
-                <Text style={styles.subtitle}>{t('onboarding.step1_subtitle')}</Text>
 
                 <View style={styles.formGroup}>
                     <Text style={styles.label}>{t('onboarding.name_question')}</Text>

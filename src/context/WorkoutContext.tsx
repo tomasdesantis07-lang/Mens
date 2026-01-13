@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { workoutStorage } from "../storage/mmkv";
 import { Routine, RoutineExercise } from "../types/routine";
 import { WorkoutSetLog } from "../types/workout";
 
@@ -8,6 +9,7 @@ interface ActiveWorkout {
     startTime: number; // Timestamp
     logs: Record<string, WorkoutSetLog[]>; // exerciseId -> sets
     completedSets: Set<string>; // "exerciseId-setIndex"
+    isMinimized: boolean;
 }
 
 import { useWorkoutTimerContext } from "./WorkoutTimerContext";
@@ -27,6 +29,7 @@ interface WorkoutContextType {
     reorderExercises: (orderedIds: string[]) => void;
     addExerciseToSession: (exercise: RoutineExercise) => void;
     removeExerciseFromSession: (exerciseId: string) => void;
+    setIsMinimized: (minimized: boolean) => void;
     // Proxied from Timer Context for convenience, or removed?
     // Let's remove them to force clean separation. Consumers should use useWorkoutTimerContext.
 }
@@ -39,6 +42,19 @@ const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
     const { setStartTime, startRest, stopRest, isResting } = useWorkoutTimerContext();
+    const saveTimeout = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    // Debounced persistence to avoid blocking UI with JSON.stringify on every tap
+    const persistState = useCallback((state: ActiveWorkout | null) => {
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = setTimeout(() => {
+            if (state) {
+                workoutStorage.saveActiveWorkout(state);
+            } else {
+                workoutStorage.clearActiveWorkout();
+            }
+        }, 300); // 300ms debounce
+    }, []);
 
     const startWorkout = useCallback((routine: Routine, dayIndex: number) => {
         // Initialize logs based on the routine day
@@ -56,27 +72,33 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
 
         const now = Date.now();
-        setActiveWorkout({
+        const newState = {
             routine,
             dayIndex,
             startTime: now,
             logs: initialLogs,
-            completedSets: new Set(),
-        });
+            completedSets: new Set<string>(),
+            isMinimized: false,
+        };
+
+        setActiveWorkout(newState);
+        persistState(newState); // First save
         setStartTime(now); // Sync with Timer Context
-    }, [setStartTime]);
+    }, [setStartTime, persistState]);
 
     const cancelWorkout = useCallback(() => {
         setActiveWorkout(null);
+        persistState(null);
         setStartTime(null);
         stopRest();
-    }, [setStartTime, stopRest]);
+    }, [setStartTime, stopRest, persistState]);
 
     const finishWorkout = useCallback(() => {
         setActiveWorkout(null);
+        persistState(null);
         setStartTime(null);
         stopRest();
-    }, [setStartTime, stopRest]);
+    }, [setStartTime, stopRest, persistState]);
 
     const logSet = useCallback((exerciseId: string, setIndex: number, field: "weight" | "reps", value: number) => {
         setActiveWorkout(prev => {
@@ -88,9 +110,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 currentSets[setIdx] = { ...currentSets[setIdx], [field]: value };
             }
 
-            return { ...prev, logs: { ...prev.logs, [exerciseId]: currentSets } };
+            const nextState = { ...prev, logs: { ...prev.logs, [exerciseId]: currentSets } };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const toggleSetComplete = useCallback((exerciseId: string, setIndex: number) => {
         setActiveWorkout(prev => {
@@ -102,9 +126,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             } else {
                 nextCompleted.add(key);
             }
-            return { ...prev, completedSets: nextCompleted };
+            const nextState = { ...prev, completedSets: nextCompleted };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const addSet = useCallback((exerciseId: string) => {
         setActiveWorkout(prev => {
@@ -114,29 +140,33 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 ? Math.max(...currentSets.map(s => s.setIndex)) + 1
                 : 1;
 
-            return {
+            const nextState = {
                 ...prev,
                 logs: {
                     ...prev.logs,
                     [exerciseId]: [...currentSets, { setIndex: nextIndex, weight: 0, reps: 0 }]
                 }
             };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const removeSet = useCallback((exerciseId: string, setIndex: number) => {
         setActiveWorkout(prev => {
             if (!prev) return null;
             const currentSets = prev.logs[exerciseId] ? [...prev.logs[exerciseId]] : [];
-            return {
+            const nextState = {
                 ...prev,
                 logs: {
                     ...prev.logs,
                     [exerciseId]: currentSets.filter(s => s.setIndex !== setIndex)
                 }
             };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const replaceExercise = useCallback((exerciseId: string, newExerciseData: { id: string; name: string; targetZone?: any }) => {
         setActiveWorkout(prev => {
@@ -182,7 +212,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 nextCompleted.delete(`${exerciseId}-${log.setIndex}`);
             });
 
-            return {
+            const nextState = {
                 ...prev,
                 routine: updatedRoutine,
                 logs: {
@@ -191,8 +221,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 },
                 completedSets: nextCompleted
             };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const reorderExercises = useCallback((orderedIds: string[]) => {
         setActiveWorkout(prev => {
@@ -217,12 +249,14 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             days[dayIndexInRoutine] = updatedDay;
             updatedRoutine.days = days;
 
-            return {
+            const nextState = {
                 ...prev,
                 routine: updatedRoutine
             };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const addExerciseToSession = useCallback((exercise: RoutineExercise) => {
         setActiveWorkout(prev => {
@@ -247,7 +281,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 reps: set.targetReps || 0,
             }));
 
-            return {
+            const nextState = {
                 ...prev,
                 routine: updatedRoutine,
                 logs: {
@@ -255,8 +289,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     [exercise.id]: initialLogs
                 }
             };
+            persistState(nextState);
+            return nextState;
         });
-    }, []);
+    }, [persistState]);
 
     const removeExerciseFromSession = useCallback((exerciseId: string) => {
         setActiveWorkout(prev => {
@@ -267,32 +303,44 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const dayIndexInRoutine = days.findIndex(d => d.dayIndex === prev.dayIndex);
 
             if (dayIndexInRoutine === -1) return prev;
-
-            const updatedDay = { ...days[dayIndexInRoutine] };
-            updatedDay.exercises = updatedDay.exercises.filter(e => e.id !== exerciseId);
-
-            days[dayIndexInRoutine] = updatedDay;
-            updatedRoutine.days = days;
-
-            // Remove logs and completed status
             const newLogs = { ...prev.logs };
             delete newLogs[exerciseId];
 
+            const newState = {
+                ...prev,
+                routine: {
+                    ...prev.routine,
+                    days: prev.routine.days.map(d =>
+                        d.dayIndex === prev.dayIndex
+                            ? { ...d, exercises: d.exercises.filter(ex => ex.id !== exerciseId) }
+                            : d
+                    )
+                },
+                logs: newLogs
+            };
+            // Also remove from completedSets
             const nextCompleted = new Set(prev.completedSets);
             for (const key of nextCompleted) {
                 if (key.startsWith(`${exerciseId}-`)) {
                     nextCompleted.delete(key);
                 }
             }
+            newState.completedSets = nextCompleted;
 
-            return {
-                ...prev,
-                routine: updatedRoutine,
-                logs: newLogs,
-                completedSets: nextCompleted
-            };
+            persistState(newState);
+            return newState;
         });
-    }, []);
+    }, [persistState]);
+
+    const setIsMinimized = useCallback((minimized: boolean) => {
+        setActiveWorkout(prev => {
+            if (!prev) return null;
+            if (prev.isMinimized === minimized) return prev;
+            const nextState = { ...prev, isMinimized: minimized };
+            persistState(nextState); // Persist the minimized state
+            return nextState;
+        });
+    }, [persistState]);
 
     const contextValue = useMemo(() => ({
         activeWorkout,
@@ -306,7 +354,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         replaceExercise,
         reorderExercises,
         addExerciseToSession,
-        removeExerciseFromSession
+        removeExerciseFromSession,
+        setIsMinimized
     }), [
         activeWorkout,
         startWorkout,
