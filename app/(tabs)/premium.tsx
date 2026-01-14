@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AnimatedCard, AnimatedHeader } from '../../src/components/common/Animations';
-import { SectionAppBar } from '../../src/components/common/SectionAppBar';
+import { AnimatedCard } from '../../src/components/common/Animations';
 import { useTabBarInset } from '../../src/hooks/useTabBarInset';
 import { COLORS } from '../../src/theme/theme';
 
@@ -14,8 +13,6 @@ const PremiumScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* App Bar */}
-      <SectionAppBar title={t('premium.title')} />
 
       <ScrollView
         contentContainerStyle={[
@@ -24,9 +21,6 @@ const PremiumScreen: React.FC = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <AnimatedHeader>
-          <Text style={styles.subtitle}>{t('premium.placeholder')}</Text>
-        </AnimatedHeader>
 
         <AnimatedCard delay={100}>
           <View style={styles.placeholderCard}>
@@ -40,7 +34,7 @@ const PremiumScreen: React.FC = () => {
   );
 };
 
-export default PremiumScreen;
+export default memo(PremiumScreen);
 
 const styles = StyleSheet.create({
   container: {

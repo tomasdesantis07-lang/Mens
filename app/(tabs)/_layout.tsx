@@ -2,7 +2,9 @@ import { BlurView } from 'expo-blur';
 import { usePathname, useRouter } from "expo-router";
 import {
   BarChart3,
+  Bell,
   Home,
+  Settings,
   ShoppingBag,
   User,
   Users
@@ -20,9 +22,11 @@ import Animated, {
   type SharedValue
 } from "react-native-reanimated";
 import { AnimatedTabIcon } from "../../src/components/common/AnimatedTabIcon";
+import { SectionAppBar } from "../../src/components/common/SectionAppBar";
 import { ActiveWorkoutOverlay } from "../../src/components/workout/ActiveWorkoutOverlay";
 import { COLORS } from "../../src/theme/theme";
 import { MensHaptics } from "../../src/utils/haptics";
+import { showToast } from "../../src/utils/toast";
 
 // Screen imports
 import CommunitiesScreen from "./communities";
@@ -54,6 +58,66 @@ export default function TabsLayout() {
   const scrollPosition = useSharedValue(INITIAL_TAB_INDEX);
   const [currentIndex, setCurrentIndex] = useState(INITIAL_TAB_INDEX);
   const isNavigatingRef = useRef(false);
+
+  // Determine header props based on current index
+  const getHeaderProps = (index: number) => {
+    switch (index) {
+      case 0: // Stats
+        return {
+          title: t('stats.analytics_title'),
+          rightIcon: (
+            <View>
+              <Bell size={22} color={COLORS.textPrimary} strokeWidth={2} />
+              <View style={styles.notificationDot} />
+            </View>
+          ),
+          onRightPress: () => showToast.success("Notificaciones próximamente"),
+        };
+      case 1: // Communities
+        return {
+          title: t('communities.title'),
+          rightIcon: (
+            <View>
+              <Bell size={22} color={COLORS.textPrimary} strokeWidth={2} />
+              <View style={styles.notificationDot} />
+            </View>
+          ),
+          onRightPress: () => showToast.success("Notificaciones próximamente"),
+        };
+      case 2: // Home
+        return {
+          title: "MENS",
+          rightIcon: (
+            <View>
+              <Bell size={22} color={COLORS.textPrimary} strokeWidth={2} />
+              <View style={styles.notificationDot} />
+            </View>
+          ),
+          onRightPress: () => showToast.success("Notificaciones próximamente"),
+        };
+      case 3: // Premium
+        return {
+          title: t('premium.title'),
+          rightIcon: (
+            <View>
+              <Bell size={22} color={COLORS.textPrimary} strokeWidth={2} />
+              <View style={styles.notificationDot} />
+            </View>
+          ),
+          onRightPress: () => showToast.success("Notificaciones próximamente"),
+        };
+      case 4: // Profile
+        return {
+          title: t('profile.title'),
+          rightIcon: <Settings size={24} color={COLORS.textPrimary} strokeWidth={2} />,
+          onRightPress: () => router.push('/settings'),
+        };
+      default:
+        return { title: "", rightIcon: null, onRightPress: undefined };
+    }
+  };
+
+  const headerProps = getHeaderProps(currentIndex);
 
   // Sync URL with pager state ONLY on initial mount or deep link
   useEffect(() => {
@@ -111,12 +175,21 @@ export default function TabsLayout() {
         overdrag={true} // Allow bounce effect at edges
         offscreenPageLimit={1} // Keep nearby pages in memory
       >
-        {TAB_CONFIG.map((tab) => (
+        {(TAB_CONFIG || []).map((tab) => (
           <View key={tab.name} style={styles.page}>
             <tab.component />
           </View>
         ))}
       </AnimatedPagerView>
+
+      <View style={styles.appBarContainer} pointerEvents="box-none">
+        <SectionAppBar
+          title={headerProps.title}
+          rightIcon={headerProps.rightIcon}
+          onRightPress={headerProps.onRightPress}
+          style={{ elevation: 50, zIndex: 9999 }}
+        />
+      </View>
 
       {/* Real-time fluid tab bar */}
       <FluidTabBar
@@ -228,6 +301,8 @@ const styles = StyleSheet.create({
   },
   pager: {
     flex: 1,
+    zIndex: 0,
+    elevation: 0,
   },
   page: {
     flex: 1,
@@ -279,5 +354,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
+  },
+  appBarContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    zIndex: 9999,      // Extremely high zIndex
+    elevation: 50,     // High elevation for Android
+    backgroundColor: 'transparent',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.background,
   },
 });

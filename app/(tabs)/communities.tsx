@@ -1,5 +1,5 @@
 import { Users } from "lucide-react-native";
-import React from "react";
+import React, { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,7 +9,6 @@ import {
   AnimatedSection,
 } from "../../src/components/common/Animations";
 import { PrimaryButton } from "../../src/components/common/PrimaryButton";
-import { SectionAppBar } from "../../src/components/common/SectionAppBar";
 import { COLORS } from "../../src/theme/theme";
 import { showToast } from "../../src/utils/toast";
 
@@ -23,8 +22,6 @@ const CommunitiesScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* App Bar */}
-      <SectionAppBar title={t('communities.title')} />
 
       <View style={[styles.content, { paddingTop: 80 + insets.top }]}>
         {/* Icon */}
@@ -60,7 +57,7 @@ const CommunitiesScreen: React.FC = () => {
   );
 };
 
-export default CommunitiesScreen;
+export default memo(CommunitiesScreen);
 
 const styles = StyleSheet.create({
   container: {

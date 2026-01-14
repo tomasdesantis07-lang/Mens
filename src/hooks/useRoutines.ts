@@ -1,35 +1,36 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Unsubscribe } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { auth } from '../services/firebaseConfig';
 import { RoutineService } from '../services/routineService';
-import { Routine } from '../types/routine';
 
 export function useRoutines() {
-    const [routines, setRoutines] = useState<Routine[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
+    const queryClient = useQueryClient();
+    const userId = auth.currentUser?.uid;
+
+    const { data: routines = [], isLoading, error } = useQuery({
+        queryKey: ['routines', userId],
+        queryFn: () => {
+            if (!userId) return Promise.resolve([]);
+            return RoutineService.getUserRoutines(userId);
+        },
+        enabled: !!userId,
+        staleTime: Infinity, // Rely on real-time listener for updates
+    });
 
     useEffect(() => {
-        const userId = auth.currentUser?.uid;
+        if (!userId) return;
 
-        if (!userId) {
-            setRoutines([]);
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
         let unsubscribe: Unsubscribe | undefined;
 
         try {
+            // Subscribe to real-time changes
             unsubscribe = RoutineService.subscribeToUserRoutines(userId, (data) => {
-                setRoutines(data);
-                setLoading(false);
+                // Update the Query Cache directly
+                queryClient.setQueryData(['routines', userId], data);
             });
         } catch (err) {
             console.error("Error subscribing to routines:", err);
-            setError(err instanceof Error ? err : new Error('Unknown error'));
-            setLoading(false);
         }
 
         return () => {
@@ -37,7 +38,10 @@ export function useRoutines() {
                 unsubscribe();
             }
         };
-    }, []);
+    }, [userId, queryClient]);
 
-    return { routines, loading, error };
+    // Ensure routines is ALWAYS an array to prevent .map crashes
+    const safeRoutines = Array.isArray(routines) ? routines : [];
+
+    return { routines: safeRoutines, loading: isLoading, error };
 }

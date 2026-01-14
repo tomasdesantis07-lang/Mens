@@ -1,5 +1,6 @@
+import { useQueries } from "@tanstack/react-query";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -11,8 +12,7 @@ import {
 } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AnimatedCard, AnimatedHeader, AnimatedSection } from "../../src/components/common/Animations";
-import { SectionAppBar } from "../../src/components/common/SectionAppBar";
+import { AnimatedCard, AnimatedSection } from "../../src/components/common/Animations";
 import { ConsistencyHeatmap } from "../../src/components/stats/ConsistencyHeatmap";
 import { MuscleBreakdown } from "../../src/components/stats/MuscleBreakdown";
 import { RankingCard } from "../../src/components/stats/RankingCard";
@@ -27,6 +27,7 @@ const StatsScreen: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
+  const userId = auth.currentUser?.uid;
 
   // Real-time analytics from Firestore (instant load)
   const { analytics, loading: analyticsLoading } = useUserAnalytics();
@@ -37,62 +38,71 @@ const StatsScreen: React.FC = () => {
   const [volumeProgression, setVolumeProgression] = useState<VolumeDataPoint[]>([]);
   const [userRank, setUserRank] = useState<UserRank | null>(null);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
-  const [additionalLoading, setAdditionalLoading] = useState(true);
+  // Fetch additional stats using React Query for 0ms cache hits
+  const results = useQueries({
+    queries: [
+      {
+        queryKey: ["stats", "workout", userId],
+        queryFn: () => WorkoutService.getUserStats(userId!),
+        enabled: !!userId,
+      },
+      {
+        queryKey: ["stats", "muscles", userId],
+        queryFn: () => StatsService.getMuscleDistribution(userId!),
+        enabled: !!userId,
+      },
+      {
+        queryKey: ["stats", "volume", userId],
+        queryFn: () => StatsService.getVolumeProgression(userId!, 8),
+        enabled: !!userId,
+      },
+      {
+        queryKey: ["stats", "rank", userId],
+        queryFn: () => StatsService.getUserRank(userId!),
+        enabled: !!userId,
+      },
+      {
+        queryKey: ["history", userId],
+        queryFn: () => WorkoutService.getAllUserWorkoutSessions(userId!),
+        enabled: !!userId,
+      },
+    ],
+  });
 
-  // Memoized calculation: only recalculates when workoutHistory changes
+  const [
+    { data: workoutStats, isLoading: statsLoading },
+    { data: muscles = [] },
+    { data: volume = [] },
+    { data: rank = null },
+    { data: history = [] },
+  ] = results;
+
+  // Derived state from cached history
+  useMemo(() => {
+    if (!history || !workoutStats) return;
+
+    // Convert consistency timestamps to Map
+    const consistencyMap = new Map<string, number>();
+    workoutStats.consistency.forEach((timestamp) => {
+      const date = new Date(timestamp).toISOString().split("T")[0];
+      consistencyMap.set(date, (consistencyMap.get(date) || 0) + 1);
+    });
+    setConsistency(consistencyMap);
+    setWorkoutHistory(history);
+  }, [history, workoutStats]);
+
+  // Memoized heatmap calculation
   const heatmapData = useMemo(() => {
-    return StatsService.calculateHeatmapData(workoutHistory);
-  }, [workoutHistory]);
+    return StatsService.calculateHeatmapData(history);
+  }, [history]);
 
-  useEffect(() => {
-    loadAdditionalStats();
-  }, []);
 
-  const loadAdditionalStats = async () => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      setAdditionalLoading(false);
-      return;
-    }
-
-    try {
-      // Load stats that aren't covered by the analytics document
-      const [workoutStats, muscles, volume, rank, history] = await Promise.all([
-        WorkoutService.getUserStats(userId),
-        StatsService.getMuscleDistribution(userId),
-        StatsService.getVolumeProgression(userId, 8),
-        StatsService.getUserRank(userId),
-        WorkoutService.getAllUserWorkoutSessions(userId),
-      ]);
-
-      // Store history for memoized heatmap calculation
-      setWorkoutHistory(history);
-
-      // Convert consistency timestamps to Map
-      const consistencyMap = new Map<string, number>();
-      workoutStats.consistency.forEach((timestamp) => {
-        const date = new Date(timestamp).toISOString().split("T")[0];
-        consistencyMap.set(date, (consistencyMap.get(date) || 0) + 1);
-      });
-
-      setConsistency(consistencyMap);
-      setMuscleDistribution(muscles);
-      setVolumeProgression(volume);
-      setUserRank(rank);
-    } catch (error) {
-      console.error("Error loading additional stats:", error);
-    } finally {
-      setAdditionalLoading(false);
-    }
-  };
-
-  // Show loading only for initial load
-  const isLoading = analyticsLoading && additionalLoading;
+  // Show loading only if no cache exists for crucial data
+  const isLoading = analyticsLoading && (statsLoading || !workoutStats);
 
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <SectionAppBar title={t("stats.analytics_title")} />
         <View style={[styles.loadingContainer, { paddingTop: 80 + insets.top }]}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>{t("stats.loading")}</Text>
@@ -102,12 +112,11 @@ const StatsScreen: React.FC = () => {
   }
 
   // Check if user has any data (from analytics or calculated stats)
-  const hasData = analytics !== null || consistency.size > 0 || muscleDistribution.length > 0;
+  const hasData = analytics !== null || consistency.size > 0 || muscles.length > 0;
 
   if (!hasData) {
     return (
       <View style={styles.container}>
-        <SectionAppBar title={t("stats.analytics_title")} />
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingTop: 80 + insets.top, paddingBottom: tabBarInset }]}
           showsVerticalScrollIndicator={false}
@@ -141,17 +150,13 @@ const StatsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* App Bar */}
-      <SectionAppBar title={t("stats.analytics_title")} />
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: 80 + insets.top, paddingBottom: tabBarInset }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header subtitle */}
-        <AnimatedHeader style={styles.header}>
-          <Text style={styles.headerSubtitle}>{t("stats.performance_subtitle")}</Text>
-        </AnimatedHeader>
+        {/* Header subtitle */}
 
         {/* Quick Stats from Analytics (Instant Load) */}
         {analytics && (
@@ -192,19 +197,19 @@ const StatsScreen: React.FC = () => {
           <ConsistencyHeatmap data={consistency} muscleData={heatmapData} />
         </AnimatedSection>
 
-        {muscleDistribution.length > 0 && (
+        {muscles.length > 0 && (
           <AnimatedSection delay={250} style={styles.section}>
-            <MuscleBreakdown data={muscleDistribution} />
+            <MuscleBreakdown data={muscles} />
           </AnimatedSection>
         )}
 
         {/* Section 3: Progress - Volume Chart */}
-        {volumeProgression.length > 0 && (
+        {volume.length > 0 && (
           <AnimatedSection delay={300} style={styles.section}>
             <AnimatedCard style={styles.chartCard}>
               <Text style={styles.chartTitle}>{t("stats.volume_progression_title")}</Text>
               <LineChart
-                data={volumeProgression.map(point => ({
+                data={volume.map(point => ({
                   value: point.value,
                   label: point.label,
                 }))}
@@ -236,9 +241,9 @@ const StatsScreen: React.FC = () => {
         {/* Section 4: Status - Ranking & Best Streak */}
         <AnimatedSection delay={400} style={styles.section}>
           <View style={styles.statusRow}>
-            {userRank && (
+            {rank && (
               <View style={styles.statusItem}>
-                <RankingCard rank={userRank} />
+                <RankingCard rank={rank} />
               </View>
             )}
 
@@ -287,18 +292,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontFamily: FONT_FAMILY.heavy,
-    color: COLORS.textPrimary,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
   },
   section: {
     marginBottom: 16,
@@ -459,4 +452,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StatsScreen;
+export default memo(StatsScreen);

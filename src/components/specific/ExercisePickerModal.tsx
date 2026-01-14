@@ -44,7 +44,7 @@ const getEquipmentIcon = (equipment: string) => {
     }
 };
 
-export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
+const ExercisePickerModalContent: React.FC<ExercisePickerModalProps> = ({
     visible,
     onSelect,
     onCustomExercise,
@@ -183,120 +183,127 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
     };
 
     return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            presentationStyle="pageSheet"
-            onRequestClose={onClose}
-        >
-            <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={styles.title}>{t('exercise_picker.title')}</Text>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <X color={COLORS.textPrimary} size={24} />
+        <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
+            {/* Header */}
+            <View style={styles.header}>
+                <Text style={styles.title}>{t('exercise_picker.title')}</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                    <X color={COLORS.textPrimary} size={24} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+                <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder={t('exercise_picker.search_placeholder')}
+                    placeholderTextColor={COLORS.textTertiary}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery("")}>
+                        <X color={COLORS.textSecondary} size={16} />
                     </TouchableOpacity>
-                </View>
+                )}
+            </View>
 
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder={t('exercise_picker.search_placeholder')}
-                        placeholderTextColor={COLORS.textTertiary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery("")}>
-                            <X color={COLORS.textSecondary} size={16} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Muscle Filter Chips - Simple horizontal row */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chipsContainer}
-                    style={styles.chipsScroll}
-                >
-                    {MUSCLE_CATEGORIES.flatMap(cat => cat.muscles).map((muscle) => {
-                        const isSelected = selectedMuscle === muscle.slug;
-                        return (
-                            <TouchableOpacity
-                                key={muscle.slug}
-                                style={[
-                                    styles.chip,
-                                    isSelected && styles.chipSelected
-                                ]}
-                                onPress={() => handleMuscleSelect(muscle.slug)}
-                            >
-                                <Text style={[
-                                    styles.chipText,
-                                    isSelected && styles.chipTextSelected
-                                ]}>
-                                    {muscle.label}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-
-                {/* Results count */}
-                <View style={styles.resultsBar}>
-                    <Text style={styles.resultsText}>
-                        {filteredExercises.length} {filteredExercises.length === 1 ? 'ejercicio' : 'ejercicios'}
-                    </Text>
-                    {selectedMuscle && (
-                        <TouchableOpacity onPress={() => setSelectedMuscle(null)}>
-                            <Text style={styles.clearText}>Limpiar</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Exercise List */}
-                <View style={{ flex: 1 }}>
-                    <TypedFlashList
-                        data={filteredExercises}
-                        renderItem={renderItem}
-                        keyExtractor={(item: any) => item.id}
-                        contentContainerStyle={styles.listContent}
-                        estimatedItemSize={75}
-                        ListEmptyComponent={
-                            <View style={styles.emptyState}>
-                                <Text style={styles.emptyText}>
-                                    {t('exercise_picker.no_results')}
-                                </Text>
-                            </View>
-                        }
-                    />
-                </View>
-
-                {/* Bottom Actions */}
-                <View style={[styles.customButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
-                    <TouchableOpacity
-                        style={styles.customButton}
-                        onPress={onCustomExercise}
-                    >
-                        <Text style={styles.customButtonText}>
-                            {t('exercise_picker.custom_exercise')}
-                        </Text>
-                    </TouchableOpacity>
-
-                    {multiSelect && selectedExercises.size > 0 && (
+            {/* Muscle Filter Chips - Simple horizontal row */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsContainer}
+                style={styles.chipsScroll}
+            >
+                {MUSCLE_CATEGORIES.flatMap(cat => cat.muscles).map((muscle) => {
+                    const isSelected = selectedMuscle === muscle.slug;
+                    return (
                         <TouchableOpacity
-                            style={styles.addSelectedButton}
-                            onPress={handleConfirmSelection}
+                            key={muscle.slug}
+                            style={[
+                                styles.chip,
+                                isSelected && styles.chipSelected
+                            ]}
+                            onPress={() => handleMuscleSelect(muscle.slug)}
                         >
-                            <Text style={styles.addSelectedButtonText}>
-                                Añadir {selectedExercises.size} {selectedExercises.size === 1 ? 'ejercicio' : 'ejercicios'}
+                            <Text style={[
+                                styles.chipText,
+                                isSelected && styles.chipTextSelected
+                            ]}>
+                                {muscle.label}
                             </Text>
                         </TouchableOpacity>
-                    )}
-                </View>
+                    );
+                })}
+            </ScrollView>
+
+            {/* Results count */}
+            <View style={styles.resultsBar}>
+                <Text style={styles.resultsText}>
+                    {filteredExercises.length} {filteredExercises.length === 1 ? 'ejercicio' : 'ejercicios'}
+                </Text>
+                {selectedMuscle && (
+                    <TouchableOpacity onPress={() => setSelectedMuscle(null)}>
+                        <Text style={styles.clearText}>Limpiar</Text>
+                    </TouchableOpacity>
+                )}
             </View>
+
+            {/* Exercise List */}
+            <View style={{ flex: 1 }}>
+                <TypedFlashList
+                    data={filteredExercises}
+                    renderItem={renderItem}
+                    keyExtractor={(item: any) => item.id}
+                    contentContainerStyle={styles.listContent}
+                    estimatedItemSize={75}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyText}>
+                                {t('exercise_picker.no_results')}
+                            </Text>
+                        </View>
+                    }
+                />
+            </View>
+
+            {/* Bottom Actions */}
+            <View style={[styles.customButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
+                <TouchableOpacity
+                    style={styles.customButton}
+                    onPress={onCustomExercise}
+                >
+                    <Text style={styles.customButtonText}>
+                        {t('exercise_picker.custom_exercise')}
+                    </Text>
+                </TouchableOpacity>
+
+                {multiSelect && selectedExercises.size > 0 && (
+                    <TouchableOpacity
+                        style={styles.addSelectedButton}
+                        onPress={handleConfirmSelection}
+                    >
+                        <Text style={styles.addSelectedButtonText}>
+                            Añadir {selectedExercises.size} {selectedExercises.size === 1 ? 'ejercicio' : 'ejercicios'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        </View>
+    );
+};
+
+export const ExercisePickerModal = (props: ExercisePickerModalProps) => {
+    if (!props.visible) return null;
+    return (
+        <Modal
+            visible={true}
+            animationType="slide"
+            presentationStyle="pageSheet"
+            onRequestClose={props.onClose}
+        >
+            <ExercisePickerModalContent {...props} />
         </Modal>
     );
 };

@@ -1,55 +1,70 @@
-﻿// MMKV Storage Adapter - Safe fallback version
-// Provides a no-op implementation if MMKV native module is not available
+﻿
+// Strict MMKV Storage Adapter with In-Memory Fallback
+// This approach ensures the app works in Expo Go (non-persistent) and Dev Builds (persistent)
 
-let storageInstance: any = null;
-let mmkvAvailable = false;
 
-try {
-    const mmkvModule = require('react-native-mmkv');
-    if (mmkvModule && mmkvModule.MMKV) {
-        storageInstance = new mmkvModule.MMKV();
-        mmkvAvailable = true;
-        console.log('[MMKV] Successfully initialized');
-    }
-} catch (e) {
-    console.warn('[MMKV] Native module not available - caching disabled. Run `npx expo run:android` to rebuild.');
+interface StorageAdapter {
+    set: (key: string, value: string) => void;
+    getString: (key: string) => string | undefined;
+    delete: (key: string) => void;
+    clearAll: () => void;
 }
 
-export const storage = storageInstance;
+let storage: StorageAdapter;
+
+try {
+    // Use require to get the actual class (avoids TS type-only interpretation)
+    const { MMKV } = require('react-native-mmkv');
+    const mmkv = new MMKV();
+    storage = {
+        set: (key, value) => mmkv.set(key, value),
+        getString: (key) => mmkv.getString(key),
+        delete: (key) => mmkv.delete(key),
+        clearAll: () => mmkv.clearAll(),
+    };
+    console.log('[Storage] MMKV initialized successfully');
+} catch (e) {
+    console.warn('[Storage] MMKV failed to initialize (missing native module?). Falling back to In-Memory storage.');
+
+    // In-Memory Fallback
+    const memoryStore = new Map<string, string>();
+    storage = {
+        set: (key, value) => memoryStore.set(key, value),
+        getString: (key) => memoryStore.get(key),
+        delete: (key) => memoryStore.delete(key),
+        clearAll: () => memoryStore.clear(),
+    };
+}
 
 export const MMKVStorage = {
     setItem: (key: string, value: any) => {
-        if (!mmkvAvailable) return;
         try {
-            storage?.set(key, JSON.stringify(value));
+            storage.set(key, JSON.stringify(value));
         } catch (e) {
-            console.error('MMKV setItem error', e);
+            console.error('Storage setItem error', e);
         }
     },
     getItem: <T>(key: string): T | null => {
-        if (!mmkvAvailable) return null;
         try {
-            const value = storage?.getString(key);
+            const value = storage.getString(key);
             return value ? JSON.parse(value) : null;
         } catch (e) {
-            console.error('MMKV getItem error', e);
+            console.error('Storage getItem error', e);
             return null;
         }
     },
     removeItem: (key: string) => {
-        if (!mmkvAvailable) return;
         try {
-            storage?.delete(key);
+            storage.delete(key);
         } catch (e) {
-            console.error('MMKV removeItem error', e);
+            console.error('Storage removeItem error', e);
         }
     },
     clearAll: () => {
-        if (!mmkvAvailable) return;
         try {
-            storage?.clearAll();
+            storage.clearAll();
         } catch (e) {
-            console.error('MMKV clearAll error', e);
+            console.error('Storage clearAll error', e);
         }
     }
 };
@@ -59,22 +74,24 @@ const ACTIVE_WORKOUT_KEY = 'active_workout';
 
 export const workoutStorage = {
     saveActiveWorkout: (workout: any) => {
-        if (!mmkvAvailable || !workout) return;
+        if (!workout) {
+            storage.delete(ACTIVE_WORKOUT_KEY);
+            return;
+        }
         try {
             // Convert Set to Array for JSON serialization
             const serializable = {
                 ...workout,
                 completedSets: Array.from(workout.completedSets || [])
             };
-            storage?.set(ACTIVE_WORKOUT_KEY, JSON.stringify(serializable));
+            storage.set(ACTIVE_WORKOUT_KEY, JSON.stringify(serializable));
         } catch (e) {
-            console.error('MMKV saveActiveWorkout error', e);
+            console.error('Storage saveActiveWorkout error', e);
         }
     },
     getActiveWorkout: (): any | null => {
-        if (!mmkvAvailable) return null;
         try {
-            const value = storage?.getString(ACTIVE_WORKOUT_KEY);
+            const value = storage.getString(ACTIVE_WORKOUT_KEY);
             if (!value) return null;
             const parsed = JSON.parse(value);
             // Convert Array back to Set
@@ -83,16 +100,15 @@ export const workoutStorage = {
                 completedSets: new Set(parsed.completedSets || [])
             };
         } catch (e) {
-            console.error('MMKV getActiveWorkout error', e);
+            console.error('Storage getActiveWorkout error', e);
             return null;
         }
     },
     clearActiveWorkout: () => {
-        if (!mmkvAvailable) return;
         try {
-            storage?.delete(ACTIVE_WORKOUT_KEY);
+            storage.delete(ACTIVE_WORKOUT_KEY);
         } catch (e) {
-            console.error('MMKV clearActiveWorkout error', e);
+            console.error('Storage clearActiveWorkout error', e);
         }
     }
 };

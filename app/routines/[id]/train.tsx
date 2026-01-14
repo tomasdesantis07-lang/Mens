@@ -1,38 +1,32 @@
-import { useIsFocused } from '@react-navigation/native';
-import { FlashList } from "@shopify/flash-list";
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { CheckSquare, Edit3, Plus, Trash2 } from "lucide-react-native";
+import { CheckSquare, Edit3 } from "lucide-react-native";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     Dimensions,
+    KeyboardAvoidingView,
     LayoutAnimation,
     Platform,
-    Animated as RNAnimated,
     StyleSheet,
     Text,
     TouchableOpacity,
-    UIManager,
     View
 } from "react-native";
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
-import { Gesture, Swipeable } from "react-native-gesture-handler";
+import { Gesture } from "react-native-gesture-handler";
 import Animated, {
-    FadeInDown,
-    FadeOut,
-    LinearTransition,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
-    withSpring,
-    withTiming
+    withSpring
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { v4 as uuidv4 } from "uuid";
 import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
 import { PrimaryButton } from "../../../src/components/common/PrimaryButton";
 import { ExercisePickerModal } from "../../../src/components/specific/ExercisePickerModal";
-import { WorkoutExerciseCard } from "../../../src/components/specific/WorkoutExerciseCard";
+import TrainingSessionList from "../../../src/components/training/TrainingSessionList";
+import { queryClient } from "../../../src/context/QueryContext";
 import { useWorkout } from "../../../src/context/WorkoutContext";
 import { useWorkoutTick, useWorkoutTimerContext } from "../../../src/context/WorkoutTimerContext";
 import { ExerciseRecommendationService } from "../../../src/services/ExerciseRecommendationService";
@@ -84,17 +78,13 @@ const WorkoutSkeleton: React.FC = memo(() => (
 ));
 
 // Enable LayoutAnimation on Android
-if (Platform.OS === 'android') {
-    if (UIManager.setLayoutAnimationEnabledExperimental) {
-        UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-}
+
 
 const TrainScreen: React.FC = () => {
     const { t } = useTranslation();
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { id, dayIndex } = useLocalSearchParams<{ id: string; dayIndex?: string }>();
+    const { id, dayIndex, startTime: startTimeParam } = useLocalSearchParams<{ id: string; dayIndex?: string; startTime?: string }>();
 
     const {
         activeWorkout,
@@ -133,19 +123,8 @@ const TrainScreen: React.FC = () => {
         ? activeWorkout.dayIndex
         : (dayIndex ? parseInt(dayIndex) : 0);
 
-    // ===== PROGRESSIVE RENDERING: Defer heavy list until transition completes =====
-    // If we have active session data, render list immediately (coming from overlay)
-    // Otherwise wait for transition (deep link case)
-    const [isListReady, setIsListReady] = useState(hasActiveSession);
-
-    useEffect(() => {
-        if (isListReady) return; // Already ready, skip
-        // For deep link case only - wait minimal time
-        const timeout = setTimeout(() => {
-            setIsListReady(true);
-        }, 50); // Minimal delay, just let first paint happen
-        return () => clearTimeout(timeout);
-    }, []);
+    // Use synchronous availability
+    const isListReady = hasActiveSession || !!routine;
 
     // ===== Deep link fallback: Only fetch if no context data =====
     // This path is rarely taken - only for direct URL access
@@ -217,26 +196,26 @@ const TrainScreen: React.FC = () => {
 
     // Scroll to expanded exercise
     // Scroll to expanded exercise with centering logic
-    useEffect(() => {
-        if (expandedExerciseId && exercises.length > 0 && isListReady) {
-            const index = exercises.findIndex((e: any) => e.id === expandedExerciseId);
-            if (index !== -1) {
-                // Wait slightly for layout change to begin
-                setTimeout(() => {
-                    flatListRef.current?.scrollToIndex({
-                        index,
-                        animated: true,
-                        viewPosition: 0.15, // Places it near top with breathing room
-                    });
-                }, 50);
-            }
+    // Scroll helper - only used for auto-advance
+    const scrollToExercise = useCallback((exerciseId: string) => {
+        if (!exercises.length || !isListReady) return;
+        const index = exercises.findIndex((e: any) => e.id === exerciseId);
+        if (index !== -1) {
+            // Wait for layout animation to settle
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                    index,
+                    animated: true,
+                    viewPosition: 0.15,
+                });
+            }, 300);
         }
-    }, [expandedExerciseId, exercises, isListReady]);
+    }, [exercises, isListReady]);
 
     const emptySet = useMemo(() => new Set<string>(), []);
 
     const handleToggleExpand = useCallback((exerciseId: string) => {
-        // Native LayoutAnimation for 100% smooth "Accordion" effect
+        // Use LayoutAnimation for smooth local transition without forced scrolling
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpandedExerciseId(prev => prev === exerciseId ? null : exerciseId);
     }, []);
@@ -246,21 +225,22 @@ const TrainScreen: React.FC = () => {
     const [recommendations, setRecommendations] = useState<CatalogExercise[]>([]);
     const [addExerciseModalVisible, setAddExerciseModalVisible] = useState(false);
 
-    // ===== Defer modal mounting until after list is ready =====
-    const [modalsReady, setModalsReady] = useState(false);
-    useEffect(() => {
-        if (isListReady) {
-            // Extra delay to ensure smooth list rendering first
-            const timeout = setTimeout(() => setModalsReady(true), 300);
-            return () => clearTimeout(timeout);
-        }
-    }, [isListReady]);
+    // Modals can mount immediately, they are hidden by visible prop
+    const modalsReady = true;
 
     const translateY = useSharedValue(0);
     const { height: SCREEN_HEIGHT } = Dimensions.get('window');
     const DISMISS_THRESHOLD = SCREEN_HEIGHT * 0.4;
     const VELOCITY_THRESHOLD = 800; // pixels per second - fast swipe
-    const dismissScreen = () => router.back();
+    const navigation = useNavigation();
+
+    const handleMinimize = useCallback(() => {
+        if (navigation.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/(tabs)/home' as any);
+        }
+    }, [navigation, router]);
 
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
@@ -273,9 +253,10 @@ const TrainScreen: React.FC = () => {
                 (event.velocityY > VELOCITY_THRESHOLD && event.translationY > 50);
 
             if (shouldDismiss) {
-                translateY.value = withTiming(SCREEN_HEIGHT, { duration: 200 }, () => {
-                    runOnJS(dismissScreen)();
-                });
+                runOnJS(() => {
+                    setIsMinimized(true);
+                    handleMinimize();
+                })();
             } else {
                 translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
             }
@@ -312,13 +293,18 @@ const TrainScreen: React.FC = () => {
                             return !isDone;
                         });
 
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setExpandedExerciseId(nextExercise ? nextExercise.id : null);
+                        if (nextExercise) {
+                            setExpandedExerciseId(nextExercise.id);
+                            // ONLY scroll on auto-advance
+                            scrollToExercise(nextExercise.id);
+                        } else {
+                            setExpandedExerciseId(null);
+                        }
                     }, 400);
                 }
             }
         }
-    }, [toggleSetComplete, startRest, activeWorkout, exercises]);
+    }, [toggleSetComplete, startRest, activeWorkout, exercises, scrollToExercise]);
 
     const getLastSessionSet = useCallback((exerciseId: string, setIndex: number) => {
         if (!lastSession) return null;
@@ -331,10 +317,17 @@ const TrainScreen: React.FC = () => {
 
     const handleFinishWorkout = async () => {
         if (!routine || !auth.currentUser || !activeWorkout) return;
+
+        // 1. UI FEEDBACK: Instant navigation (Offline-First)
         setIsSaving(true);
+        MensHaptics.success();
+
         try {
             const currentDay = activeWorkout.routine.days.find((d) => d.dayIndex === selectedDayIndex);
             if (!currentDay) return;
+
+            const sessionDuration = Math.floor((Date.now() - (activeWorkout?.startTime || Date.now())) / 1000);
+
             const exercisesLog: WorkoutExerciseLog[] = currentDay.exercises.map((ex) => ({
                 exerciseId: ex.exerciseId,
                 routineExerciseId: ex.id,
@@ -343,19 +336,42 @@ const TrainScreen: React.FC = () => {
                 targetReps: ex.reps,
                 sets: activeWorkout.logs[ex.id] || [],
             }));
-            await WorkoutService.createWorkoutSession({
+
+            const sessionData = {
                 userId: auth.currentUser.uid,
                 routineId: routine.id,
                 routineName: routine.name,
                 dayIndex: selectedDayIndex,
-                durationSeconds: Math.floor((Date.now() - (activeWorkout?.startTime || Date.now())) / 1000),
+                durationSeconds: sessionDuration,
                 exercises: exercisesLog,
-            });
+                performedAt: new Date(), // Local date for instant display
+                id: 'local-' + Date.now(), // Temporary ID
+            };
+
+            // 2. OPTIMISTIC UPDATE: Update local history cache IMMEDIATELY
+            // This ensures the Home screen shows the new workout instantly
+            WorkoutService.saveLocalSession(auth.currentUser.uid, sessionData);
+
+            // 3. BACKGROUND SYNC: Kick off Firestore save without awaiting
+            WorkoutService.createWorkoutSession(sessionData)
+                .then(() => {
+                    console.log("[TrainScreen] Workout synced to cloud successfully");
+                    queryClient.invalidateQueries({ queryKey: ['stats'] });
+                    queryClient.invalidateQueries({ queryKey: ['user', auth.currentUser?.uid] });
+                })
+                .catch(err => {
+                    console.error("[TrainScreen] Failed to sync workout to cloud:", err);
+                });
+
+            // 4. CLEANUP & NAVIGATE: Immediate action
             finishWorkout();
             router.replace("/(tabs)/home" as any);
+            showToast.success(t('train.finish_success') || "Entrenamiento guardado");
+
         } catch (error) {
-            setIsSaving(true); // reset
+            console.error("Error finishing workout:", error);
             setIsSaving(false);
+            showToast.error("Error al finalizar el entrenamiento");
         }
     };
 
@@ -413,242 +429,124 @@ const TrainScreen: React.FC = () => {
         isEditMode
     ], [activeWorkout?.logs, activeWorkout?.completedSets, expandedExerciseId, isEditMode]);
 
-    const renderFlashListItem = useCallback(({ item, index }: { item: any, index: number }) => (
-        <TrainingListItem
-            item={item}
-            index={index}
-            logs={activeWorkout?.logs[item.id] || []}
-            isExpanded={expandedExerciseId === item.id}
-            completedSets={activeWorkout?.completedSets || emptySet}
-            onToggleExpand={handleToggleExpand}
-            onLogSet={logSet}
-            onToggleSetComplete={handleToggleSet}
-            onAddSet={addSet}
-            getLastSessionSet={getLastSessionSet}
-            onReplace={handleInitiateReplace}
-            onRemove={removeExerciseFromSession}
-            onRemoveSet={removeSet}
-        />
-    ), [activeWorkout?.logs, activeWorkout?.completedSets, emptySet, expandedExerciseId, handleToggleExpand, logSet, handleToggleSet, addSet, getLastSessionSet, handleInitiateReplace, removeExerciseFromSession, removeSet]);
 
-    const renderDraggableItem = useCallback(({ item, drag, isActive }: RenderItemParams<any>) => (
-        <ScaleDecorator activeScale={1.03}>
-            <View style={{ marginBottom: 4, opacity: isActive ? 0.8 : 1 }}>
-                {/* In Edit Mode, we disable Swipeable to avoid gesture conflicts */}
-                <WorkoutExerciseCard
-                    exercise={item}
-                    logs={activeWorkout?.logs[item.id] || []}
-                    // Lock completed sets logic in edit mode if desired, or keep as is.
-                    completedSets={activeWorkout?.completedSets || emptySet}
-                    isExpanded={false} // Force collapsed in edit mode
-                    onToggleExpand={() => { }} // Disable expand in edit mode
-                    onLogSet={() => { }} // Disable editing
-                    onToggleSetComplete={() => { }}
-                    onAddSet={() => { }}
-                    getLastSessionSet={() => null}
-                    onReplace={() => { }}
-                    onRemoveSet={() => { }}
-                    onLongPress={drag} // Enable drag
-                />
-            </View>
-        </ScaleDecorator>
-    ), [activeWorkout?.logs, activeWorkout?.completedSets, emptySet]);
-
-
-
+    // Removed inline list renderers (moved to TrainingSessionList)
 
     return (
         /* @ts-ignore */
-        <Animated.View
-            style={[styles.container, { paddingTop: Math.max(insets.top, 20) }, animatedStyle]}
-        // REMOVED: FadeIn.duration(300) - This was blocking the native slide animation
+        <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
         >
-            {!displayRoutine ? (
-                // Only show full skeleton for deep link access without context data
-                <WorkoutSkeleton />
-            ) : (
-                <>
-                    {/* Header renders IMMEDIATELY - lightweight, no heavy components */}
-                    <View style={styles.header}>
-                        <View style={styles.dragHandle}><View style={styles.dragIndicator} /></View>
-                        <View style={styles.headerTop}>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    MensHaptics.light();
-                                    setIsMinimized(true);
-                                    // Use explicit animation instead of pan gesture
-                                    translateY.value = withTiming(SCREEN_HEIGHT, { duration: 300 }, () => {
-                                        runOnJS(router.back)();
-                                    });
-                                }}
-                                style={styles.minimizeButton}
-                            >
-                                <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.timerWrapper}>
-                                <View style={styles.timerContainer}>
-                                    <WorkoutTimerDisplay startTime={activeWorkout?.startTime ?? null} />
-                                </View>
-                            </View>
-
-                            {/* Edit Mode Toggle */}
-                            <TouchableOpacity
-                                onPress={() => {
-                                    if (isEditMode) {
-                                        // Exit edit mode
-                                        setIsEditMode(false);
-                                    } else {
-                                        // Enter edit mode - collapse all for better drag performance
-                                        setExpandedExerciseId(null);
-                                        setIsEditMode(true);
+            <Animated.View
+                style={[styles.container, { paddingTop: Math.max(insets.top, 20) }, animatedStyle]}
+            // REMOVED: FadeIn.duration(300) - This was blocking the native slide animation
+            >
+                {!displayRoutine ? (
+                    // Only show full skeleton for deep link access without context data
+                    <WorkoutSkeleton />
+                ) : (
+                    <>
+                        {/* Header renders IMMEDIATELY - lightweight, no heavy components */}
+                        <View style={styles.header}>
+                            <View style={styles.dragHandle}><View style={styles.dragIndicator} /></View>
+                            <View style={styles.headerTop}>
+                                <TouchableOpacity
+                                    onPress={() => {
                                         MensHaptics.light();
-                                        showToast.info(t('train.reorder_mode_active') || "Reorder Mode Active");
-                                    }
-                                }}
-                                style={styles.editButton}
-                            >
-                                {isEditMode ? (
-                                    <CheckSquare size={22} color={COLORS.primary} />
-                                ) : (
-                                    <Edit3 size={20} color={COLORS.textSecondary} />
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
-                    </View>
+                                        setIsMinimized(true); // Signal context to show overlay
+                                        handleMinimize(); // Use native slide_from_bottom pop
+                                    }}
+                                    style={styles.minimizeButton}
+                                >
+                                    <Text style={styles.backButtonText}>↓ {t('train.minimize')}</Text>
+                                </TouchableOpacity>
 
-                    {/* OPTIMIZED: Dual List Engine - FlashList (View) / DraggableFlatList (Edit) */}
-                    {isListReady ? (
-                        isEditMode ? (
-                            <DraggableFlatList
-                                data={exercises}
-                                keyExtractor={(item) => item.id}
-                                onDragEnd={({ data }) => {
-                                    reorderExercises(data.map(e => e.id));
-                                }}
-                                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
-                                activationDistance={10}
-                                renderItem={renderDraggableItem}
-                                ListFooterComponent={<View style={{ height: 80 }} />}
+                                <View style={styles.timerWrapper}>
+                                    <View style={styles.timerContainer}>
+                                        <WorkoutTimerDisplay
+                                            startTime={activeWorkout?.startTime ?? (startTimeParam ? parseInt(startTimeParam) : null)}
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* Edit Mode Toggle */}
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (isEditMode) {
+                                            // Exit edit mode
+                                            setIsEditMode(false);
+                                        } else {
+                                            // Enter edit mode - collapse all for better drag performance
+                                            setExpandedExerciseId(null);
+                                            setIsEditMode(true);
+                                            MensHaptics.light();
+                                            showToast.info(t('train.reorder_mode_active') || "Reorder Mode Active");
+                                        }
+                                    }}
+                                    style={styles.editButton}
+                                >
+                                    {isEditMode ? (
+                                        <CheckSquare size={22} color={COLORS.primary} />
+                                    ) : (
+                                        <Edit3 size={20} color={COLORS.textSecondary} />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.routineName}>{translateIfKey(displayRoutine.name)}</Text>
+                        </View>
+
+                        {/* OPTIMIZED: Dual List Engine - FlashList (View) / DraggableFlatList (Edit) */}
+                        {isListReady ? (
+                            <TrainingSessionList
+                                exercises={exercises}
+                                logs={activeWorkout?.logs || {}}
+                                completedSets={activeWorkout?.completedSets || emptySet}
+                                expandedExerciseId={expandedExerciseId}
+                                isEditMode={isEditMode}
+                                flatListRef={flatListRef}
+                                onToggleExpand={handleToggleExpand}
+                                onLogSet={logSet}
+                                onToggleSetComplete={handleToggleSet}
+                                onAddSet={addSet}
+                                onRemoveSet={removeSet}
+                                onReplace={handleInitiateReplace}
+                                onRemoveExercise={removeExerciseFromSession}
+                                onReorder={(ids) => reorderExercises(ids)}
+                                getLastSessionSet={getLastSessionSet}
+                                onShowAddExercise={() => setAddExerciseModalVisible(true)}
                             />
                         ) : (
-                            // @ts-ignore - Force bypass broken type definition
-                            <FlashList
-                                ref={flatListRef}
-                                data={exercises}
-                                keyExtractor={(item: any) => item.id}
-                                {...({ estimatedItemSize: 160 } as any)} // Force prop injection
-                                extraData={flashListExtraData}
-                                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
-                                removeClippedSubviews={true}
-                                drawDistance={500} // Render ahead for smooth scroll
-                                renderItem={renderFlashListItem}
-                                // Native-side layout animation for item resizing/reordering
-                                itemLayoutAnimation={LinearTransition}
-                                ListFooterComponent={
-                                    <TouchableOpacity
-                                        style={styles.addExerciseButton}
-                                        onPress={() => setAddExerciseModalVisible(true)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Plus size={20} color={COLORS.primary} />
-                                        <Text style={styles.addExerciseButtonText}>{t('train.add_exercise')}</Text>
-                                    </TouchableOpacity>
-                                }
-                            />
-                        )
-                    ) : (
-                        <View style={{ flex: 1, paddingHorizontal: 24 }}>
-                            <WorkoutSkeleton />
+                            <View style={{ flex: 1, paddingHorizontal: 24 }}>
+                                <WorkoutSkeleton />
+                            </View>
+                        )}
+
+                        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24), position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
+                            <PrimaryButton title={t('train.finish_session')} onPress={handleFinishWorkout} loading={isSaving} />
+                            <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
+                                <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
+                            </TouchableOpacity>
                         </View>
-                    )}
 
-                    <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24), position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
-                        <PrimaryButton title={t('train.finish_session')} onPress={handleFinishWorkout} loading={isSaving} />
-                        <TouchableOpacity onPress={handleCancelWorkout} style={styles.cancelWorkoutButton}>
-                            <Text style={styles.cancelWorkoutText}>{t('train.cancel_workout')}</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Defer heavy modals until after initial render to prioritize main UI */}
-                    {modalsReady && (
-                        <>
-                            <ConfirmDialog visible={showCancelDialog} onConfirm={confirmCancelWorkout} onCancel={() => setShowCancelDialog(false)} title={t('train.cancel_dialog.title') || ""} message={t('train.cancel_dialog.message') || ""} variant="danger" />
-                            <ExercisePickerModal visible={replacementModalVisible} onClose={() => setReplacementModalVisible(false)} onSelect={handleConfirmReplace} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} recommendedExercises={recommendations} multiSelect={false} />
-                            <ExercisePickerModal visible={addExerciseModalVisible} onClose={() => setAddExerciseModalVisible(false)} onSelect={handleAddExercises} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} multiSelect={true} />
-                        </>
-                    )}
-                </>
-            )}
-        </Animated.View>
+                        {/* Defer heavy modals until after initial render to prioritize main UI */}
+                        {modalsReady && (
+                            <>
+                                <ConfirmDialog visible={showCancelDialog} onConfirm={confirmCancelWorkout} onCancel={() => setShowCancelDialog(false)} title={t('train.cancel_dialog.title') || ""} message={t('train.cancel_dialog.message') || ""} variant="danger" />
+                                <ExercisePickerModal visible={replacementModalVisible} onClose={() => setReplacementModalVisible(false)} onSelect={handleConfirmReplace} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} recommendedExercises={recommendations} multiSelect={false} />
+                                <ExercisePickerModal visible={addExerciseModalVisible} onClose={() => setAddExerciseModalVisible(false)} onSelect={handleAddExercises} onCustomExercise={() => showToast.info(t('train.custom_exercise_hint') || "Selecciona un ejercicio existente")} multiSelect={true} />
+                            </>
+                        )}
+                    </>
+                )}
+            </Animated.View>
+        </KeyboardAvoidingView>
     );
 };
 
 export default TrainScreen;
 
-// Moved OUTSIDE TrainScreen for perfect memoization (prevents component re-creation)
-const TrainingListItem = memo(({
-    item, index, logs, isExpanded, completedSets, onToggleExpand,
-    onLogSet, onToggleSetComplete, onAddSet, getLastSessionSet, onReplace, onRemove, onRemoveSet
-}: any) => {
-    const renderRightActions = (progress: RNAnimated.AnimatedInterpolation<number>) => (
-        <View style={styles.deleteActionContainer}>
-            <RNAnimated.View
-                style={[
-                    styles.deleteActionInner,
-                    {
-                        opacity: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 1] }),
-                        transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }]
-                    }
-                ]}
-            >
-                <Trash2 size={26} color="#FFFFFF" />
-            </RNAnimated.View>
-        </View>
-    );
-
-    return (
-        <Animated.View
-            entering={FadeInDown.delay(index * 50).springify()}
-            exiting={FadeOut.duration(300)}
-            style={{ marginBottom: 12 }}
-        >
-            <Swipeable
-                friction={2}
-                enabled={!isExpanded} // Prevent swipe when expanded to avoid bugs
-                rightThreshold={80} // increased threshold to prevent accidental deletes
-                renderRightActions={renderRightActions}
-                onSwipeableOpen={(direction) => {
-                    if (direction === 'right') {
-                        onRemove(item.id);
-                        MensHaptics.success();
-                    }
-                }}
-            >
-                <WorkoutExerciseCard
-                    exercise={item}
-                    logs={logs}
-                    completedSets={completedSets}
-                    isExpanded={isExpanded}
-                    onToggleExpand={onToggleExpand}
-                    onLogSet={onLogSet}
-                    onToggleSetComplete={onToggleSetComplete}
-                    onAddSet={onAddSet}
-                    getLastSessionSet={getLastSessionSet}
-                    onReplace={onReplace}
-                    onRemoveSet={onRemoveSet}
-                />
-            </Swipeable>
-        </Animated.View>
-    );
-}, (prev, next) => {
-    // Custom comparator for ultra-performance: only re-render if essential data changes
-    return prev.isExpanded === next.isExpanded &&
-        prev.logs === next.logs &&
-        prev.completedSets === next.completedSets &&
-        prev.item.id === next.item.id;
-});
+// TrainingListItem definition removed (moved to TrainingSessionList.tsx)
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },

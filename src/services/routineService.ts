@@ -114,11 +114,8 @@ export const RoutineService = {
     subscribeToUserRoutines(userId: string, callback: (routines: Routine[]) => void): Unsubscribe {
         // 1. Immediate Cache Return (Disk First)
         const cached = MMKVStorage.getItem<Routine[]>(CACHE_KEYS.USER_ROUTINES(userId));
-        if (cached) {
+        if (cached && Array.isArray(cached)) {
             console.log("[RoutineService] Returning cached routines from MMKV");
-            // Convert string dates back to objects if necessary, though Routines usually use native Firestore timestamps
-            // which might be lost in JSON. For display, we might need a transformer if using toDate().
-            // Ideally we store normalized data. For now, we assume basic structure works.
             callback(cached);
         }
 

@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Edit2, Moon, Play, X } from 'lucide-react-native';
+import { ChevronRight, Edit2, Moon, Play, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useDeleteRoutine } from '../../hooks/useDeleteRoutine';
 import { auth } from '../../services/firebaseConfig';
 import { WorkoutService } from '../../services/workoutService';
 import { COLORS, TYPOGRAPHY } from '../../theme/theme';
@@ -34,6 +35,7 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
     const router = useRouter();
     const [lastSession, setLastSession] = useState<WorkoutSession | null>(null);
     const [loading, setLoading] = useState(false);
+    const deleteMutation = useDeleteRoutine();
 
     // Get today's day of week (Monday=0, Tuesday=1, ..., Sunday=6)
     const jsDay = new Date().getDay();
@@ -143,6 +145,17 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                         </View>
                         <View style={styles.headerActions}>
                             <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={() => {
+                                    if (!routine) return;
+                                    onClose();
+                                    deleteMutation.mutate(routine.id);
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Trash2 size={20} color={COLORS.error} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
                                 style={styles.editButton}
                                 onPress={() => {
                                     onClose();
@@ -177,7 +190,7 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                             {/* Days List - Always show 7 days */}
                             {allDays.map((day) => {
                                 const isToday = day.dayIndex === todayDayIndex;
-                                const exerciseCount = day.exercises.length;
+                                const exerciseCount = Array.isArray(day.exercises) ? day.exercises.length : 0;
 
                                 return (
                                     <TouchableOpacity
@@ -237,7 +250,7 @@ export const RoutinePreviewSheet: React.FC<RoutinePreviewSheetProps> = ({
                                         </View>
 
                                         {/* Preview of exercises */}
-                                        {day.exercises.length > 0 && (
+                                        {Array.isArray(day.exercises) && day.exercises.length > 0 && (
                                             <View style={styles.exercisePreview}>
                                                 {day.exercises.slice(0, 3).map((ex, i) => (
                                                     <Text key={i} style={styles.exercisePreviewText} numberOfLines={1}>
@@ -318,6 +331,14 @@ const styles = StyleSheet.create({
         height: 40,
         borderRadius: 20,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    deleteButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 69, 58, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
     },

@@ -3,6 +3,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../theme/theme';
+import { translateIfKey } from '../../utils/translationHelpers';
 
 interface RoutinePreviewCardProps {
     name: string;
@@ -43,7 +44,7 @@ export const RoutinePreviewCard: React.FC<RoutinePreviewCardProps> = ({
                 </View>
 
                 <Text style={styles.name} numberOfLines={2}>
-                    {name}
+                    {translateIfKey(name, t)}
                 </Text>
             </View>
 

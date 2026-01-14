@@ -11,9 +11,6 @@ import {
 } from "react-native";
 import { Swipeable, TextInput } from "react-native-gesture-handler";
 import Animated, {
-    FadeInDown,
-    FadeOut,
-    LinearTransition,
     useAnimatedStyle,
     useSharedValue,
     withTiming
@@ -140,16 +137,22 @@ const SetRow = memo(({ set, index, isCompleted, isActive, lastSet, exerciseId, o
     }, [exerciseId, set.setIndex, onLogSet]);
 
     const handleToggle = () => {
+        // 1. OPTIMISTIC UPDATE: Update Visuals IMMEDIATELY (0ms delay)
         const next = !localComplete;
         setLocalComplete(next);
 
+        // 2. Feedback
         if (next) {
             MensHaptics.success();
         } else {
             MensHaptics.light();
         }
 
-        onToggleSet(set.setIndex);
+        // 3. Defer Logic: Let the paint finish before hitting the Context/Storage
+        // This prevents the "heavy" logic from blocking the visual toggle
+        requestAnimationFrame(() => {
+            onToggleSet(set.setIndex);
+        });
     };
 
     return (
@@ -220,16 +223,32 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
     exercise, logs, completedSets, isExpanded, onToggleExpand, onLogSet, onToggleSetComplete, onRemoveSet, onAddSet, getLastSessionSet, onReplace, onLongPress,
 }) => {
     const { t } = useTranslation();
+    // Removed InteractionManager delay - render sets immediately for instant feel
+    const isContentReady = true;
 
-    const doneCount = useMemo(() =>
-        logs.filter(s => completedSets.has(`${exercise.id}-${s.setIndex}`)).length
-        , [logs.length, completedSets.size]);
+    // OPTIMISTIC ACTIVE SET: Calculate initial state from props...
+    const [optimisticCompleted, setOptimisticCompleted] = React.useState<Set<string>>(completedSets);
 
-    // Find first incomplete set to highlight as active
-    const activeSetIndex = useMemo(() => {
-        // Returns -1 if all are complete 
-        return logs.findIndex(s => !completedSets.has(`${exercise.id}-${s.setIndex}`));
-    }, [logs, completedSets, exercise.id]);
+    // Sync with props when they eventually update (server confirmed)
+    React.useEffect(() => {
+        setOptimisticCompleted(completedSets);
+    }, [completedSets]);
+
+    // Derived from LOCAL optimistic state (0ms latency for grey highlight)
+    // const activeSetIndex = useMemo(() => {
+    //    return logs.findIndex(s => !optimisticCompleted.has(`${exercise.id}-${s.setIndex}`));
+    // }, [logs, optimisticCompleted, exercise.id]);
+
+    // Handler for immediate local updates from children
+    const handleOptimisticToggle = useCallback((setIndex: number, isComplete: boolean) => {
+        setOptimisticCompleted(prev => {
+            const next = new Set(prev);
+            const key = `${exercise.id}-${setIndex}`;
+            if (isComplete) next.add(key);
+            else next.delete(key);
+            return next;
+        });
+    }, [exercise.id]);
 
     const scale = useSharedValue(1);
 
@@ -251,6 +270,10 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
         borderBottomColor: withTiming(isExpanded ? COLORS.border : 'transparent', { duration: 200 }),
         paddingBottom: withTiming(isExpanded ? 10 : 0, { duration: 200 }),
     }));
+
+    const doneCount = useMemo(() =>
+        logs.filter(s => optimisticCompleted.has(`${exercise.id}-${s.setIndex}`)).length
+        , [logs.length, optimisticCompleted]);
 
     return (
         <Animated.View style={[styles.containerBase, containerStyle]}>
@@ -301,14 +324,17 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                     </Animated.View>
                 </TouchableOpacity>
             </View>
-
-            {/* Native Accordion - Conditional Rendering with LayoutAnimation driving the resize */}
-            {isExpanded && (
-                <Animated.View
-                    style={styles.contentWrapper}
-                    entering={FadeInDown.duration(200)}
-                    exiting={FadeOut.duration(150)}
-                >
+            {/* Native Accordion */}
+            <View
+                style={[
+                    styles.contentWrapper,
+                    {
+                        display: isExpanded ? 'flex' : 'none',
+                        opacity: isExpanded ? 1 : 0,
+                    }
+                ]}
+            >
+                {(isExpanded || isContentReady) && (
                     <View style={styles.contentContainer}>
                         <View style={styles.setsHeader}>
                             <Text style={[styles.colHeader, { width: 40 }]}>{t('train.set')}</Text>
@@ -319,24 +345,29 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                         </View>
 
                         {logs.map((set, index) => (
-                            <Animated.View
+                            <View
                                 key={`${exercise.exerciseId}-${set.setIndex}`}
-                                layout={LinearTransition.springify().damping(15)}
-                                exiting={FadeOut.duration(200)}
-                                style={{ marginVertical: 4 }} // Control spacing here so Swipeable is exact height
+                                style={{ marginVertical: 4 }}
                             >
                                 <SetRow
                                     set={set}
                                     index={index}
-                                    isCompleted={completedSets.has(`${exercise.id}-${set.setIndex}`)}
-                                    isActive={index === activeSetIndex}
+                                    isCompleted={optimisticCompleted.has(`${exercise.id}-${set.setIndex}`)}
+                                    isActive={false} // Feature disabled for performance
                                     lastSet={getLastSessionSet(exercise.id, set.setIndex)}
                                     exerciseId={exercise.id}
                                     onLogSet={onLogSet}
-                                    onToggleSet={(idx: any) => onToggleSetComplete(exercise.id, idx, exercise.restSeconds)}
+                                    onToggleSet={(idx: any) => {
+                                        // 1. Notify Parent Optimistically (Updates Grey Highlight)
+                                        const isNowComplete = !optimisticCompleted.has(`${exercise.id}-${idx}`);
+                                        handleOptimisticToggle(idx, isNowComplete);
+
+                                        // 2. Trigger Real Logic
+                                        onToggleSetComplete(exercise.id, idx, exercise.restSeconds);
+                                    }}
                                     onRemove={(idx: number) => onRemoveSet(exercise.id, idx)}
                                 />
-                            </Animated.View>
+                            </View>
                         ))}
 
                         <TouchableOpacity
@@ -348,8 +379,8 @@ const WorkoutExerciseCardComponent: React.FC<WorkoutExerciseCardProps> = ({
                             <Text style={styles.addSetText}>{t('train.add_set')}</Text>
                         </TouchableOpacity>
                     </View>
-                </Animated.View>
-            )}
+                )}
+            </View>
         </Animated.View>
     );
 };
@@ -430,8 +461,8 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         height: 54,
-        gap: 12,
-        paddingHorizontal: 16, // Plenty of air inside the pill
+        gap: 8, // Reduced from 12
+        paddingHorizontal: 12, // Reduced from 16
         borderRadius: 27, // Perfect pill shape
         marginHorizontal: -8, // Expand backgrounds into the content padding for "floating" look
         overflow: 'hidden',

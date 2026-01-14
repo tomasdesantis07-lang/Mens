@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { InteractionManager } from "react-native";
 import { workoutStorage } from "../storage/mmkv";
 import { Routine, RoutineExercise } from "../types/routine";
 import { WorkoutSetLog } from "../types/workout";
@@ -40,19 +41,30 @@ const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 // Removing useWorkoutTimer and useRestTimer exports from here
 
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
+    // Synchronous initialization from MMKV
+    const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(() => {
+        const saved = workoutStorage.getActiveWorkout();
+        if (saved) console.log('[WorkoutContext] Restored active workout (Sync)');
+        return saved;
+    });
+
     const { setStartTime, startRest, stopRest, isResting } = useWorkoutTimerContext();
     const saveTimeout = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    // Sync Timer Context on mount if workout exists
+    React.useEffect(() => {
+        if (activeWorkout?.startTime) {
+            setStartTime(activeWorkout.startTime);
+        }
+    }, []); // Run once on mount
 
     // Debounced persistence to avoid blocking UI with JSON.stringify on every tap
     const persistState = useCallback((state: ActiveWorkout | null) => {
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = setTimeout(() => {
-            if (state) {
+            InteractionManager.runAfterInteractions(() => {
                 workoutStorage.saveActiveWorkout(state);
-            } else {
-                workoutStorage.clearActiveWorkout();
-            }
+            });
         }, 300); // 300ms debounce
     }, []);
 

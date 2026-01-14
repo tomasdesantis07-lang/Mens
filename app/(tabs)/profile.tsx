@@ -1,10 +1,9 @@
-import { useFocusEffect } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { Award, Dumbbell, Plus, Settings, Trophy } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import { Award, Dumbbell, Plus, Trophy } from 'lucide-react-native';
+import React, { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
@@ -36,39 +35,26 @@ type UserData = {
   photoURL?: string;
 };
 
-// ...
-
 const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const { routines: userRoutines } = useRoutines(); // Hook usage
-  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
-
-  // Reload routines when screen is focused (after editing)
-  useFocusEffect(
-    useCallback(() => {
-      loadUserData();
-    }, [])
-  );
-
-  const loadUserData = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
+  const { data: userData = null } = useQuery({
+    queryKey: ['user', auth.currentUser?.uid],
+    queryFn: async () => {
+      const user = auth.currentUser;
+      if (!user) return null;
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        setUserData(userDoc.data() as UserData);
-      }
-      // Routines fetched via hook
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
-  };
+      return userDoc.exists() ? (userDoc.data() as UserData) : null;
+    },
+    enabled: !!auth.currentUser,
+    initialData: auth.currentUser?.uid === 'guest' ? null : undefined,
+  });
+
+  const { routines: userRoutines } = useRoutines();
+  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
 
   const handleSignOut = async () => {
     try {
@@ -107,21 +93,7 @@ const ProfileScreen: React.FC = () => {
   return (
     <>
       <View style={styles.container}>
-        {/* App Bar */}
-        <BlurView
-          intensity={95}
-          tint="dark"
-          style={[styles.appBar, { paddingTop: insets.top + 12 }]}
-        >
-          <Text style={styles.appBarTitle}>{t('profile.title')}</Text>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => router.push('/settings' as any)}
-            activeOpacity={0.7}
-          >
-            <Settings size={24} color={COLORS.textPrimary} strokeWidth={2} />
-          </TouchableOpacity>
-        </BlurView>
+        {/* App Bar moved to layout */}
 
         <ScrollView
           style={styles.scrollView}
@@ -154,7 +126,7 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>{t('profile.my_routines')}</Text>
 
             <View style={styles.routinesGrid}>
-              {userRoutines.map((routine, index) => (
+              {(userRoutines || []).map((routine, index) => (
                 <AnimatedPopIn key={routine.id} index={index} delay={150} style={styles.routineItem}>
                   <RoutinePreviewCard
                     name={routine.name}
@@ -214,35 +186,12 @@ const ProfileScreen: React.FC = () => {
   );
 };
 
-export default ProfileScreen;
+export default memo(ProfileScreen);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  appBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: 'rgba(10, 10, 15, 0.4)',
-  },
-  appBarTitle: {
-    fontSize: 20,
-    fontFamily: FONT_FAMILY.bold,
-    color: COLORS.textPrimary,
-  },
-  menuButton: {
-    padding: 8,
   },
   scrollView: {
     flex: 1,

@@ -69,10 +69,26 @@ const RecentWorkoutItem = memo(({
     const duration = useMemo(() => formatDuration(getDurationMinutes(workout)), [workout]);
     const exerciseCount = workout.exercises.length;
 
-    // Memoize date formatting
+    // Memoize date formatting - safely handles Firestore Timestamps and cached JSON
     const formattedDate = useMemo(() => {
         const timestamp = workout.performedAt;
-        const date = timestamp.toDate();
+        if (!timestamp) return '';
+
+        // Handle both Firestore Timestamp (.toDate()) and cached JSON (._seconds or direct Date)
+        let date: Date;
+        if (typeof timestamp.toDate === 'function') {
+            date = timestamp.toDate();
+        } else if (timestamp._seconds) {
+            // Firestore Timestamp serialized to JSON has _seconds and _nanoseconds
+            date = new Date(timestamp._seconds * 1000);
+        } else if (timestamp.seconds) {
+            // Alternative format
+            date = new Date(timestamp.seconds * 1000);
+        } else {
+            // Assume it's already a Date-like or timestamp number
+            date = new Date(timestamp);
+        }
+
         const now = new Date();
         const diffTime = now.getTime() - date.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));

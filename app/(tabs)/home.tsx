@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Dimensions,
-  InteractionManager,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,11 +26,9 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   AnimatedCard,
-  AnimatedHeader,
   AnimatedSection,
-  AnimatedSlideIn,
+  AnimatedSlideIn
 } from "../../src/components/common/Animations";
-import { SectionAppBar } from "../../src/components/common/SectionAppBar";
 import { CalorieResultsModal } from "../../src/components/home/CalorieResultsModal";
 import { RecentWorkouts } from "../../src/components/home/RecentWorkouts";
 import { DaySelectorSheet } from "../../src/components/specific/DaySelectorSheet";
@@ -127,21 +124,28 @@ const HomeScreen: React.FC = () => {
     }
 
     try {
-      const userRef = doc(db, "users", user.uid);
+      // Create a timeout promise that resolves (not rejects, to show UI) after 4 seconds
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 4000));
 
-      // Parallelize independent requests
-      const [userSnap, community, workout] = await Promise.all([
-        getDoc(userRef),
-        RoutineService.getCommunityRoutines(),
-        WorkoutService.getWorkoutForToday(user.uid)
-      ]);
+      const dataPromise = (async () => {
+        const userRef = doc(db, "users", user.uid);
+        // Parallelize independent requests
+        const [userSnap, community, workout] = await Promise.all([
+          getDoc(userRef),
+          RoutineService.getCommunityRoutines(),
+          WorkoutService.getWorkoutForToday(user.uid)
+        ]);
 
-      if (userSnap.exists()) {
-        setUserData(userSnap.data() as UserData);
-      }
+        if (userSnap.exists()) {
+          setUserData(userSnap.data() as UserData);
+        }
 
-      setCommunityRoutines(community);
-      setNextWorkout(workout);
+        setCommunityRoutines(community);
+        setNextWorkout(workout);
+      })();
+
+      // Race data loading against timeout
+      await Promise.race([dataPromise, timeoutPromise]);
 
     } catch (e) {
       console.log("Error loading data", e);
@@ -158,16 +162,11 @@ const HomeScreen: React.FC = () => {
       setShowFloatingButton(true);
       expandAnimation.value = 1;
 
-      // Defer data loading to keep navigation smooth
-      const interaction = InteractionManager.runAfterInteractions(() => {
-        loadData();
-      });
-
-      // NO TIMER: Buttons stay expanded indefinitely as requested
-      // const timer = setTimeout(...) REMOVED
+      // Load data immediately to prevent stalls if interaction manager hangs
+      loadData();
 
       return () => {
-        interaction.cancel();
+        // Cleanup if needed
       };
     }, [loadData])
   );
@@ -351,8 +350,13 @@ const HomeScreen: React.FC = () => {
       if (routine) {
         MensHaptics.heavy();
         setShowFloatingButton(false);
-        startWorkout(routine, nextWorkout.dayIndex);
-        router.push(`/routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}` as any);
+        // Navigate immediately for instant feedback
+        const now = Date.now();
+        router.push(`/routines/${nextWorkout.routineId}/train?dayIndex=${nextWorkout.dayIndex}&startTime=${now}` as any);
+        // Defer heavy context update to avoid blocking navigation animation
+        requestAnimationFrame(() => {
+          startWorkout(routine, nextWorkout.dayIndex);
+        });
       }
     }
   }, [nextWorkout, userRoutines, startWorkout, router]);
@@ -363,8 +367,9 @@ const HomeScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-        <ActivityIndicator color={COLORS.primary} />
+      <View style={[styles.container, { paddingTop: insets.top + 20, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ color: COLORS.textSecondary, marginTop: 12, fontSize: 12 }}>Cargando...</Text>
       </View>
     );
   }
@@ -380,8 +385,6 @@ const HomeScreen: React.FC = () => {
   return (
     <>
       <View style={styles.container}>
-        {/* App Bar */}
-        <SectionAppBar title="MENS" />
 
         <ScrollView
           style={styles.scrollView}
@@ -390,13 +393,11 @@ const HomeScreen: React.FC = () => {
             { paddingTop: 80 + insets.top, paddingBottom: tabBarInset },
           ]}
         >
-          {/* Animated Header */}
-          <AnimatedHeader>
-            <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
-          </AnimatedHeader>
+          {/* Greeting */}
+          <Text style={styles.greeting}>{t('home.greeting', { name: displayName })}</Text>
 
           {/* No Routine Reminder Card */}
-          {userRoutines.length === 0 && !hasActiveWorkout && (
+          {(userRoutines?.length === 0 || !Array.isArray(userRoutines)) && !hasActiveWorkout && (
             <AnimatedSection delay={50} style={styles.heroSection}>
               <TouchableOpacity
                 style={styles.noRoutineCard}
@@ -715,7 +716,7 @@ const HomeScreen: React.FC = () => {
   );
 };
 
-export default HomeScreen;
+export default React.memo(HomeScreen);
 
 const styles = StyleSheet.create({
   container: {

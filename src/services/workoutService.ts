@@ -47,30 +47,37 @@ export const WorkoutService = {
 
             console.log("Workout session created successfully with ID:", docRef.id);
 
-            // Fire-and-forget: Update analytics INCREMENTALLY (non-blocking, O(1))
-            // We create the session object with a client-side timestamp for analytics
-            import("./analyticsService")
-                .then(({ AnalyticsService }) => {
-                    const { Timestamp } = require("firebase/firestore");
-                    const sessionWithTimestamp = {
-                        ...session,
-                        id: docRef.id,
-                        performedAt: Timestamp.now(), // Use client timestamp for immediate analytics
-                    };
-                    console.log("[WorkoutService] Triggering incremental analytics update...");
-                    AnalyticsService.updateFromSession(session.userId, sessionWithTimestamp).catch(err => {
-                        console.warn("[WorkoutService] Analytics update failed:", err);
-                    });
-                })
-                .catch(err => {
-                    console.error("[WorkoutService] Failed to import analyticsService:", err);
-                });
+            // Fire-and-forget analytics
+            import("./analyticsService").then(({ AnalyticsService }) => {
+                const { Timestamp } = require("firebase/firestore");
+                AnalyticsService.updateFromSession(session.userId, {
+                    ...session,
+                    id: docRef.id,
+                    performedAt: Timestamp.now(),
+                } as any).catch(err => console.warn("Analytics failed:", err));
+            }).catch(() => { });
 
             return docRef.id;
         } catch (error) {
             console.error("Error creating workout session:", error);
-            console.error("Error details:", JSON.stringify(error, null, 2));
             throw error;
+        }
+    },
+
+    /**
+     * Cache a session locally in MMKV for instant UI feedback
+     */
+    saveLocalSession(userId: string, session: any) {
+        try {
+            const key = CACHE_KEYS.RECENT_SESSIONS(userId);
+            const cached = MMKVStorage.getItem<WorkoutSession[]>(key) || [];
+
+            // Add to the beginning and limit to 10
+            const updated = [session, ...cached].slice(0, 10);
+            MMKVStorage.setItem(key, updated);
+            console.log("[WorkoutService] Session cached locally for instant UI");
+        } catch (error) {
+            console.error("[WorkoutService] Error caching session locally:", error);
         }
     },
 

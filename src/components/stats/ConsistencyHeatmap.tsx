@@ -97,7 +97,7 @@ export const ConsistencyHeatmap: React.FC<ConsistencyHeatmapProps> = ({ data, mu
         });
     };
 
-    const dayLabels = t('stats.day_initials', { returnObjects: true }) as string[];
+    const dayLabels = (t('stats.day_initials', { returnObjects: true }) as string[]) || ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
     return (
         <View style={styles.container}>
